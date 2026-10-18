@@ -1,0 +1,21 @@
+node_modules
+.next
+out
+*.tsbuildinfo
+next-env.d.ts
+.vercel
+
+# Rahasia — jangan pernah di-commit (hanya .env.example yang boleh)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Dokumen sumber internal (buku panduan) — tidak untuk repo publik
+*.pdf
+
+# Lain-lain
+.DS_Store
+Thumbs.db
+*.log

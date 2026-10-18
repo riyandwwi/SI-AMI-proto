@@ -1,0 +1,1118 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Prototype UI — Sistem AMI Berbasis AI Kampus ITBMP</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    :root {
+      --background: #0f172a;
+      --foreground: #f8fafc;
+      --card: #1e293b;
+      --border: #334155;
+      --muted-foreground: #94a3b8;
+      --secondary: #334155;
+    }
+  </style>
+</head>
+<body class="bg-[var(--background)] text-[var(--foreground)] antialiased min-h-screen font-sans">
+  <!-- TOP ROLE SWITCHER BAR (SIMULATION BAR) -->
+  <div class="sticky top-0 z-40 bg-[var(--card)] border-b border-[var(--border)] px-4 py-2.5 shadow-sm">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-2.5">
+        <div class="w-8 h-8 rounded-lg bg-blue-600 text-white font-bold flex items-center justify-center text-sm">
+          AMI
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="font-bold text-sm tracking-tight">SI-AMI AI Kampus ITBMP</span>
+            <span class="text-xs px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 font-medium border border-blue-500/30">
+              Interactive GUI Prototype
+            </span>
+          </div>
+          <p class="text-xs text-[var(--muted-foreground)]">
+            Klik tombol peran di samping untuk mencoba tampilan tiap akun secara langsung
+          </p>
+        </div>
+      </div>
+
+      <!-- 5 Role Switcher Buttons -->
+      <div class="flex flex-wrap items-center gap-1.5" id="roleSwitcher">
+        <button onclick="switchRole('SUPER_ADMIN')" id="btn-role-SUPER_ADMIN" class="role-btn px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all">
+          1. Super Admin
+        </button>
+        <button onclick="switchRole('LPM')" id="btn-role-LPM" class="role-btn px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all">
+          2. LPM (Pengendali Sesi)
+        </button>
+        <button onclick="switchRole('AUDITEE')" id="btn-role-AUDITEE" class="role-btn px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all">
+          3. Auditee (Prodi/Unit)
+        </button>
+        <button onclick="switchRole('AUDITOR')" id="btn-role-AUDITOR" class="role-btn px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all">
+          4. Auditor Internal
+        </button>
+        <button onclick="switchRole('PIMPINAN')" id="btn-role-PIMPINAN" class="role-btn px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all">
+          5. Pimpinan (Rektorat)
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACTIVE USER HEADER & GLOBAL SESSION STATUS BANNER -->
+  <div class="max-w-7xl mx-auto px-4 pt-4">
+    <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-sm">
+      <div class="flex items-center gap-3">
+        <div id="activeRoleBadge" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-600 text-white">
+          LPM
+        </div>
+        <div>
+          <h1 id="activeUserTitle" class="text-base font-bold">Kepala LPM ITBMP (Koordinator AMI)</h1>
+          <p id="activeUserDesc" class="text-xs text-[var(--muted-foreground)]">
+            Mengelola indikator SPMI, mengunci sumber data (Source-Lock), mengatur sesi/cut-off, dan menyusun jadwal berbantuan AI.
+          </p>
+        </div>
+      </div>
+
+      <!-- Status Sesi & Self-Service Password Button -->
+      <div class="flex flex-wrap items-center gap-3">
+        <div class="px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--background)] flex items-center gap-2">
+          <span class="text-xs text-[var(--muted-foreground)]">Sesi Aktif:</span>
+          <span id="globalSessionBadge" class="text-xs font-bold text-emerald-400">2. Pengisian Bukti Auditee (Buka)</span>
+          <span id="globalSourceLockBadge" class="text-xs px-2 py-0.5 rounded bg-amber-500/15 text-amber-400 font-semibold border border-amber-500/30">
+            🔒 Source-Locked
+          </span>
+        </div>
+        <button onclick="openModal('modalSelfPassword')" class="px-3 py-1.5 rounded-lg text-xs font-medium border border-[var(--border)] hover:bg-[var(--secondary)] transition">
+          🔑 Ganti Password Saya
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN CONTENT CONTAINER -->
+  <main class="max-w-7xl mx-auto px-4 py-5 space-y-6">
+
+    <!-- VIEW 1: SUPER ADMIN -->
+    <section id="view-SUPER_ADMIN" class="role-view hidden space-y-5">
+      <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-5 shadow-sm">
+        <div class="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-[var(--border)]">
+          <div>
+            <h2 class="text-base font-bold">Manajemen Akun Pengguna (Tanpa OTP / Langsung Aktif)</h2>
+            <p class="text-xs text-[var(--muted-foreground)]">
+              Super Admin hanya bertugas membuat akun, melihat username &amp; password jika user lupa, serta mereset password akun.
+            </p>
+          </div>
+          <button onclick="openModal('modalAddUser')" class="px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition">
+            + Tambah Akun Baru
+          </button>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-3 my-4">
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-medium text-[var(--muted-foreground)]">Filter Role:</span>
+            <select id="filterUserRole" onchange="renderUsersTable()" class="bg-[var(--background)] border border-[var(--border)] rounded-lg px-2.5 py-1.5 text-xs">
+              <option value="ALL">Semua Role (5 Role)</option>
+              <option value="SUPER_ADMIN">Super Admin</option>
+              <option value="LPM">LPM</option>
+              <option value="AUDITOR">Auditor</option>
+              <option value="AUDITEE">Auditee (Prodi/Unit)</option>
+              <option value="PIMPINAN">Pimpinan</option>
+            </select>
+          </div>
+          <div class="text-xs text-[var(--muted-foreground)]">
+            💡 Klik ikon <strong>👁️ Intip</strong> untuk melihat password asli user, atau <strong>✏️ Ubah Password</strong> untuk mengganti langsung.
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="border-b border-[var(--border)] text-[var(--muted-foreground)]">
+                <th class="py-2.5 px-3 font-semibold">Nama Lengkap / Jabatan</th>
+                <th class="py-2.5 px-3 font-semibold">Role</th>
+                <th class="py-2.5 px-3 font-semibold">Unit / Homebase ITBMP</th>
+                <th class="py-2.5 px-3 font-semibold">Username</th>
+                <th class="py-2.5 px-3 font-semibold">Password Saat Ini</th>
+                <th class="py-2.5 px-3 font-semibold text-right">Aksi Super Admin</th>
+              </tr>
+            </thead>
+            <tbody id="userTableBody" class="divide-y divide-[var(--border)]"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 2: LPM -->
+    <section id="view-LPM" class="role-view space-y-5">
+      <div class="flex flex-wrap gap-2 border-b border-[var(--border)] pb-3">
+        <button onclick="switchLpmTab('sesi')" id="lpm-tab-btn-sesi" class="lpm-tab-btn px-3.5 py-2 rounded-lg text-xs font-semibold bg-blue-600 text-white">
+          🎛️ 1. Kontrol Sesi &amp; Lock Tahapan
+        </button>
+        <button onclick="switchLpmTab('indikator')" id="lpm-tab-btn-indikator" class="lpm-tab-btn px-3.5 py-2 rounded-lg text-xs font-semibold border border-[var(--border)]">
+          📋 2. Master Indikator SPMI &amp; Source-Lock
+        </button>
+        <button onclick="switchLpmTab('ai_jadwal')" id="lpm-tab-btn-ai_jadwal" class="lpm-tab-btn px-3.5 py-2 rounded-lg text-xs font-semibold border border-[var(--border)]">
+          🤖 3. AI Plotting Tim, CoI &amp; Jadwal AMI
+        </button>
+      </div>
+
+      <!-- LPM TAB 1 -->
+      <div id="lpm-tab-sesi" class="lpm-tab-content bg-[var(--card)] border border-[var(--border)] rounded-xl p-5 shadow-sm space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 class="text-base font-bold">Pengendali Sesi Siklus AMI (Stage-Gate Controller)</h2>
+            <p class="text-xs text-[var(--muted-foreground)]">
+              Siklus Aktif: <strong>AMI Tahun Akademik 2026/2027 Ganjil — Kampus ITBMP</strong>. LPM dapat membuka/mengunci sesi kapan saja.
+            </p>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-[var(--muted-foreground)]">Status Source-Lock Indikator:</span>
+            <button onclick="toggleSourceLock()" id="btnToggleSourceLock" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/40">
+              🔒 Terkunci (Klik untuk Buka Kunci)
+            </button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2" id="sessionStageCards"></div>
+
+        <div class="p-3.5 rounded-lg bg-blue-500/10 border border-blue-500/30 text-xs space-y-1">
+          <div class="font-semibold text-blue-400">💡 Efek Penguncian Sesi (Real-Time ke Role Lain):</div>
+          <p class="text-[var(--muted-foreground)]">
+            Saat LPM memindahkan sesi dari <strong>"2. Pengisian Bukti Auditee"</strong> ke <strong>"3. Audit Dokumen (Cut-off)"</strong>, maka kolom input Link Google Drive pada halaman <strong>Auditee</strong> otomatis terkunci (tidak bisa diedit lagi) dan meja penilaian <strong>Auditor</strong> terbuka.
+          </p>
+        </div>
+      </div>
+
+      <!-- LPM TAB 2 -->
+      <div id="lpm-tab-indikator" class="lpm-tab-content hidden bg-[var(--card)] border border-[var(--border)] rounded-xl p-5 shadow-sm space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[var(--border)]">
+          <div>
+            <h2 class="text-base font-bold">Daftar Standar &amp; Indikator Mutu SPMI ITBMP</h2>
+            <p class="text-xs text-[var(--muted-foreground)]">
+              Hanya LPM yang berwenang menambah/mengubah indikator sebelum dikunci (<em>Source-Lock</em>).
+            </p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="openModal('modalAddIndikator')" id="btnAddIndikator" class="px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition">
+              + Tambah Indikator SPMI
+            </button>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="border-b border-[var(--border)] text-[var(--muted-foreground)]">
+                <th class="py-2.5 px-3 font-semibold w-24">Kode</th>
+                <th class="py-2.5 px-3 font-semibold w-44">Standar SPMI</th>
+                <th class="py-2.5 px-3 font-semibold">Pernyataan Indikator &amp; Bukti yang Diminta</th>
+                <th class="py-2.5 px-3 font-semibold w-28">Target</th>
+                <th class="py-2.5 px-3 font-semibold w-28 text-right">Status Kunci</th>
+              </tr>
+            </thead>
+            <tbody id="lpmIndikatorTableBody" class="divide-y divide-[var(--border)]"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- LPM TAB 3 -->
+      <div id="lpm-tab-ai_jadwal" class="lpm-tab-content hidden bg-[var(--card)] border border-[var(--border)] rounded-xl p-5 shadow-sm space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[var(--border)]">
+          <div>
+            <h2 class="text-base font-bold">Penyusunan Tim Auditor &amp; Jadwal AMI dengan AI (Prinsip Buku Panduan)</h2>
+            <p class="text-xs text-[var(--muted-foreground)]">
+              Menerapkan 4 Prinsip: <strong>Source-Lock</strong>, <strong>Bebas Conflict of Interest (CoI)</strong>, <strong>Team Continuity (Tim Dokumen = Tim Lapangan)</strong>, dan <strong>Human Approval</strong>.
+            </p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <button onclick="runAiScheduleGenerator()" class="px-3.5 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold transition">
+              ✨ Generate Usulan AI &amp; Cek CoI
+            </button>
+            <button onclick="approveAiSchedule()" id="btnApproveSchedule" class="px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition">
+              ✅ Sahkan Jadwal (Human Approval)
+            </button>
+          </div>
+        </div>
+
+        <div id="aiQcBanner" class="p-3.5 rounded-lg bg-purple-500/10 border border-purple-500/30 text-xs space-y-1.5">
+          <div class="font-bold text-purple-400 flex items-center justify-between">
+            <span>🤖 Hasil AI Quality Control &amp; Cross-Check Konsistensi:</span>
+            <span id="scheduleApprovalStatus" class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400">Draft Usulan AI (Menunggu Pengesahan LPM)</span>
+          </div>
+          <ul class="list-disc list-inside text-[var(--muted-foreground)] space-y-0.5">
+            <li><strong>Cek Conflict of Interest (CoI):</strong> <span class="text-emerald-400 font-semibold">Aman (0 Konflik)</span> — Tidak ada auditor yang ditugaskan mengaudit prodi/unit asalnya sendiri.</li>
+            <li><strong>Team Continuity:</strong> <span class="text-emerald-400 font-semibold">100% Sinkron</span> — Tim Audit Dokumen otomatis dikunci menjadi Tim Audit Lapangan pada unit yang sama.</li>
+            <li><strong>Keseimbangan Beban (Workload Balancing):</strong> Rata-rata 1–2 Auditee per Tim Auditor, tidak ada jadwal visitasi yang bertabrakan.</li>
+            <li><strong>Deteksi Data Kosong (Source-Lock Rule):</strong> Unit <em>UPT Perpustakaan</em> belum memiliki tanggal visitasi tetap $\rightarrow$ ditandai <code>Perlu verifikasi manual</code> (AI tidak mengarang tanggal).</li>
+          </ul>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="border-b border-[var(--border)] text-[var(--muted-foreground)]">
+                <th class="py-2.5 px-3 font-semibold">Unit Auditee ITBMP</th>
+                <th class="py-2.5 px-3 font-semibold">Ketua &amp; Anggota Auditor</th>
+                <th class="py-2.5 px-3 font-semibold">Validasi CoI (Homebase)</th>
+                <th class="py-2.5 px-3 font-semibold">Jadwal Audit Dokumen</th>
+                <th class="py-2.5 px-3 font-semibold">Jadwal Audit Lapangan</th>
+                <th class="py-2.5 px-3 font-semibold">Kontinuitas Tim</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-[var(--border)]">
+              <tr>
+                <td class="py-3 px-3 font-semibold">Prodi S1 Teknik Informatika</td>
+                <td class="py-3 px-3">
+                  <div>Ketua: <strong>Dr. Hendra Wijaya</strong></div>
+                  <div class="text-[var(--muted-foreground)]">Anggota: Siti Aminah, M.Kom</div>
+                </td>
+                <td class="py-3 px-3"><span class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-medium">✅ Bebas CoI (Asal: Manajemen)</span></td>
+                <td class="py-3 px-3">20–24 Okt 2026</td>
+                <td class="py-3 px-3">28 Okt 2026 (09:00 - 12:00)</td>
+                <td class="py-3 px-3"><span class="px-2 py-0.5 rounded bg-blue-500/15 text-blue-400 font-medium">🔗 Tim Sama</span></td>
+              </tr>
+              <tr>
+                <td class="py-3 px-3 font-semibold">Prodi S1 Sistem Informasi</td>
+                <td class="py-3 px-3">
+                  <div>Ketua: <strong>Dr. Budi Santoso</strong></div>
+                  <div class="text-[var(--muted-foreground)]">Anggota: Rina Kartika, M.T</div>
+                </td>
+                <td class="py-3 px-3"><span class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-medium">✅ Bebas CoI (Asal: Teknik Sipil)</span></td>
+                <td class="py-3 px-3">20–24 Okt 2026</td>
+                <td class="py-3 px-3">29 Okt 2026 (09:00 - 12:00)</td>
+                <td class="py-3 px-3"><span class="px-2 py-0.5 rounded bg-blue-500/15 text-blue-400 font-medium">🔗 Tim Sama</span></td>
+              </tr>
+              <tr>
+                <td class="py-3 px-3 font-semibold">UPT Perpustakaan ITBMP</td>
+                <td class="py-3 px-3">
+                  <div>Ketua: <strong>Siti Aminah, M.Kom</strong></div>
+                  <div class="text-[var(--muted-foreground)]">Anggota: Dr. Hendra Wijaya</div>
+                </td>
+                <td class="py-3 px-3"><span class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-medium">✅ Bebas CoI (Asal: Akuntansi)</span></td>
+                <td class="py-3 px-3">20–24 Okt 2026</td>
+                <td class="py-3 px-3"><span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 font-semibold">⚠️ Perlu verifikasi manual</span></td>
+                <td class="py-3 px-3"><span class="px-2 py-0.5 rounded bg-blue-500/15 text-blue-400 font-medium">🔗 Tim Sama</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 3: AUDITEE -->
+    <section id="view-AUDITEE" class="role-view hidden space-y-5">
+      <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-5 shadow-sm space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[var(--border)]">
+          <div>
+            <h2 class="text-base font-bold">Portal Evaluasi Diri &amp; Unggah Tautan Bukti (Auditee: Prodi S1 Teknik Informatika)</h2>
+            <p class="text-xs text-[var(--muted-foreground)]">
+              Seluruh dokumen bukti disimpan di <strong>Google Drive Resmi Kampus ITBMP</strong>. Tempelkan tautan (link) folder/file Drive pada setiap indikator di bawah ini.
+            </p>
+          </div>
+          <div id="auditeeCutOffStatusBanner" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+            🟢 Sesi Pengisian Bukti Terbuka (Sebelum Cut-Off)
+          </div>
+        </div>
+        <div id="auditeeIndikatorList" class="space-y-4"></div>
+      </div>
+    </section>
+
+    <!-- VIEW 4: AUDITOR -->
+    <section id="view-AUDITOR" class="role-view hidden space-y-5">
+      <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-5 shadow-sm space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[var(--border)]">
+          <div>
+            <h2 class="text-base font-bold">Meja Kerja Auditor Internal — Auditee: Prodi S1 Teknik Informatika</h2>
+            <p class="text-xs text-[var(--muted-foreground)]">
+              Tim Auditor: <strong>Dr. Hendra Wijaya (Ketua)</strong> &amp; <strong>Siti Aminah, M.Kom (Anggota)</strong> • Kontinuitas Tim: <span class="text-blue-400 font-semibold">Audit Dokumen &amp; Audit Lapangan Terintegrasi</span>
+            </p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="switchAuditorMode('DESK')" id="auditor-mode-DESK" class="px-3.5 py-2 rounded-lg text-xs font-semibold bg-blue-600 text-white">
+              📄 1. Audit Dokumen (Cek Link Drive)
+            </button>
+            <button onclick="switchAuditorMode('FIELD')" id="auditor-mode-FIELD" class="px-3.5 py-2 rounded-lg text-xs font-semibold border border-[var(--border)]">
+              🏛️ 2. Audit Lapangan &amp; Temuan (KTS/OB)
+            </button>
+          </div>
+        </div>
+
+        <div class="p-3 rounded-lg bg-blue-500/10 border border-blue-500/30 text-xs flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <strong>🔄 Prinsip One Workflow (Bab 8 Buku Panduan):</strong> Indikator yang ditandai <em>"Perlu Klarifikasi Lapangan"</em> saat Audit Dokumen akan otomatis menjadi <strong>Daftar Fokus Pertanyaan Audit Lapangan</strong>.
+          </div>
+          <span class="px-2.5 py-1 rounded bg-[var(--card)] border border-[var(--border)] font-semibold" id="auditorSyncCounter">
+            Fokus Lapangan: 1 Indikator
+          </span>
+        </div>
+
+        <div id="auditorWorkspaceList" class="space-y-4"></div>
+      </div>
+    </section>
+
+    <!-- VIEW 5: PIMPINAN -->
+    <section id="view-PIMPINAN" class="role-view hidden space-y-5">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 shadow-sm">
+          <div class="text-xs text-[var(--muted-foreground)]">Total Unit Auditee ITBMP</div>
+          <div class="text-2xl font-bold mt-1">12 Unit</div>
+          <div class="text-xs text-emerald-400 mt-1">100% Terpetakan (0 Terlewat)</div>
+        </div>
+        <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 shadow-sm">
+          <div class="text-xs text-[var(--muted-foreground)]">Rata-rata Pemenuhan Standar</div>
+          <div class="text-2xl font-bold mt-1 text-blue-400">86,4%</div>
+          <div class="text-xs text-[var(--muted-foreground)] mt-1">Siklus AMI 2026/2027 Ganjil</div>
+        </div>
+        <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 shadow-sm">
+          <div class="text-xs text-[var(--muted-foreground)]">Temuan KTS (Mayor / Minor)</div>
+          <div class="text-2xl font-bold mt-1 text-amber-400">1 Mayor / 3 Minor</div>
+          <div class="text-xs text-[var(--muted-foreground)] mt-1">+ 4 Observasi (OB)</div>
+        </div>
+        <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 shadow-sm">
+          <div class="text-xs text-[var(--muted-foreground)]">Status Pengesahan Pimpinan</div>
+          <div class="text-lg font-bold mt-1" id="pimpinanApprovalCardText">Menunggu Pengesahan</div>
+          <div class="text-xs text-[var(--muted-foreground)] mt-1">Prinsip Human-in-the-Loop</div>
+        </div>
+      </div>
+
+      <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-5 shadow-sm space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[var(--border)]">
+          <div>
+            <h2 class="text-base font-bold">Rekapitulasi Hasil Audit Mutu Internal &amp; Lembar Pengesahan Pimpinan ITBMP</h2>
+            <p class="text-xs text-[var(--muted-foreground)]">
+              Pimpinan memantau ketercapaian standar, temuan KTS/OB, progres Rencana Tindak Lanjut (RTL), dan mengesahkan laporan AMI.
+            </p>
+          </div>
+          <button onclick="sahkanLaporanPimpinan()" id="btnPimpinanSahkan" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition">
+            ✍️ Sahkan Laporan AMI Institusi
+          </button>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="border-b border-[var(--border)] text-[var(--muted-foreground)]">
+                <th class="py-2.5 px-3 font-semibold">Unit / Program Studi ITBMP</th>
+                <th class="py-2.5 px-3 font-semibold">Tim Auditor</th>
+                <th class="py-2.5 px-3 font-semibold">Keterisian Link Drive</th>
+                <th class="py-2.5 px-3 font-semibold">Hasil Klasifikasi Temuan</th>
+                <th class="py-2.5 px-3 font-semibold">Status Tindak Lanjut (RTL)</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-[var(--border)]">
+              <tr>
+                <td class="py-3 px-3 font-semibold">Prodi S1 Teknik Informatika</td>
+                <td class="py-3 px-3">Dr. Hendra Wijaya &amp; Siti Aminah</td>
+                <td class="py-3 px-3"><span class="text-emerald-400 font-semibold">100% Lengkap</span></td>
+                <td class="py-3 px-3">2 Mencapai, 1 Observasi (OB), 1 KTS Minor</td>
+                <td class="py-3 px-3"><span class="px-2 py-0.5 rounded bg-blue-500/15 text-blue-400">Dalam Proses Perbaikan</span></td>
+              </tr>
+              <tr>
+                <td class="py-3 px-3 font-semibold">Prodi S1 Sistem Informasi</td>
+                <td class="py-3 px-3">Dr. Budi Santoso &amp; Rina Kartika</td>
+                <td class="py-3 px-3"><span class="text-emerald-400 font-semibold">100% Lengkap</span></td>
+                <td class="py-3 px-3">3 Mencapai, 1 Melampaui Standar</td>
+                <td class="py-3 px-3"><span class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400">Closed / Terverifikasi</span></td>
+              </tr>
+              <tr>
+                <td class="py-3 px-3 font-semibold">UPT Perpustakaan ITBMP</td>
+                <td class="py-3 px-3">Siti Aminah &amp; Dr. Hendra Wijaya</td>
+                <td class="py-3 px-3"><span class="text-amber-400 font-semibold">75% Terisi</span></td>
+                <td class="py-3 px-3">2 Mencapai, 1 KTS Mayor</td>
+                <td class="py-3 px-3"><span class="px-2 py-0.5 rounded bg-amber-500/15 text-amber-400">Menunggu Upload Bukti RTL</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MODALS -->
+  <div id="modalAddUser" class="fixed inset-0 z-50 hidden bg-black/60 flex items-center justify-center p-4">
+    <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl max-w-md w-full p-5 space-y-4 shadow-xl">
+      <div class="flex items-center justify-between border-b border-[var(--border)] pb-3">
+        <h3 class="font-bold text-sm">Tambah Akun Pengguna Baru (Tanpa OTP)</h3>
+        <button onclick="closeModal('modalAddUser')" class="text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)]">✕ Tutup</button>
+      </div>
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block font-semibold mb-1">Nama Lengkap &amp; Gelar</label>
+          <input id="newUserName" type="text" placeholder="Contoh: Dosen Baru, M.Kom" class="w-full px-3 py-2 rounded-lg bg-[var(--background)] border border-[var(--border)]" />
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold mb-1">Pilih Role</label>
+            <select id="newUserRole" class="w-full px-3 py-2 rounded-lg bg-[var(--background)] border border-[var(--border)]">
+              <option value="AUDITOR">Auditor</option>
+              <option value="AUDITEE">Auditee (Prodi/Unit)</option>
+              <option value="LPM">LPM</option>
+              <option value="PIMPINAN">Pimpinan</option>
+              <option value="SUPER_ADMIN">Super Admin</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-semibold mb-1">Unit / Homebase ITBMP</label>
+            <input id="newUserUnit" type="text" placeholder="Prodi / Biro / LPM" class="w-full px-3 py-2 rounded-lg bg-[var(--background)] border border-[var(--border)]" />
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold mb-1">Username Login</label>
+            <input id="newUserUsername" type="text" placeholder="username_itbmp" class="w-full px-3 py-2 rounded-lg bg-[var(--background)] border border-[var(--border)]" />
+          </div>
+          <div>
+            <label class="block font-semibold mb-1">Password Awal</label>
+            <input id="newUserPassword" type="text" placeholder="itbmp2026" class="w-full px-3 py-2 rounded-lg bg-[var(--background)] border border-[var(--border)]" />
+          </div>
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button onclick="closeModal('modalAddUser')" class="px-3 py-1.5 rounded-lg border border-[var(--border)] text-xs">Batal</button>
+        <button onclick="addNewUser()" class="px-4 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold">Simpan Akun</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modalSelfPassword" class="fixed inset-0 z-50 hidden bg-black/60 flex items-center justify-center p-4">
+    <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl max-w-sm w-full p-5 space-y-4 shadow-xl">
+      <div class="flex items-center justify-between border-b border-[var(--border)] pb-3">
+        <h3 class="font-bold text-sm">🔑 Ganti Password Akun Saya</h3>
+        <button onclick="closeModal('modalSelfPassword')" class="text-xs text-[var(--muted-foreground)]">✕</button>
+      </div>
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block font-semibold mb-1">Password Baru</label>
+          <input id="selfNewPass" type="text" placeholder="Masukkan password baru..." class="w-full px-3 py-2 rounded-lg bg-[var(--background)] border border-[var(--border)]" />
+        </div>
+        <p class="text-[var(--muted-foreground)]">
+          Perubahan langsung aktif tanpa kode OTP dan juga tercatat di tabel Super Admin jika sewaktu-waktu Anda lupa.
+        </p>
+      </div>
+      <div class="flex justify-end gap-2">
+        <button onclick="closeModal('modalSelfPassword')" class="px-3 py-1.5 rounded-lg border border-[var(--border)] text-xs">Batal</button>
+        <button onclick="saveSelfPassword()" class="px-4 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold">Simpan Password</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modalAddIndikator" class="fixed inset-0 z-50 hidden bg-black/60 flex items-center justify-center p-4">
+    <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl max-w-lg w-full p-5 space-y-4 shadow-xl">
+      <div class="flex items-center justify-between border-b border-[var(--border)] pb-3">
+        <h3 class="font-bold text-sm">Tambah Indikator Standar SPMI Baru (Khusus LPM)</h3>
+        <button onclick="closeModal('modalAddIndikator')" class="text-xs text-[var(--muted-foreground)]">✕</button>
+      </div>
+      <div class="space-y-3 text-xs">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold mb-1">Kode Indikator</label>
+            <input id="newIndKode" type="text" placeholder="STD-PEND-04" class="w-full px-3 py-2 rounded-lg bg-[var(--background)] border border-[var(--border)]" />
+          </div>
+          <div>
+            <label class="block font-semibold mb-1">Kategori Standar SPMI</label>
+            <input id="newIndStandar" type="text" placeholder="Standar Proses Pembelajaran" class="w-full px-3 py-2 rounded-lg bg-[var(--background)] border border-[var(--border)]" />
+          </div>
+        </div>
+        <div>
+          <label class="block font-semibold mb-1">Pernyataan Indikator &amp; Dokumen Bukti Drive yang Diminta</label>
+          <textarea id="newIndPernyataan" rows="3" placeholder="Contoh: Persentase mata kuliah yang memiliki RPS berbasis OBE yang diunggah pada Google Drive Prodi..." class="w-full px-3 py-2 rounded-lg bg-[var(--background)] border border-[var(--border)]"></textarea>
+        </div>
+        <div>
+          <label class="block font-semibold mb-1">Target Capaian</label>
+          <input id="newIndTarget" type="text" placeholder="100% Mata Kuliah" class="w-full px-3 py-2 rounded-lg bg-[var(--background)] border border-[var(--border)]" />
+        </div>
+      </div>
+      <div class="flex justify-end gap-2">
+        <button onclick="closeModal('modalAddIndikator')" class="px-3 py-1.5 rounded-lg border border-[var(--border)] text-xs">Batal</button>
+        <button onclick="addNewIndikator()" class="px-4 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold">Tambahkan Indikator</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toastBox" class="fixed bottom-4 right-4 z-50 hidden px-4 py-2.5 rounded-xl bg-blue-600 text-white text-xs font-semibold shadow-lg"></div>
+
+  <script>
+    let currentRole = 'LPM';
+    let currentAuditorMode = 'DESK';
+    let isSourceLocked = true;
+    let activeSessionIndex = 1;
+
+    const sessionStages = [
+      { id: 0, title: '1. Persiapan & Source-Lock', desc: 'LPM menyusun indikator SPMI, memetakan auditee & auditor, lalu mengunci sumber data.' },
+      { id: 1, title: '2. Pengisian Bukti Auditee (Buka)', desc: 'Auditee mengisi evaluasi diri dan menempelkan Link Google Drive bukti dukung.' },
+      { id: 2, title: '3. Audit Dokumen / Desk Audit (Cut-Off)', desc: 'Input link Drive Auditee dikunci otomatis. Auditor memeriksa link Drive & menyusun fokus lapangan.' },
+      { id: 3, title: '4. Audit Lapangan (Visitasi)', desc: 'Opening meeting & pemeriksaan lapangan oleh tim auditor yang sama (Team Continuity).' },
+      { id: 4, title: '5. Rapat Kalibrasi & Closing Meeting', desc: 'Penyamaaan persepsi temuan KTS/OB antar-auditor dan penandatanganan berita acara.' },
+      { id: 5, title: '6. Pelaporan, RTL & Evaluasi AMI', desc: 'Pengesahan laporan oleh Pimpinan dan verifikasi link Drive bukti tindak lanjut (RTL).' }
+    ];
+
+    const roleMeta = {
+      SUPER_ADMIN: {
+        badge: 'SUPER ADMIN',
+        title: 'Super Admin IT Support ITBMP',
+        desc: 'Fokus manajemen akun: tambah akun, lihat username & password asli (tanpa OTP), serta ganti password user.'
+      },
+      LPM: {
+        badge: 'LPM / KOORDINATOR AMI',
+        title: 'Kepala LPM ITBMP (Pengendali Mutu & Sesi)',
+        desc: 'Mengelola indikator SPMI, mengunci sumber data (Source-Lock), mengunci/membuka sesi audit, dan menjalankan AI Planner.'
+      },
+      AUDITEE: {
+        badge: 'AUDITEE (PRODI / UNIT)',
+        title: 'Kaprodi S1 Teknik Informatika ITBMP',
+        desc: 'Mengisi klaim evaluasi diri dan menempelkan tautan (link) Google Drive bukti untuk setiap indikator yang ditetapkan LPM.'
+      },
+      AUDITOR: {
+        badge: 'AUDITOR INTERNAL',
+        title: 'Dr. Hendra Wijaya (Ketua Tim Auditor)',
+        desc: 'Fokus memeriksa link Google Drive auditee (Audit Dokumen), menyusun pertanyaan fokus lapangan, dan menetapkan temuan KTS/OB.'
+      },
+      PIMPINAN: {
+        badge: 'PIMPINAN INSTITUSI',
+        title: 'Rektor / Wakil Rektor Bidang Akademik ITBMP',
+        desc: 'Memantau capaian mutu seluruh unit kerja ITBMP, memonitor penyelesaian KTS, dan mengesahkan Laporan AMI.'
+      }
+    };
+
+    let usersData = [
+      { id: 1, name: 'Admin Teknis ITBMP', role: 'SUPER_ADMIN', unit: 'UPT TIK / Sistem Informasi', username: 'superadmin', password: 'admin#itbmp26', showPass: false },
+      { id: 2, name: 'Agus Kurniawan, M.Kom', role: 'LPM', unit: 'Lembaga Penjaminan Mutu (LPM)', username: 'ketua_lpm', password: 'lpm#spmi2026', showPass: false },
+      { id: 3, name: 'Dr. Hendra Wijaya, M.M', role: 'AUDITOR', unit: 'Prodi S1 Manajemen', username: 'auditor_hendra', password: 'audit#hendra1', showPass: false },
+      { id: 4, name: 'Siti Aminah, M.Kom', role: 'AUDITOR', unit: 'Prodi S1 Akuntansi', username: 'auditor_siti', password: 'audit#siti22', showPass: false },
+      { id: 5, name: 'Ir. Rahmat Hidayat, M.T', role: 'AUDITEE', unit: 'Prodi S1 Teknik Informatika', username: 'prodi_ti', password: 'kaprodi#ti26', showPass: false },
+      { id: 6, name: 'Dr. Dewi Lestari, M.Si', role: 'PIMPINAN', unit: 'Rektorat ITBMP', username: 'rektor_itbmp', password: 'rektor#itbmp1', showPass: false }
+    ];
+
+    let indikatorData = [
+      {
+        id: 1,
+        kode: 'STD-PEND-01',
+        standar: 'Standar Isi Pembelajaran',
+        pernyataan: 'Ketersediaan dokumen Kurikulum Berbasis OBE dan RPS lengkap untuk seluruh mata kuliah aktif semester berjalan di folder Google Drive Prodi.',
+        target: '100% Mata Kuliah',
+        klaimAuditee: 'Seluruh 42 mata kuliah aktif telah memiliki RPS OBE yang disahkan Kaprodi dan diunggah ke folder Drive.',
+        driveLink: 'https://drive.google.com/drive/folders/1ITBMP_RPS_OBE_2026_TI',
+        statusDesk: 'LENGKAP',
+        catatanDesk: 'Dokumen SK Kurikulum dan 42 file RPS di Google Drive sudah lengkap dan sesuai template SPMI.',
+        catatanLapangan: 'Sudah terverifikasi saat audit dokumen, tidak ditemukan kendala di lapangan.',
+        klasifikasiTemuan: 'MENCAPAI'
+      },
+      {
+        id: 2,
+        kode: 'STD-PEND-02',
+        standar: 'Standar Proses Pembelajaran',
+        pernyataan: 'Pelaksanaan monitoring kehadiran dosen & kesesuaian materi perkuliahan minimal 14–16 pertemuan per semester beserta berita acara.',
+        target: '≥ 95% Kehadiran',
+        klaimAuditee: 'Monitoring dilakukan rutin melalui presensi dan rekapitulasi disimpan pada Google Drive.',
+        driveLink: 'https://drive.google.com/drive/folders/1ITBMP_MON_PERKULIAHAN_TI',
+        statusDesk: 'PERLU_KLARIFIKASI',
+        catatanDesk: 'Di dalam folder Google Drive baru terdapat rekap minggu ke-1 s.d ke-8. Bukti minggu ke-9 s.d 16 dan tanda tangan Kaprodi belum ditemukan.',
+        catatanLapangan: 'Saat konfirmasi lapangan, Kaprodi menunjukkan rekap manual minggu 9–14 namun belum di-scan ke Drive. Ditetapkan sebagai KTS Minor.',
+        klasifikasiTemuan: 'KTS_MINOR'
+      },
+      {
+        id: 3,
+        kode: 'STD-PENEL-01',
+        standar: 'Standar Penelitian & PKM',
+        pernyataan: 'Keterlibatan mahasiswa dalam peta jalan penelitian dosen tetap program studi yang dibuktikan dengan SK/Kontrak atau publikasi bersama.',
+        target: '≥ 30% Penelitian Dosen',
+        klaimAuditee: 'Terdapat 8 judul penelitian dosen yang melibatkan 16 mahasiswa tugas akhir.',
+        driveLink: 'https://drive.google.com/drive/folders/1ITBMP_RISET_MAHASISWA_TI',
+        statusDesk: 'PERLU_KLARIFIKASI',
+        catatanDesk: 'Daftar nama mahasiswa ada di Excel Drive, namun dokumen laporan akhir/luaran publikasi bersama perlu dikonfirmasi saat visitasi lapangan.',
+        catatanLapangan: 'Bukti artikel terbit sudah ditunjukkan saat visitasi lapangan, disarankan pengarsipan terpusat (Observasi).',
+        klasifikasiTemuan: 'OB'
+      }
+    ];
+
+    function showToast(msg) {
+      const box = document.getElementById('toastBox');
+      box.textContent = msg;
+      box.classList.remove('hidden');
+      setTimeout(() => box.classList.add('hidden'), 3200);
+    }
+
+    function openModal(id) {
+      document.getElementById(id).classList.remove('hidden');
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.add('hidden');
+    }
+
+    function switchRole(role) {
+      currentRole = role;
+      document.querySelectorAll('.role-view').forEach(el => el.classList.add('hidden'));
+      document.getElementById('view-' + role).classList.remove('hidden');
+
+      document.querySelectorAll('.role-btn').forEach(btn => {
+        btn.className = 'role-btn px-3 py-1.5 rounded-lg text-xs font-semibold border border-[var(--border)] hover:bg-[var(--secondary)] transition-all';
+      });
+      const activeBtn = document.getElementById('btn-role-' + role);
+      if (activeBtn) {
+        activeBtn.className = 'role-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 text-white border border-blue-600 shadow-sm transition-all';
+      }
+
+      const meta = roleMeta[role];
+      document.getElementById('activeRoleBadge').textContent = meta.badge;
+      document.getElementById('activeUserTitle').textContent = meta.title;
+      document.getElementById('activeUserDesc').textContent = meta.desc;
+
+      renderAll();
+    }
+
+    function renderUsersTable() {
+      const filter = document.getElementById('filterUserRole').value;
+      const tbody = document.getElementById('userTableBody');
+      const filtered = filter === 'ALL' ? usersData : usersData.filter(u => u.role === filter);
+
+      tbody.innerHTML = filtered.map(u => `
+        <tr class="hover:bg-[var(--secondary)]/40">
+          <td class="py-3 px-3 font-semibold">${u.name}</td>
+          <td class="py-3 px-3">
+            <span class="px-2 py-0.5 rounded bg-blue-500/15 text-blue-400 font-semibold">${u.role}</span>
+          </td>
+          <td class="py-3 px-3 text-[var(--muted-foreground)]">${u.unit}</td>
+          <td class="py-3 px-3 font-mono font-semibold">${u.username}</td>
+          <td class="py-3 px-3 font-mono">
+            ${u.showPass
+              ? `<span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold">${u.password}</span>`
+              : `<span class="text-[var(--muted-foreground)]">••••••••••</span>`
+            }
+          </td>
+          <td class="py-3 px-3 text-right space-x-1.5">
+            <button onclick="togglePasswordView(${u.id})" class="px-2.5 py-1 rounded border border-[var(--border)] hover:bg-[var(--secondary)] text-xs font-medium">
+              ${u.showPass ? '🙈 Sembunyikan' : '👁️ Intip Password'}
+            </button>
+            <button onclick="promptResetPassword(${u.id})" class="px-2.5 py-1 rounded bg-blue-600/20 text-blue-400 border border-blue-500/30 hover:bg-blue-600 hover:text-white text-xs font-medium transition">
+              ✏️ Ubah Password
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function togglePasswordView(id) {
+      const user = usersData.find(u => u.id === id);
+      if (user) {
+        user.showPass = !user.showPass;
+        renderUsersTable();
+      }
+    }
+
+    function promptResetPassword(id) {
+      const user = usersData.find(u => u.id === id);
+      if (!user) return;
+      const newPass = prompt(`Masukkan password baru untuk akun "${user.username}" (${user.name}):`, user.password);
+      if (newPass && newPass.trim() !== '') {
+        user.password = newPass.trim();
+        user.showPass = true;
+        renderUsersTable();
+        showToast(`✅ Password untuk ${user.username} berhasil diubah menjadi "${user.password}"!`);
+      }
+    }
+
+    function addNewUser() {
+      const name = document.getElementById('newUserName').value.trim();
+      const role = document.getElementById('newUserRole').value;
+      const unit = document.getElementById('newUserUnit').value.trim();
+      const username = document.getElementById('newUserUsername').value.trim();
+      const password = document.getElementById('newUserPassword').value.trim();
+
+      if (!name || !username || !password) {
+        showToast('⚠️ Mohon lengkapi nama, username, dan password!');
+        return;
+      }
+
+      usersData.push({
+        id: Date.now(),
+        name,
+        role,
+        unit: unit || 'Kampus ITBMP',
+        username,
+        password,
+        showPass: true
+      });
+      closeModal('modalAddUser');
+      renderUsersTable();
+      showToast(`✅ Akun ${username} (${role}) berhasil ditambahkan dan langsung aktif!`);
+    }
+
+    function saveSelfPassword() {
+      const val = document.getElementById('selfNewPass').value.trim();
+      if (!val) {
+        showToast('⚠️ Masukkan password baru terlebih dahulu!');
+        return;
+      }
+      const matchUser = usersData.find(u => u.role === currentRole);
+      if (matchUser) {
+        matchUser.password = val;
+      }
+      document.getElementById('selfNewPass').value = '';
+      closeModal('modalSelfPassword');
+      renderUsersTable();
+      showToast('✅ Password Anda berhasil diperbarui!');
+    }
+
+    function switchLpmTab(tabName) {
+      document.querySelectorAll('.lpm-tab-content').forEach(el => el.classList.add('hidden'));
+      document.getElementById('lpm-tab-' + tabName).classList.remove('hidden');
+
+      document.querySelectorAll('.lpm-tab-btn').forEach(btn => {
+        btn.className = 'lpm-tab-btn px-3.5 py-2 rounded-lg text-xs font-semibold border border-[var(--border)]';
+      });
+      document.getElementById('lpm-tab-btn-' + tabName).className = 'lpm-tab-btn px-3.5 py-2 rounded-lg text-xs font-semibold bg-blue-600 text-white';
+    }
+
+    function renderSessionStages() {
+      const container = document.getElementById('sessionStageCards');
+      container.innerHTML = sessionStages.map(stage => {
+        const isActive = stage.id === activeSessionIndex;
+        const isPast = stage.id < activeSessionIndex;
+        return `
+          <div class="p-4 rounded-xl border transition-all ${
+            isActive
+              ? 'border-blue-500 bg-blue-500/10 shadow-sm'
+              : isPast
+              ? 'border-emerald-500/30 bg-emerald-500/5'
+              : 'border-[var(--border)] bg-[var(--background)]'
+          }">
+            <div class="flex items-center justify-between gap-2 mb-1.5">
+              <span class="text-xs font-bold ${isActive ? 'text-blue-400' : isPast ? 'text-emerald-400' : ''}">
+                ${stage.title}
+              </span>
+              <span class="text-xs px-2 py-0.5 rounded font-semibold ${
+                isActive
+                  ? 'bg-blue-600 text-white'
+                  : isPast
+                  ? 'bg-emerald-500/20 text-emerald-400'
+                  : 'bg-[var(--secondary)] text-[var(--muted-foreground)]'
+              }">
+                ${isActive ? 'Sesi Aktif' : isPast ? 'Selesai / Terkunci' : 'Menunggu'}
+              </span>
+            </div>
+            <p class="text-xs text-[var(--muted-foreground)] mb-3">${stage.desc}</p>
+            <button onclick="setSessionStage(${stage.id})" class="w-full py-1.5 rounded-lg text-xs font-semibold border transition ${
+              isActive
+                ? 'border-blue-500/40 text-blue-400 cursor-default'
+                : 'border-[var(--border)] hover:bg-blue-600 hover:text-white'
+            }">
+              ${isActive ? '✓ Sedang Berlangsung' : 'Aktifkan & Kunci Sesi Sebelumnya'}
+            </button>
+          </div>
+        `;
+      }).join('');
+
+      document.getElementById('globalSessionBadge').textContent = sessionStages[activeSessionIndex].title;
+    }
+
+    function setSessionStage(idx) {
+      activeSessionIndex = idx;
+      renderAll();
+      showToast(`🔒 Sesi AMI dipindahkan ke: "${sessionStages[idx].title}"`);
+    }
+
+    function toggleSourceLock() {
+      isSourceLocked = !isSourceLocked;
+      renderAll();
+      showToast(
+        isSourceLocked
+          ? '🔒 Source-Lock DIAKTIFKAN: Indikator dikunci sebagai sumber resmi AI & Audit.'
+          : '🔓 Source-Lock DIBUKA: LPM dapat menambah atau mengedit indikator SPMI.'
+      );
+    }
+
+    function renderLpmIndikator() {
+      const btnToggle = document.getElementById('btnToggleSourceLock');
+      const globalBadge = document.getElementById('globalSourceLockBadge');
+      const btnAdd = document.getElementById('btnAddIndikator');
+
+      if (isSourceLocked) {
+        btnToggle.textContent = '🔒 Terkunci (Klik untuk Buka Kunci)';
+        btnToggle.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/40';
+        globalBadge.textContent = '🔒 Source-Locked';
+        globalBadge.className = 'text-xs px-2 py-0.5 rounded bg-amber-500/15 text-amber-400 font-semibold border border-amber-500/30';
+        btnAdd.disabled = true;
+        btnAdd.className = 'px-3.5 py-2 rounded-lg bg-gray-500/30 text-[var(--muted-foreground)] text-xs font-semibold cursor-not-allowed';
+        btnAdd.textContent = '🔒 Buka Source-Lock untuk Tambah Indikator';
+      } else {
+        btnToggle.textContent = '🔓 Terbuka (Klik untuk Kunci Source-Lock)';
+        btnToggle.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40';
+        globalBadge.textContent = '🔓 Source Unlocked';
+        globalBadge.className = 'text-xs px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-semibold border border-emerald-500/30';
+        btnAdd.disabled = false;
+        btnAdd.className = 'px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition';
+        btnAdd.textContent = '+ Tambah Indikator SPMI';
+      }
+
+      const tbody = document.getElementById('lpmIndikatorTableBody');
+      tbody.innerHTML = indikatorData.map(ind => `
+        <tr>
+          <td class="py-3 px-3 font-mono font-bold text-blue-400">${ind.kode}</td>
+          <td class="py-3 px-3 font-semibold">${ind.standar}</td>
+          <td class="py-3 px-3">${ind.pernyataan}</td>
+          <td class="py-3 px-3 font-semibold">${ind.target}</td>
+          <td class="py-3 px-3 text-right">
+            <span class="px-2 py-0.5 rounded text-xs font-semibold ${
+              isSourceLocked ? 'bg-amber-500/15 text-amber-400' : 'bg-emerald-500/15 text-emerald-400'
+            }">
+              ${isSourceLocked ? '🔒 Locked' : '✏️ Editable'}
+            </span>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function addNewIndikator() {
+      const kode = document.getElementById('newIndKode').value.trim();
+      const standar = document.getElementById('newIndStandar').value.trim();
+      const pernyataan = document.getElementById('newIndPernyataan').value.trim();
+      const target = document.getElementById('newIndTarget').value.trim();
+
+      if (!kode || !standar || !pernyataan) {
+        showToast('⚠️ Mohon isi kode, standar, dan pernyataan indikator!');
+        return;
+      }
+
+      indikatorData.push({
+        id: Date.now(),
+        kode,
+        standar,
+        pernyataan,
+        target: target || '100%',
+        klaimAuditee: '',
+        driveLink: '',
+        statusDesk: 'BELUM_DICEK',
+        catatanDesk: '',
+        catatanLapangan: '',
+        klasifikasiTemuan: 'MENCAPAI'
+      });
+
+      closeModal('modalAddIndikator');
+      renderAll();
+      showToast(`✅ Indikator ${kode} berhasil ditambahkan oleh LPM!`);
+    }
+
+    function runAiScheduleGenerator() {
+      showToast('🤖 AI berhasil memvalidasi Conflict of Interest (0 konflik), menyeimbangkan beban tim, dan menyinkronkan jadwal!');
+    }
+
+    function approveAiSchedule() {
+      const badge = document.getElementById('scheduleApprovalStatus');
+      badge.textContent = '✅ Disahkan oleh Kepala LPM (Human Approved)';
+      badge.className = 'px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold';
+      showToast('✅ Jadwal & Tim Auditor resmi disahkan oleh LPM!');
+    }
+
+    function renderAuditeeView() {
+      const isEditable = activeSessionIndex === 1;
+      const banner = document.getElementById('auditeeCutOffStatusBanner');
+      if (isEditable) {
+        banner.textContent = '🟢 Sesi Pengisian Bukti Terbuka (Auditee Dapat Mengisi Link Google Drive)';
+        banner.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30';
+      } else {
+        banner.textContent = `🔒 Sesi Pengisian Terkunci (Saat ini berada di: ${sessionStages[activeSessionIndex].title})`;
+        banner.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/30';
+      }
+
+      const list = document.getElementById('auditeeIndikatorList');
+      list.innerHTML = indikatorData.map(ind => `
+        <div class="p-4 rounded-xl border border-[var(--border)] bg-[var(--background)] space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <span class="px-2.5 py-0.5 rounded bg-blue-500/15 text-blue-400 font-mono text-xs font-bold">${ind.kode}</span>
+              <span class="font-bold text-xs">${ind.standar}</span>
+              <span class="text-xs text-[var(--muted-foreground)]">• Target: <strong>${ind.target}</strong></span>
+            </div>
+            <span class="text-xs px-2.5 py-0.5 rounded font-semibold ${
+              ind.driveLink ? 'bg-emerald-500/15 text-emerald-400' : 'bg-amber-500/15 text-amber-400'
+            }">
+              ${ind.driveLink ? '✓ Link Drive Tersimpan' : '⚠️ Belum Ada Link Drive'}
+            </span>
+          </div>
+
+          <p class="text-xs text-[var(--muted-foreground)]">${ind.pernyataan}</p>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+            <div>
+              <label class="block text-xs font-semibold mb-1">Klaim Evaluasi Diri Auditee:</label>
+              <textarea
+                id="auditee-klaim-${ind.id}"
+                rows="2"
+                ${!isEditable ? 'disabled' : ''}
+                class="w-full px-3 py-2 rounded-lg bg-[var(--card)] border border-[var(--border)] text-xs disabled:opacity-60"
+                placeholder="Jelaskan pemenuhan standar di prodi/unit Anda..."
+              >${ind.klaimAuditee}</textarea>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold mb-1">🔗 Tautan Bukti Google Drive (Folder / File):</label>
+              <div class="flex gap-2">
+                <input
+                  id="auditee-link-${ind.id}"
+                  type="url"
+                  value="${ind.driveLink}"
+                  ${!isEditable ? 'disabled' : ''}
+                  placeholder="https://drive.google.com/drive/folders/..."
+                  class="flex-1 px-3 py-2 rounded-lg bg-[var(--card)] border border-[var(--border)] text-xs font-mono disabled:opacity-60"
+                />
+                ${isEditable ? `
+                  <button onclick="saveAuditeeDrive(${ind.id})" class="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shrink-0">
+                    Simpan
+                  </button>
+                ` : ''}
+              </div>
+              <div class="flex items-center justify-between mt-1.5 text-xs">
+                <span class="text-[var(--muted-foreground)]">Pastikan akses link Drive disetel <em>Viewer</em> untuk akun ITBMP.</span>
+                ${ind.driveLink ? `<a href="${ind.driveLink}" target="_blank" rel="noopener" class="text-blue-400 hover:underline font-semibold">↗ Tes Buka Drive</a>` : ''}
+              </div>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function saveAuditeeDrive(id) {
+      const ind = indikatorData.find(x => x.id === id);
+      if (!ind) return;
+      ind.klaimAuditee = document.getElementById('auditee-klaim-' + id).value.trim();
+      ind.driveLink = document.getElementById('auditee-link-' + id).value.trim();
+      renderAll();
+      showToast(`✅ Bukti Link Google Drive untuk ${ind.kode} berhasil disimpan!`);
+    }
+
+    function switchAuditorMode(mode) {
+      currentAuditorMode = mode;
+      document.getElementById('auditor-mode-DESK').className =
+        mode === 'DESK'
+          ? 'px-3.5 py-2 rounded-lg text-xs font-semibold bg-blue-600 text-white'
+          : 'px-3.5 py-2 rounded-lg text-xs font-semibold border border-[var(--border)]';
+      document.getElementById('auditor-mode-FIELD').className =
+        mode === 'FIELD'
+          ? 'px-3.5 py-2 rounded-lg text-xs font-semibold bg-blue-600 text-white'
+          : 'px-3.5 py-2 rounded-lg text-xs font-semibold border border-[var(--border)]';
+      renderAuditorView();
+    }
+
+    function renderAuditorView() {
+      const fokusCount = indikatorData.filter(i => i.statusDesk === 'PERLU_KLARIFIKASI').length;
+      document.getElementById('auditorSyncCounter').textContent = `Fokus Lapangan: ${fokusCount} Indikator`;
+
+      const container = document.getElementById('auditorWorkspaceList');
+      container.innerHTML = indikatorData.map(ind => {
+        const isFokusLapangan = ind.statusDesk === 'PERLU_KLARIFIKASI';
+        return `
+          <div class="p-4 rounded-xl border transition-all space-y-3 ${
+            currentAuditorMode === 'FIELD' && isFokusLapangan
+              ? 'border-amber-500/60 bg-amber-500/5'
+              : 'border-[var(--border)] bg-[var(--background)]'
+          }">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div class="flex items-center gap-2">
+                <span class="px-2.5 py-0.5 rounded bg-blue-500/15 text-blue-400 font-mono text-xs font-bold">${ind.kode}</span>
+                <span class="font-bold text-xs">${ind.standar}</span>
+                ${isFokusLapangan ? `<span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 text-xs font-bold">🎯 Fokus Konfirmasi Lapangan</span>` : ''}
+              </div>
+              <a href="${ind.driveLink || '#'}" target="_blank" rel="noopener" class="px-3 py-1 rounded-lg bg-blue-600/15 text-blue-400 border border-blue-500/30 hover:bg-blue-600 hover:text-white text-xs font-semibold transition">
+                📂 Buka Link Google Drive Bukti Auditee
+              </a>
+            </div>
+
+            <p class="text-xs text-[var(--muted-foreground)]"><strong>Indikator:</strong> ${ind.pernyataan}</p>
+            <div class="p-2.5 rounded-lg bg-[var(--card)] border border-[var(--border)] text-xs">
+              <div><strong>Klaim Auditee:</strong> ${ind.klaimAuditee || '<em>Belum diisi</em>'}</div>
+              <div class="font-mono text-blue-400 mt-0.5 truncate"><strong>URL Drive:</strong> ${ind.driveLink || '<em>Belum ada link</em>'}</div>
+            </div>
+
+            ${currentAuditorMode === 'DESK' ? `
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+                <div>
+                  <label class="block text-xs font-semibold mb-1">Status Kecukupan Bukti Drive:</label>
+                  <select id="desk-status-${ind.id}" class="w-full px-3 py-2 rounded-lg bg-[var(--card)] border border-[var(--border)] text-xs">
+                    <option value="LENGKAP" ${ind.statusDesk === 'LENGKAP' ? 'selected' : ''}>✅ Bukti Drive Lengkap &amp; Sesuai</option>
+                    <option value="PERLU_KLARIFIKASI" ${ind.statusDesk === 'PERLU_KLARIFIKASI' ? 'selected' : ''}>🎯 Perlu Klarifikasi di Audit Lapangan</option>
+                    <option value="BELUM_DICEK" ${ind.statusDesk === 'BELUM_DICEK' ? 'selected' : ''}>⏳ Belum Diperiksa</option>
+                  </select>
+                </div>
+                <div class="md:col-span-2">
+                  <label class="block text-xs font-semibold mb-1">Catatan Audit Dokumen &amp; Pertanyaan untuk Lapangan:</label>
+                  <div class="flex gap-2">
+                    <input id="desk-note-${ind.id}" type="text" value="${ind.catatanDesk}" class="flex-1 px-3 py-2 rounded-lg bg-[var(--card)] border border-[var(--border)] text-xs" placeholder="Tulis hasil pengecekan link Drive..." />
+                    <button onclick="saveDeskAudit(${ind.id})" class="px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shrink-0">
+                      Simpan Desk Audit
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ` : `
+              <div class="p-2.5 rounded-lg bg-purple-500/10 border border-purple-500/20 text-xs">
+                <strong>Catatan dari Audit Dokumen (Desk Audit):</strong> ${ind.catatanDesk || '-'}
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+                <div>
+                  <label class="block text-xs font-semibold mb-1">Keputusan Klasifikasi Temuan:</label>
+                  <select id="field-temuan-${ind.id}" class="w-full px-3 py-2 rounded-lg bg-[var(--card)] border border-[var(--border)] text-xs font-semibold">
+                    <option value="MELAMPAUI" ${ind.klasifikasiTemuan === 'MELAMPAUI' ? 'selected' : ''}>🌟 Melampaui Standar</option>
+                    <option value="MENCAPAI" ${ind.klasifikasiTemuan === 'MENCAPAI' ? 'selected' : ''}>✅ Mencapai Standar</option>
+                    <option value="OB" ${ind.klasifikasiTemuan === 'OB' ? 'selected' : ''}>👀 Observasi (OB)</option>
+                    <option value="KTS_MINOR" ${ind.klasifikasiTemuan === 'KTS_MINOR' ? 'selected' : ''}>⚠️ KTS Minor</option>
+                    <option value="KTS_MAYOR" ${ind.klasifikasiTemuan === 'KTS_MAYOR' ? 'selected' : ''}>🚨 KTS Mayor</option>
+                  </select>
+                </div>
+                <div class="md:col-span-2">
+                  <label class="block text-xs font-semibold mb-1">Fakta Lapangan / Berita Acara / Akar Masalah:</label>
+                  <div class="flex gap-2">
+                    <input id="field-note-${ind.id}" type="text" value="${ind.catatanLapangan}" class="flex-1 px-3 py-2 rounded-lg bg-[var(--card)] border border-[var(--border)] text-xs" placeholder="Hasil konfirmasi lapangan..." />
+                    <button onclick="saveFieldAudit(${ind.id})" class="px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shrink-0">
+                      Simpan Temuan
+                    </button>
+                  </div>
+                </div>
+              </div>
+            `}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function saveDeskAudit(id) {
+      const ind = indikatorData.find(x => x.id === id);
+      if (!ind) return;
+      ind.statusDesk = document.getElementById('desk-status-' + id).value;
+      ind.catatanDesk = document.getElementById('desk-note-' + id).value.trim();
+      renderAll();
+      showToast(`✅ Hasil Audit Dokumen ${ind.kode} disimpan & disinkronkan ke Audit Lapangan!`);
+    }
+
+    function saveFieldAudit(id) {
+      const ind = indikatorData.find(x => x.id === id);
+      if (!ind) return;
+      ind.klasifikasiTemuan = document.getElementById('field-temuan-' + id).value;
+      ind.catatanLapangan = document.getElementById('field-note-' + id).value.trim();
+      renderAll();
+      showToast(`✅ Klasifikasi temuan ${ind.kode} (${ind.klasifikasiTemuan}) berhasil disimpan!`);
+    }
+
+    function sahkanLaporanPimpinan() {
+      const txt = document.getElementById('pimpinanApprovalCardText');
+      txt.textContent = '✅ Disahkan Rektorat';
+      txt.className = 'text-lg font-bold mt-1 text-emerald-400';
+      const btn = document.getElementById('btnPimpinanSahkan');
+      btn.textContent = '✓ Laporan AMI Telah Disahkan';
+      btn.className = 'px-4 py-2 rounded-lg bg-emerald-600/20 text-emerald-400 border border-emerald-500/40 text-xs font-semibold';
+      showToast('✍️ Laporan Akhir AMI Kampus ITBMP resmi disahkan oleh Pimpinan!');
+    }
+
+    function renderAll() {
+      renderUsersTable();
+      renderSessionStages();
+      renderLpmIndikator();
+      renderAuditeeView();
+      renderAuditorView();
+    }
+
+    switchRole('LPM');
+  </script>
+</body>
+</html>

@@ -1,0 +1,184 @@
+// Skema database SI-AMI ITBMP
+// Prinsip buku panduan yang dicerminkan di skema:
+// - Source-lock      : Periode.sourceLocked mengunci indikator & daftar unit
+// - One workflow     : satu baris Isian membawa bukti auditee -> audit dokumen -> audit lapangan -> RTL
+// - Team continuity  : satu Penugasan per (periode, unit) dipakai untuk audit dokumen DAN lapangan
+// - Human approval   : Penugasan.disahkan & Periode.disahkanAt diisi manusia, bukan otomatis
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  LPM
+  AUDITOR
+  AUDITEE
+  PIMPINAN
+}
+
+enum Tahap {
+  PERSIAPAN
+  PENGISIAN
+  AUDIT_DOKUMEN
+  AUDIT_LAPANGAN
+  KALIBRASI_CLOSING
+  PELAPORAN_RTL
+  SELESAI
+}
+
+enum StatusDokumen {
+  BELUM_DICEK
+  LENGKAP
+  PERLU_KLARIFIKASI
+}
+
+enum Klasifikasi {
+  MELAMPAUI
+  MENCAPAI
+  OBSERVASI
+  KTS_MINOR
+  KTS_MAYOR
+}
+
+enum StatusRtl {
+  BELUM
+  PROSES
+  SELESAI_AUDITEE
+  TERVERIFIKASI
+}
+
+enum PeranTim {
+  KETUA
+  ANGGOTA
+}
+
+model Unit {
+  id        String      @id @default(cuid())
+  kode      String      @unique
+  nama      String
+  jenis     String
+  diaudit   Boolean     @default(true)
+  createdAt DateTime    @default(now())
+  users     User[]
+  penugasan Penugasan[]
+  isian     Isian[]
+}
+
+model User {
+  id           String             @id @default(cuid())
+  nama         String
+  username     String             @unique
+  passwordHash String
+  /// Salinan password terenkripsi AES-256-GCM agar Super Admin bisa melihatnya (permintaan pengguna).
+  passwordEnc  String
+  role         Role
+  unitId       String?
+  unit         Unit?              @relation(fields: [unitId], references: [id])
+  aktif        Boolean            @default(true)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  tim          PenugasanAuditor[]
+  logs         AuditLog[]
+}
+
+model Periode {
+  id                String      @id @default(cuid())
+  nama              String
+  tahun             String
+  tahap             Tahap       @default(PERSIAPAN)
+  sourceLocked      Boolean     @default(false)
+  aktif             Boolean     @default(true)
+  tglMulaiPengisian DateTime?
+  tglCutOff         DateTime?
+  tglOpening        DateTime?
+  tglClosing        DateTime?
+  disahkanAt        DateTime?
+  disahkanOleh      String?
+  createdAt         DateTime    @default(now())
+  indikator         Indikator[]
+  penugasan         Penugasan[]
+}
+
+model Indikator {
+  id           String  @id @default(cuid())
+  periodeId    String
+  periode      Periode @relation(fields: [periodeId], references: [id], onDelete: Cascade)
+  kode         String
+  standar      String
+  pernyataan   String
+  target       String
+  buktiDiminta String?
+  urutan       Int     @default(0)
+  isian        Isian[]
+
+  @@unique([periodeId, kode])
+}
+
+model Penugasan {
+  id                    String             @id @default(cuid())
+  periodeId             String
+  periode               Periode            @relation(fields: [periodeId], references: [id], onDelete: Cascade)
+  unitId                String
+  unit                  Unit               @relation(fields: [unitId], references: [id])
+  jadwalDokumenMulai    DateTime?
+  jadwalDokumenSelesai  DateTime?
+  jadwalLapanganMulai   DateTime?
+  jadwalLapanganSelesai DateTime?
+  disahkan              Boolean            @default(false)
+  alasanPerubahan       String?
+  /// "USULAN_OTOMATIS" atau "MANUAL"
+  sumber                String             @default("MANUAL")
+  updatedAt             DateTime           @updatedAt
+  tim                   PenugasanAuditor[]
+
+  @@unique([periodeId, unitId])
+}
+
+model PenugasanAuditor {
+  id          String    @id @default(cuid())
+  penugasanId String
+  penugasan   Penugasan @relation(fields: [penugasanId], references: [id], onDelete: Cascade)
+  auditorId   String
+  auditor     User      @relation(fields: [auditorId], references: [id])
+  peran       PeranTim
+
+  @@unique([penugasanId, auditorId])
+}
+
+model Isian {
+  id                String        @id @default(cuid())
+  indikatorId       String
+  indikator         Indikator     @relation(fields: [indikatorId], references: [id], onDelete: Cascade)
+  unitId            String
+  unit              Unit          @relation(fields: [unitId], references: [id])
+  klaim             String?
+  linkDrive         String?
+  statusDokumen     StatusDokumen @default(BELUM_DICEK)
+  catatanDokumen    String?
+  catatanLapangan   String?
+  klasifikasi       Klasifikasi?
+  rekomendasi       String?
+  rtlRencana        String?
+  rtlLinkBukti      String?
+  rtlStatus         StatusRtl     @default(BELUM)
+  rtlCatatanAuditor String?
+  updatedAt         DateTime      @updatedAt
+
+  @@unique([indikatorId, unitId])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  aksi      String
+  detail    String?
+  createdAt DateTime @default(now())
+}
