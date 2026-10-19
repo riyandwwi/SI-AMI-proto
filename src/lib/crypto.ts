@@ -1,4 +1,3 @@
-import "server-only";
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypto";
 
 // Salinan password disimpan terenkripsi (bukan teks polos) supaya bocornya database
