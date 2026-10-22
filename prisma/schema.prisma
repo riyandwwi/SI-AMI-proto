@@ -63,6 +63,7 @@ model Unit {
   diaudit   Boolean     @default(true)
   createdAt DateTime    @default(now())
   users     User[]
+  periode   Periode[]
   penugasan Penugasan[]
   isian     Isian[]
 }
@@ -89,7 +90,10 @@ model Periode {
   id                String      @id @default(cuid())
   nama              String
   tahun             String
-  tahap             Tahap       @default(PERSIAPAN)
+  semester          String      @default("Ganjil")
+  unitId            String?
+  unit              Unit?       @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  tahap             Tahap       @default(PENGISIAN)
   sourceLocked      Boolean     @default(false)
   aktif             Boolean     @default(true)
   tglMulaiPengisian DateTime?

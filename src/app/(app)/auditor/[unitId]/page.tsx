@@ -3,7 +3,6 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import {
   BUTUH_RTL,
-  getActivePeriode,
   KLASIFIKASI_LABEL,
   RTL_LABEL,
   STATUS_DOK_LABEL,
@@ -19,43 +18,55 @@ export default async function AuditorUnitWorkspacePage({
   searchParams: SP;
 }) {
   const user = await requireUser("AUDITOR");
-  const { unitId } = await params;
+  const { unitId: paramId } = await params;
   const sp = await searchParams;
   const mode = one(sp.mode) ?? "dokumen"; // dokumen | lapangan | rtl
 
-  const periode = await getActivePeriode();
-  if (!periode) return <Empty>Belum ada periode AMI aktif.</Empty>;
+  // Cari Sesi AMI berdasarkan ID periode (atau unitId sebagai fallback)
+  const periode =
+    (await prisma.periode.findUnique({
+      where: { id: paramId },
+      include: { unit: true },
+    })) ??
+    (await prisma.periode.findFirst({
+      where: { unitId: paramId },
+      include: { unit: true },
+      orderBy: { createdAt: "desc" },
+    }));
 
-  const penugasan = await prisma.penugasan.findUnique({
-    where: { periodeId_unitId: { periodeId: periode.id, unitId } },
-    include: { unit: true, tim: { include: { auditor: true } } },
-  });
+  if (!periode) return <Empty>Sesi AMI tidak ditemukan.</Empty>;
 
-  if (!penugasan || !penugasan.tim.some((t) => t.auditorId === user.id)) {
-    return <Empty>Anda tidak terdaftar dalam tim auditor untuk unit ini.</Empty>;
-  }
+  const targetUnitId = periode.unitId ?? user.unitId;
+  if (!targetUnitId) return <Empty>Program Studi untuk sesi ini belum ditentukan.</Empty>;
 
-  const [indikator, isianList] = await Promise.all([
+  const [indikator, isianList, prodiAuditees] = await Promise.all([
     prisma.indikator.findMany({
       where: { periodeId: periode.id },
       orderBy: [{ urutan: "asc" }, { kode: "asc" }],
     }),
     prisma.isian.findMany({
-      where: { unitId, indikator: { periodeId: periode.id } },
+      where: { unitId: targetUnitId, indikator: { periodeId: periode.id } },
+    }),
+    prisma.user.findMany({
+      where: { role: "AUDITEE", unitId: targetUnitId, aktif: true },
+      orderBy: { nama: "asc" },
     }),
   ]);
 
   const isianByInd = new Map(isianList.map((i) => [i.indikatorId, i]));
   const jmlFokusLapangan = isianList.filter((i) => i.statusDokumen === "PERLU_KLARIFIKASI").length;
+  const buka = periode.aktif;
 
   return (
     <>
       <PageHeader
-        title={`Meja Kerja Auditor — ${penugasan.unit.nama}`}
-        desc={`Tim Auditor: ${penugasan.tim.map((t) => `${t.auditor.nama} (${t.peran})`).join(" & ")} · Kontinuitas Tim: Dokumen & Lapangan Terintegrasi`}
+        title={`Meja Kerja Auditor — ${periode.nama}`}
+        desc={`Auditee Prodi ${periode.unit?.nama ?? ""}: ${
+          prodiAuditees.map((a) => `${a.nama}${a.nimNuptk ? ` (${a.nimNuptk})` : ""}`).join(", ") || "Belum ada akun Auditee"
+        }`}
       >
         <Link href="/auditor" className="btn-secondary text-xs">
-          ← Kembali ke Daftar Auditee
+          ← Kembali ke Daftar Sesi
         </Link>
       </PageHeader>
       <Flash ok={one(sp.ok)} err={one(sp.err)} />
@@ -64,25 +75,27 @@ export default async function AuditorUnitWorkspacePage({
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
         <div className="flex flex-wrap gap-2">
           <Link
-            href={`/auditor/${unitId}?mode=dokumen`}
+            href={`/auditor/${periode.id}?mode=dokumen`}
             className={mode === "dokumen" ? "btn text-xs" : "btn-secondary text-xs"}
           >
             📄 1. Audit Dokumen (Cek Link Drive)
           </Link>
           <Link
-            href={`/auditor/${unitId}?mode=lapangan`}
+            href={`/auditor/${periode.id}?mode=lapangan`}
             className={mode === "lapangan" ? "btn text-xs" : "btn-secondary text-xs"}
           >
             🏛️ 2. Audit Lapangan &amp; Klasifikasi Temuan ({jmlFokusLapangan} Fokus)
           </Link>
           <Link
-            href={`/auditor/${unitId}?mode=rtl`}
+            href={`/auditor/${periode.id}?mode=rtl`}
             className={mode === "rtl" ? "btn text-xs" : "btn-secondary text-xs"}
           >
             🛠️ 3. Verifikasi Tindak Lanjut (RTL)
           </Link>
         </div>
-        <Badge tone="blue">🔗 Prinsip One Workflow: Hasil Desk Audit Otomatis Menjadi Fokus Lapangan</Badge>
+        <Badge tone={buka ? "green" : "amber"}>
+          {buka ? "🟢 Sesi Terbuka" : "🔒 Sesi Terkunci oleh LPM"}
+        </Badge>
       </div>
 
       {/* Daftar Indikator */}
@@ -151,11 +164,17 @@ export default async function AuditorUnitWorkspacePage({
               {/* MODE 1: AUDIT DOKUMEN (DESK AUDIT) */}
               {mode === "dokumen" && (
                 <form action={simpanAuditDokumen} className="grid grid-cols-1 gap-3 pt-1 md:grid-cols-3">
-                  <input type="hidden" name="unitId" value={unitId} />
+                  <input type="hidden" name="periodeId" value={periode.id} />
+                  <input type="hidden" name="unitId" value={targetUnitId} />
                   <input type="hidden" name="indikatorId" value={ind.id} />
                   <div className="space-y-1">
                     <label>Status Kecukupan Bukti Drive (Desk Audit)</label>
-                    <select name="statusDokumen" defaultValue={isian?.statusDokumen ?? "BELUM_DICEK"} className="w-full">
+                    <select
+                      name="statusDokumen"
+                      disabled={!buka}
+                      defaultValue={isian?.statusDokumen ?? "BELUM_DICEK"}
+                      className="w-full"
+                    >
                       <option value="BELUM_DICEK">⏳ Belum Diperiksa</option>
                       <option value="LENGKAP">✅ Bukti Drive Lengkap &amp; Sesuai</option>
                       <option value="PERLU_KLARIFIKASI">🎯 Perlu Klarifikasi di Audit Lapangan</option>
@@ -166,11 +185,12 @@ export default async function AuditorUnitWorkspacePage({
                     <div className="flex gap-2">
                       <input
                         name="catatanDokumen"
+                        disabled={!buka}
                         defaultValue={isian?.catatanDokumen ?? ""}
                         placeholder="Tulis hasil pemeriksaan dokumen Drive & fokus pertanyaan lapangan..."
                         className="w-full"
                       />
-                      <button className="btn shrink-0">Simpan Desk Audit</button>
+                      {buka && <button className="btn shrink-0">Simpan Desk Audit</button>}
                     </div>
                   </div>
                 </form>
@@ -185,12 +205,18 @@ export default async function AuditorUnitWorkspacePage({
                   </div>
 
                   <form action={simpanAuditLapangan} className="space-y-3 pt-1">
-                    <input type="hidden" name="unitId" value={unitId} />
+                    <input type="hidden" name="periodeId" value={periode.id} />
+                    <input type="hidden" name="unitId" value={targetUnitId} />
                     <input type="hidden" name="indikatorId" value={ind.id} />
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                       <div className="space-y-1">
                         <label>Klasifikasi Hasil / Temuan Audit</label>
-                        <select name="klasifikasi" defaultValue={isian?.klasifikasi ?? "MENCAPAI"} className="w-full font-semibold">
+                        <select
+                          name="klasifikasi"
+                          disabled={!buka}
+                          defaultValue={isian?.klasifikasi ?? "MENCAPAI"}
+                          className="w-full font-semibold"
+                        >
                           <option value="MELAMPAUI">🌟 Melampaui Standar</option>
                           <option value="MENCAPAI">✅ Mencapai Standar</option>
                           <option value="OBSERVASI">👀 Observasi (OB)</option>
@@ -202,6 +228,7 @@ export default async function AuditorUnitWorkspacePage({
                         <label>Fakta Lapangan / Akar Masalah</label>
                         <input
                           name="catatanLapangan"
+                          disabled={!buka}
                           defaultValue={isian?.catatanLapangan ?? ""}
                           placeholder="Catat hasil konfirmasi wawancara/observasi..."
                           className="w-full"
@@ -212,11 +239,12 @@ export default async function AuditorUnitWorkspacePage({
                         <div className="flex gap-2">
                           <input
                             name="rekomendasi"
+                            disabled={!buka}
                             defaultValue={isian?.rekomendasi ?? ""}
                             placeholder="Rekomendasi tindak lanjut..."
                             className="w-full"
                           />
-                          <button className="btn-success shrink-0">Simpan Temuan</button>
+                          {buka && <button className="btn-success shrink-0">Simpan Temuan</button>}
                         </div>
                       </div>
                     </div>
@@ -247,11 +275,16 @@ export default async function AuditorUnitWorkspacePage({
                   </div>
 
                   <form action={verifikasiRtlAuditor} className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                    <input type="hidden" name="unitId" value={unitId} />
+                    <input type="hidden" name="periodeId" value={periode.id} />
                     <input type="hidden" name="isianId" value={isian.id} />
                     <div className="space-y-1">
                       <label>Keputusan Verifikasi RTL ({RTL_LABEL[isian.rtlStatus]})</label>
-                      <select name="rtlStatus" defaultValue={isian.rtlStatus === "TERVERIFIKASI" ? "TERVERIFIKASI" : "PROSES"} className="w-full">
+                      <select
+                        name="rtlStatus"
+                        disabled={!buka}
+                        defaultValue={isian.rtlStatus === "TERVERIFIKASI" ? "TERVERIFIKASI" : "PROSES"}
+                        className="w-full"
+                      >
                         <option value="PROSES">⏳ Masih Perlu Perbaikan (Proses)</option>
                         <option value="TERVERIFIKASI">✅ Closed / Terverifikasi Selesai</option>
                       </select>
@@ -261,11 +294,12 @@ export default async function AuditorUnitWorkspacePage({
                       <div className="flex gap-2">
                         <input
                           name="rtlCatatanAuditor"
+                          disabled={!buka}
                           defaultValue={isian.rtlCatatanAuditor ?? ""}
                           placeholder="Catatan hasil pengecekan bukti perbaikan..."
                           className="w-full"
                         />
-                        <button className="btn-success shrink-0">Simpan Verifikasi</button>
+                        {buka && <button className="btn-success shrink-0">Simpan Verifikasi</button>}
                       </div>
                     </div>
                   </form>
@@ -276,7 +310,7 @@ export default async function AuditorUnitWorkspacePage({
         })}
 
         {mode === "rtl" && isianList.filter((i) => i.klasifikasi && BUTUH_RTL.includes(i.klasifikasi)).length === 0 && (
-          <Empty>Tidak ada temuan Observasi / KTS yang memerlukan verifikasi RTL pada unit ini.</Empty>
+          <Empty>Tidak ada temuan Observasi / KTS yang memerlukan verifikasi RTL pada sesi ini.</Empty>
         )}
       </div>
     </>

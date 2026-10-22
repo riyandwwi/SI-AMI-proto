@@ -6,7 +6,7 @@ const prisma = new PrismaClient();
 const DEFAULT_PASS = "123";
 
 async function main() {
-  console.log("🌱 Seeding data awal SI-AMI ITBMP (3 Prodi & 4 Role, password default: 123)...");
+  console.log("🌱 Seeding data awal SI-AMI ITBMP (3 Prodi, 4 Role, password default: 123)...");
 
   // 1. Buat 3 Program Studi Resmi Kampus ITBMP
   const prodiData = [
@@ -43,57 +43,56 @@ async function main() {
     {
       username: "lpm",
       nama: "Agus Kurniawan, M.Kom (Kepala LPM)",
-      nimNuptk: "198501012015041001",
+      nimNuptk: "0401018501",
       role: "LPM",
       prodiKode: "PRODI-BD",
     },
     {
       username: "auditor_bd",
       nama: "Dr. Hendra Wijaya, M.M",
-      nimNuptk: "198603122016041002",
+      nimNuptk: "0412038602",
       role: "AUDITOR",
       prodiKode: "PRODI-BD",
     },
     {
       username: "auditor_akt",
       nama: "Siti Aminah, M.Si",
-      nimNuptk: "198907212018042001",
+      nimNuptk: "0421078901",
       role: "AUDITOR",
       prodiKode: "PRODI-AKT",
     },
     {
       username: "auditor_pwk",
       nama: "Dr. Budi Santoso, M.T",
-      nimNuptk: "198411052014041003",
+      nimNuptk: "0405118403",
       role: "AUDITOR",
       prodiKode: "PRODI-PWK",
     },
     {
       username: "auditee_bd",
       nama: "Kaprodi Bisnis Digital",
-      nimNuptk: "199002142019041001",
+      nimNuptk: "0414029001",
       role: "AUDITEE",
       prodiKode: "PRODI-BD",
     },
     {
       username: "auditee_akt",
       nama: "Kaprodi Aktuaria",
-      nimNuptk: "199106182020042002",
+      nimNuptk: "0418069102",
       role: "AUDITEE",
       prodiKode: "PRODI-AKT",
     },
     {
       username: "auditee_pwk",
       nama: "Kaprodi Perancangan Wilayah dan Kota",
-      nimNuptk: "198809252017041004",
+      nimNuptk: "0425098804",
       role: "AUDITEE",
       prodiKode: "PRODI-PWK",
     },
   ];
 
-  const userIds: Record<string, string> = {};
   for (const a of akunAwal) {
-    const u = await prisma.user.upsert({
+    await prisma.user.upsert({
       where: { username: a.username },
       update: {
         nama: a.nama,
@@ -115,27 +114,9 @@ async function main() {
         aktif: true,
       },
     });
-    userIds[a.username] = u.id;
   }
 
-  // 3. Buat Periode Aktif & Indikator SPMI
-  let periode = await prisma.periode.findFirst({ where: { aktif: true } });
-  if (!periode) {
-    periode = await prisma.periode.create({
-      data: {
-        nama: "AMI Siklus Tahun Akademik 2026/2027 Ganjil",
-        tahun: "2026/2027",
-        tahap: "PENGISIAN",
-        sourceLocked: true,
-        aktif: true,
-        tglMulaiPengisian: new Date("2026-10-15T00:00:00+07:00"),
-        tglCutOff: new Date("2026-11-15T23:59:59+07:00"),
-        tglOpening: new Date("2026-11-18T00:00:00+07:00"),
-        tglClosing: new Date("2026-11-28T00:00:00+07:00"),
-      },
-    });
-  }
-
+  // 3. Buat Sesi AMI Awal untuk 3 Prodi jika belum ada
   const daftarIndikator = [
     {
       kode: "STD-PEND-01",
@@ -166,56 +147,54 @@ async function main() {
     },
   ];
 
-  const indIds: Record<string, string> = {};
-  for (const ind of daftarIndikator) {
-    const saved = await prisma.indikator.upsert({
-      where: { periodeId_kode: { periodeId: periode.id, kode: ind.kode } },
-      update: ind,
-      create: { ...ind, periodeId: periode.id },
-    });
-    indIds[ind.kode] = saved.id;
+  // Hapus periode lama yang belum memiliki unitId agar bersih
+  await prisma.periode.deleteMany({ where: { unitId: null } });
+
+  for (const prodi of prodiData) {
+    const unitId = units[prodi.kode];
+    let p = await prisma.periode.findFirst({ where: { unitId } });
+    if (!p) {
+      p = await prisma.periode.create({
+        data: {
+          nama: `AMI ${prodi.nama} — 2026/2027 (Ganjil)`,
+          tahun: "2026/2027",
+          semester: "Ganjil",
+          unitId,
+          tahap: "PENGISIAN",
+          sourceLocked: false,
+          aktif: true,
+        },
+      });
+    }
+
+    for (const ind of daftarIndikator) {
+      const savedInd = await prisma.indikator.upsert({
+        where: { periodeId_kode: { periodeId: p.id, kode: ind.kode } },
+        update: ind,
+        create: { ...ind, periodeId: p.id },
+      });
+
+      // Isi contoh pekerjaan Auditee & Auditor pada Prodi Bisnis Digital
+      if (prodi.kode === "PRODI-BD" && ind.kode === "STD-PEND-01") {
+        await prisma.isian.upsert({
+          where: { indikatorId_unitId: { indikatorId: savedInd.id, unitId } },
+          update: {},
+          create: {
+            indikatorId: savedInd.id,
+            unitId,
+            klaim: "Seluruh mata kuliah aktif Prodi Bisnis Digital telah memiliki RPS OBE di Google Drive.",
+            linkDrive: "https://drive.google.com/drive/folders/1ITBMP_RPS_OBE_2026_BD",
+            statusDokumen: "LENGKAP",
+            catatanDokumen: "Dokumen SK Kurikulum dan seluruh file RPS di Google Drive lengkap dan sesuai template SPMI.",
+            klasifikasi: "MENCAPAI",
+            catatanLapangan: "Terverifikasi sesuai saat pemeriksaan lapangan.",
+          },
+        });
+      }
+    }
   }
 
-  // 4. Contoh Penugasan Tim Auditor Bebas Conflict of Interest:
-  // Prodi Bisnis Digital diaudit oleh Siti (Aktuaria) & Budi (PWK)
-  await prisma.penugasan.upsert({
-    where: { periodeId_unitId: { periodeId: periode.id, unitId: units["PRODI-BD"] } },
-    update: {},
-    create: {
-      periodeId: periode.id,
-      unitId: units["PRODI-BD"],
-      jadwalDokumenMulai: new Date("2026-11-16T00:00:00+07:00"),
-      jadwalDokumenSelesai: new Date("2026-11-17T23:59:59+07:00"),
-      jadwalLapanganMulai: new Date("2026-11-20T09:00:00+07:00"),
-      jadwalLapanganSelesai: new Date("2026-11-20T12:00:00+07:00"),
-      sumber: "USULAN_OTOMATIS",
-      disahkan: true,
-      tim: {
-        create: [
-          { auditorId: userIds["auditor_akt"], peran: "KETUA" },
-          { auditorId: userIds["auditor_pwk"], peran: "ANGGOTA" },
-        ],
-      },
-    },
-  });
-
-  // 5. Contoh Isian Bukti Google Drive Prodi Bisnis Digital
-  await prisma.isian.upsert({
-    where: { indikatorId_unitId: { indikatorId: indIds["STD-PEND-01"], unitId: units["PRODI-BD"] } },
-    update: {},
-    create: {
-      indikatorId: indIds["STD-PEND-01"],
-      unitId: units["PRODI-BD"],
-      klaim: "Seluruh mata kuliah aktif Prodi Bisnis Digital telah memiliki RPS OBE yang disahkan Kaprodi di Google Drive.",
-      linkDrive: "https://drive.google.com/drive/folders/1ITBMP_RPS_OBE_2026_BD",
-      statusDokumen: "LENGKAP",
-      catatanDokumen: "Dokumen SK Kurikulum dan seluruh file RPS di Google Drive lengkap dan sesuai template SPMI.",
-      klasifikasi: "MENCAPAI",
-      catatanLapangan: "Terverifikasi sesuai saat pemeriksaan lapangan.",
-    },
-  });
-
-  console.log("✅ Seed selesai! Semua akun awal menggunakan password default: 123");
+  console.log("✅ Seed selesai! Sesi AMI 3 Prodi & Akun Awal (password: 123) siap digunakan.");
 }
 
 main()

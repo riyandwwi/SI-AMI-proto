@@ -1,31 +1,32 @@
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import {
-  BUTUH_RTL,
-  getActivePeriode,
-  KLASIFIKASI_LABEL,
-  pengisianTerbuka,
-  RTL_LABEL,
-  STATUS_DOK_LABEL,
-  TAHAP_LABEL,
-} from "@/lib/periode";
-import { fmtTanggal, fmtWaktu } from "@/lib/format";
+import { BUTUH_RTL, KLASIFIKASI_LABEL, RTL_LABEL, STATUS_DOK_LABEL } from "@/lib/periode";
 import { Badge, Empty, Flash, PageHeader, one, type SP } from "@/components/ui";
 import { simpanIsianAuditee, simpanRtlAuditee } from "./actions";
 
 export default async function AuditeePage({ searchParams }: { searchParams: SP }) {
   const user = await requireUser("AUDITEE");
   const sp = await searchParams;
-  const periode = await getActivePeriode();
 
   if (!user.unitId || !user.unit) {
-    return <Empty>Akun Auditee Anda belum dihubungkan ke Unit / Program Studi. Hubungi Super Admin.</Empty>;
-  }
-  if (!periode) {
-    return <Empty>Belum ada periode AMI aktif saat ini.</Empty>;
+    return <Empty>Akun Auditee Anda belum dihubungkan ke Program Studi. Hubungi Super Admin.</Empty>;
   }
 
-  const [indikator, isianList, penugasan] = await Promise.all([
+  // Cari Sesi AMI untuk Prodi Auditee ini (atau sesi umum terbaru)
+  const periode =
+    (await prisma.periode.findFirst({
+      where: { unitId: user.unitId },
+      orderBy: [{ aktif: "desc" }, { createdAt: "desc" }],
+    })) ??
+    (await prisma.periode.findFirst({
+      orderBy: [{ aktif: "desc" }, { createdAt: "desc" }],
+    }));
+
+  if (!periode) {
+    return <Empty>Belum ada Sesi AMI yang dibuat oleh LPM untuk Program Studi {user.unit.nama}.</Empty>;
+  }
+
+  const [indikator, isianList, prodiAuditors] = await Promise.all([
     prisma.indikator.findMany({
       where: { periodeId: periode.id },
       orderBy: [{ urutan: "asc" }, { kode: "asc" }],
@@ -33,59 +34,47 @@ export default async function AuditeePage({ searchParams }: { searchParams: SP }
     prisma.isian.findMany({
       where: { unitId: user.unitId, indikator: { periodeId: periode.id } },
     }),
-    prisma.penugasan.findUnique({
-      where: { periodeId_unitId: { periodeId: periode.id, unitId: user.unitId } },
-      include: { tim: { include: { auditor: true } } },
+    prisma.user.findMany({
+      where: { role: "AUDITOR", unitId: user.unitId, aktif: true },
+      orderBy: { nama: "asc" },
     }),
   ]);
 
   const isianByInd = new Map(isianList.map((i) => [i.indikatorId, i]));
-  const buka = pengisianTerbuka(periode);
-  const bukaRtl = periode.tahap === "PELAPORAN_RTL";
+  const buka = periode.aktif;
 
   return (
     <>
       <PageHeader
-        title={`Portal Evaluasi Diri & Bukti Drive — ${user.unit.nama}`}
-        desc={`Seluruh dokumen bukti disimpan pada Google Drive resmi kampus ITBMP. Tempelkan link Google Drive pada setiap indikator di bawah ini.`}
+        title={`Portal Evaluasi Diri & Bukti Drive — Prodi ${user.unit.nama}`}
+        desc={`${periode.nama} · Tahun Akademik ${periode.tahun} (${periode.semester})`}
       >
         <Badge tone={buka ? "green" : "amber"}>
-          {buka
-            ? `🟢 Sesi Pengisian Terbuka (Cut-Off: ${fmtTanggal(periode.tglCutOff)})`
-            : `🔒 Pengisian Bukti Terkunci (${TAHAP_LABEL[periode.tahap]})`}
+          {buka ? "🟢 Sesi AMI Terbuka (Dapat Mengisi Bukti)" : "🔒 Sesi AMI Terkunci oleh LPM"}
         </Badge>
       </PageHeader>
       <Flash ok={one(sp.ok)} err={one(sp.err)} />
 
-      {/* Info Tim Auditor & Jadwal Unit */}
+      {/* Info Auditor Prodi */}
       <div className="card flex flex-wrap items-center justify-between gap-3 text-xs">
         <div>
-          <span className="font-semibold text-slate-700">Tim Auditor Penilai Unit Anda: </span>
-          {penugasan && penugasan.tim.length > 0 ? (
+          <span className="font-semibold text-slate-700">Auditor Program Studi {user.unit.nama}: </span>
+          {prodiAuditors.length > 0 ? (
             <span className="font-bold text-slate-900">
-              {penugasan.tim.map((t) => `${t.auditor.nama} (${t.peran})`).join(" & ")}
+              {prodiAuditors.map((a) => `${a.nama}${a.nimNuptk ? ` (${a.nimNuptk})` : ""}`).join(", ")}
             </span>
           ) : (
-            <span className="text-slate-500">Belum ditetapkan LPM</span>
+            <span className="text-slate-500">Belum ada akun Auditor untuk Prodi ini</span>
           )}
         </div>
-        <div className="flex flex-wrap gap-3 text-slate-600">
-          <span>
-            <strong>Jadwal Audit Dokumen:</strong>{" "}
-            {penugasan?.jadwalDokumenMulai
-              ? `${fmtTanggal(penugasan.jadwalDokumenMulai)} – ${fmtTanggal(penugasan.jadwalDokumenSelesai)}`
-              : "Perlu verifikasi manual"}
-          </span>
-          <span>
-            <strong>Jadwal Audit Lapangan:</strong>{" "}
-            {penugasan?.jadwalLapanganMulai ? fmtWaktu(penugasan.jadwalLapanganMulai) : "Perlu verifikasi manual"}
-          </span>
+        <div className="text-slate-600">
+          Tempelkan tautan (link) folder/file <strong>Google Drive</strong> resmi pada setiap indikator di bawah ini.
         </div>
       </div>
 
       {/* Daftar Indikator */}
       {indikator.length === 0 ? (
-        <Empty>LPM belum menambahkan indikator pada periode ini.</Empty>
+        <Empty>LPM belum menambahkan indikator pada sesi ini.</Empty>
       ) : (
         <div className="space-y-4">
           {indikator.map((ind) => {
@@ -153,7 +142,7 @@ export default async function AuditeePage({ searchParams }: { searchParams: SP }
                       required
                       disabled={!buka}
                       defaultValue={isian?.klaim ?? ""}
-                      placeholder="Jelaskan pemenuhan standar di prodi/unit Anda..."
+                      placeholder="Jelaskan pemenuhan standar di prodi Anda..."
                       className="w-full"
                     />
                   </div>
@@ -226,7 +215,7 @@ export default async function AuditeePage({ searchParams }: { searchParams: SP }
                         <input
                           name="rtlRencana"
                           required
-                          disabled={!bukaRtl || isian.rtlStatus === "TERVERIFIKASI"}
+                          disabled={!buka || isian.rtlStatus === "TERVERIFIKASI"}
                           defaultValue={isian.rtlRencana ?? ""}
                           placeholder="Uraikan tindakan koreksi yang dilakukan..."
                           className="w-full"
@@ -238,12 +227,12 @@ export default async function AuditeePage({ searchParams }: { searchParams: SP }
                           <input
                             name="rtlLinkBukti"
                             type="url"
-                            disabled={!bukaRtl || isian.rtlStatus === "TERVERIFIKASI"}
+                            disabled={!buka || isian.rtlStatus === "TERVERIFIKASI"}
                             defaultValue={isian.rtlLinkBukti ?? ""}
                             placeholder="https://drive.google.com/drive/folders/..."
                             className="w-full font-mono text-xs"
                           />
-                          {bukaRtl && isian.rtlStatus !== "TERVERIFIKASI" && (
+                          {buka && isian.rtlStatus !== "TERVERIFIKASI" && (
                             <button className="btn shrink-0 text-xs">Simpan RTL</button>
                           )}
                         </div>

@@ -1,143 +1,428 @@
+import Link from "next/link";
 import { requireUser } from "@/lib/auth";
-import { getActivePeriode, TAHAP_DESK, TAHAP_LABEL, TAHAP_URUT, tahapIndex } from "@/lib/periode";
-import { fmtTanggal, toInputDate } from "@/lib/format";
+import { prisma } from "@/lib/prisma";
+import { PRODI_LIST } from "@/lib/roles";
+import { KLASIFIKASI_LABEL, RTL_LABEL, STATUS_DOK_LABEL } from "@/lib/periode";
+import { fmtWaktu } from "@/lib/format";
 import { Badge, Empty, Flash, PageHeader, one, type SP } from "@/components/ui";
-import { buatPeriode, simpanTanggalPeriode, toggleSourceLock, ubahTahapPeriode } from "./actions";
+import { buatSesiAmi, hapusSesiAmi, toggleStatusSesi } from "./actions";
 
 export default async function LpmPage({ searchParams }: { searchParams: SP }) {
   await requireUser("LPM");
   const sp = await searchParams;
-  const periode = await getActivePeriode();
+  const tab = one(sp.tab) ?? "sesi"; // "sesi" | "pantau"
+  const selectedPeriodeId = one(sp.periodeId);
+
+  const [periodes, allUsers] = await Promise.all([
+    prisma.periode.findMany({
+      include: {
+        unit: true,
+        indikator: {
+          orderBy: [{ urutan: "asc" }, { kode: "asc" }],
+          include: { isian: true },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.user.findMany({
+      where: { role: { in: ["AUDITOR", "AUDITEE"] }, aktif: true },
+      include: { unit: true },
+      orderBy: { nama: "asc" },
+    }),
+  ]);
+
+  const activePeriodeForPantau =
+    periodes.find((p) => p.id === selectedPeriodeId) ?? periodes[0] ?? null;
 
   return (
     <>
       <PageHeader
-        title="Pengendali Siklus, Sesi & Source-Lock (LPM)"
-        desc="LPM mengatur tahapan sesi AMI, mengunci sumber data (Source-Lock), serta menetapkan tanggal cut-off pengisian bukti auditee."
+        title="Manajemen Sesi AMI & Pantau Pekerjaan (LPM)"
+        desc="Buat sesi AMI cukup dengan mengisi Tahun Akademik, Semester, dan Prodi. Nama Auditee & Auditor dari Prodi terkait otomatis muncul."
       />
       <Flash ok={one(sp.ok)} err={one(sp.err)} />
 
-      {!periode ? (
-        <Empty>Belum ada periode AMI aktif. Silakan buat periode baru di bawah ini.</Empty>
-      ) : (
+      {/* 2 Tab Utama: 1. Kelola Sesi AMI | 2. Pantau Pekerjaan Auditor & Auditee */}
+      <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+        <Link
+          href="/lpm?tab=sesi"
+          className={tab === "sesi" ? "btn text-xs" : "btn-secondary text-xs"}
+        >
+          📅 1. Buat &amp; Daftar Sesi AMI
+        </Link>
+        <Link
+          href={`/lpm?tab=pantau${activePeriodeForPantau ? `&periodeId=${activePeriodeForPantau.id}` : ""}`}
+          className={tab === "pantau" ? "btn text-xs" : "btn-secondary text-xs"}
+        >
+          👀 2. Pantau Pekerjaan Auditor &amp; Auditee
+        </Link>
+      </div>
+
+      {tab === "sesi" ? (
         <>
-          {/* Kartu Status Siklus & Source-Lock */}
-          <div className="card space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-base font-bold text-slate-900">{periode.nama}</h2>
-                  <Badge tone="blue">{periode.tahun}</Badge>
-                  <Badge tone={periode.sourceLocked ? "amber" : "green"}>
-                    {periode.sourceLocked ? "🔒 Source-Locked (Data Dasar Dikunci)" : "🔓 Source Terbuka (Dapat Diedit)"}
-                  </Badge>
-                </div>
-                <p className="mt-0.5 text-xs text-slate-500">
-                  Prinsip <strong>Source-Lock</strong>: Kunci sumber data sebelum membuat jadwal dan memulai pengisian agar indikator &amp; daftar unit tidak berubah di tengah audit.
-                </p>
-              </div>
-              <form action={toggleSourceLock}>
-                <button className={periode.sourceLocked ? "btn-secondary" : "btn"}>
-                  {periode.sourceLocked ? "🔓 Buka Source-Lock" : "🔒 Kunci Sumber Data (Source-Lock)"}
-                </button>
-              </form>
-            </div>
-
-            {/* 7 Tahapan Siklus AMI (Stage-Gate Controller) */}
+          {/* Form Buat Sesi AMI */}
+          <form action={buatSesiAmi} className="card space-y-4">
             <div>
-              <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-                Tahapan Sesi Siklus AMI (Klik untuk Mengaktifkan / Mengunci Sesi)
-              </h3>
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-                {TAHAP_URUT.map((t) => {
-                  const idx = tahapIndex(t);
-                  const curIdx = tahapIndex(periode.tahap);
-                  const isActive = t === periode.tahap;
-                  const isPast = idx < curIdx;
-                  return (
-                    <div
-                      key={t}
-                      className={`flex flex-col justify-between rounded-lg border p-3.5 ${
-                        isActive
-                          ? "border-blue-500 bg-blue-50/60"
-                          : isPast
-                            ? "border-emerald-200 bg-emerald-50/30"
-                            : "border-slate-200 bg-white"
-                      }`}
-                    >
-                      <div>
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-sm font-bold text-slate-900">{TAHAP_LABEL[t]}</span>
-                          <Badge tone={isActive ? "blue" : isPast ? "green" : "slate"}>
-                            {isActive ? "Sesi Aktif" : isPast ? "Selesai" : "Menunggu"}
-                          </Badge>
-                        </div>
-                        <p className="mt-1 text-xs text-slate-600">{TAHAP_DESK[t]}</p>
-                      </div>
-                      <form action={ubahTahapPeriode} className="mt-3">
-                        <input type="hidden" name="tahap" value={t} />
-                        <button disabled={isActive} className={isActive ? "btn w-full" : "btn-secondary w-full"}>
-                          {isActive ? "✓ Sedang Berlangsung" : "Aktifkan Sesi Ini"}
-                        </button>
-                      </form>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          {/* Kalender & Cut-Off Pengisian Bukti */}
-          <form action={simpanTanggalPeriode} className="card space-y-4">
-            <div>
-              <h2 className="text-base font-bold text-slate-900">Kalender &amp; Tenggat Cut-Off Pengisian Bukti Auditee</h2>
+              <h2 className="text-base font-bold text-slate-900">+ Buat Sesi AMI Baru</h2>
               <p className="text-xs text-slate-500">
-                Jika tanggal <strong>Cut-Off Pengisian Bukti</strong> terlewati atau sesi dipindah ke <em>Audit Dokumen</em>, auditee otomatis tidak bisa mengubah link Google Drive-nya lagi.
+                Pilih Tahun Akademik, Semester (Ganjil/Genap), dan Program Studi. Akun Auditor &amp; Auditee dari Prodi tersebut akan otomatis terdaftar pada sesi ini.
               </p>
             </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div className="space-y-1">
-                <label>Mulai Pengisian Auditee ({fmtTanggal(periode.tglMulaiPengisian)})</label>
-                <input name="tglMulaiPengisian" type="date" defaultValue={toInputDate(periode.tglMulaiPengisian)} className="w-full" />
+                <label>Tahun Akademik</label>
+                <input name="tahun" required defaultValue="2026/2027" placeholder="2026/2027" className="w-full" />
               </div>
               <div className="space-y-1">
-                <label>Batas Cut-Off Bukti Drive ({fmtTanggal(periode.tglCutOff)})</label>
-                <input name="tglCutOff" type="date" defaultValue={toInputDate(periode.tglCutOff)} className="w-full" />
+                <label>Semester</label>
+                <select name="semester" required defaultValue="Ganjil" className="w-full">
+                  <option value="Ganjil">Ganjil</option>
+                  <option value="Genap">Genap</option>
+                </select>
               </div>
               <div className="space-y-1">
-                <label>Tanggal Opening Meeting ({fmtTanggal(periode.tglOpening)})</label>
-                <input name="tglOpening" type="date" defaultValue={toInputDate(periode.tglOpening)} className="w-full" />
-              </div>
-              <div className="space-y-1">
-                <label>Tanggal Closing Meeting ({fmtTanggal(periode.tglClosing)})</label>
-                <input name="tglClosing" type="date" defaultValue={toInputDate(periode.tglClosing)} className="w-full" />
+                <label>Program Studi</label>
+                <div className="flex gap-2">
+                  <select name="prodiKode" required defaultValue="PRODI-BD" className="w-full">
+                    {PRODI_LIST.map((p) => (
+                      <option key={p.kode} value={p.kode}>
+                        {p.nama}
+                      </option>
+                    ))}
+                  </select>
+                  <button className="btn shrink-0">+ Buat Sesi</button>
+                </div>
               </div>
             </div>
-            <button className="btn">Simpan Kalender Periode</button>
           </form>
-        </>
-      )}
 
-      {/* Buat Periode Baru */}
-      <form action={buatPeriode} className="card space-y-3">
-        <div>
-          <h2 className="text-base font-bold text-slate-900">Buat Siklus / Periode AMI Baru</h2>
-          <p className="text-xs text-slate-500">Membuat periode baru akan menjadikan periode tersebut sebagai periode aktif.</p>
-        </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <div className="space-y-1 sm:col-span-2">
-            <label>Nama Siklus / Periode AMI</label>
-            <input name="nama" required placeholder="AMI Siklus Tahun Akademik 2026/2027 Ganjil" className="w-full" />
-          </div>
-          <div className="space-y-1">
-            <label>Tahun Akademik</label>
-            <div className="flex gap-2">
-              <input name="tahun" required placeholder="2026/2027" className="w-full" />
-              <button className="btn shrink-0">Buat</button>
+          {/* Daftar Sesi AMI & Otomatis Muncul Nama Auditee + Auditor */}
+          {periodes.length === 0 ? (
+            <Empty>Belum ada Sesi AMI yang dibuat. Silakan isi form di atas untuk membuat Sesi AMI.</Empty>
+          ) : (
+            <div className="space-y-4">
+              {periodes.map((p) => {
+                const prodiAuditees = allUsers.filter(
+                  (u) => u.role === "AUDITEE" && (p.unitId ? u.unitId === p.unitId : true)
+                );
+                const prodiAuditors = allUsers.filter(
+                  (u) => u.role === "AUDITOR" && (p.unitId ? u.unitId === p.unitId : true)
+                );
+                const totalInd = p.indikator.length;
+                const terisiDrive = p.indikator.filter((ind) =>
+                  ind.isian.some((i) => (!p.unitId || i.unitId === p.unitId) && i.linkDrive)
+                ).length;
+                const dinilaiAuditor = p.indikator.filter((ind) =>
+                  ind.isian.some((i) => (!p.unitId || i.unitId === p.unitId) && i.klasifikasi)
+                ).length;
+
+                return (
+                  <div key={p.id} className="card space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-base font-bold text-slate-900">{p.nama}</h3>
+                          <Badge tone="blue">Tahun: {p.tahun}</Badge>
+                          <Badge tone="purple">Semester: {p.semester}</Badge>
+                          {p.unit && <Badge tone="slate">Prodi: {p.unit.nama}</Badge>}
+                          <Badge tone={p.aktif ? "green" : "amber"}>
+                            {p.aktif ? "🟢 Sesi Terbuka (Aktif)" : "🔒 Sesi Terkunci"}
+                          </Badge>
+                        </div>
+                        <p className="mt-1 text-xs text-slate-500">
+                          Progres Bukti Auditee: <strong>{terisiDrive}/{totalInd} Indikator</strong> · Progres Penilaian Auditor: <strong>{dinilaiAuditor}/{totalInd} Indikator</strong>
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Link
+                          href={`/lpm?tab=pantau&periodeId=${p.id}`}
+                          className="btn text-xs"
+                        >
+                          👀 Lihat Pekerjaan Auditor &amp; Auditee
+                        </Link>
+                        <form action={toggleStatusSesi}>
+                          <input type="hidden" name="periodeId" value={p.id} />
+                          <button className="btn-secondary text-xs">
+                            {p.aktif ? "🔒 Kunci Sesi" : "🔓 Buka Sesi"}
+                          </button>
+                        </form>
+                        <form action={hapusSesiAmi}>
+                          <input type="hidden" name="periodeId" value={p.id} />
+                          <button className="btn-danger text-xs">Hapus</button>
+                        </form>
+                      </div>
+                    </div>
+
+                    {/* Kotak Otomatis Nama Auditee & Nama Auditor dari Prodi yang Dipilih */}
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3.5 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold uppercase tracking-wide text-slate-700">
+                            👤 Auditee Terdaftar ({p.unit?.nama ?? "Semua Prodi"})
+                          </span>
+                          <Badge tone="blue">{prodiAuditees.length} Akun</Badge>
+                        </div>
+                        {prodiAuditees.length === 0 ? (
+                          <p className="text-xs text-slate-400">
+                            Belum ada akun Auditee untuk Prodi {p.unit?.nama ?? "ini"}. Tambahkan di menu Super Admin.
+                          </p>
+                        ) : (
+                          <ul className="space-y-1.5 text-xs">
+                            {prodiAuditees.map((a) => (
+                              <li key={a.id} className="flex items-center justify-between rounded bg-white px-2.5 py-1.5 border border-slate-200">
+                                <div>
+                                  <span className="font-semibold text-slate-900">{a.nama}</span>
+                                  {a.nimNuptk && <span className="ml-1.5 text-slate-500">({a.nimNuptk})</span>}
+                                </div>
+                                <code className="text-slate-600">{a.username}</code>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+
+                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3.5 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold uppercase tracking-wide text-slate-700">
+                            🕵️ Auditor Terdaftar ({p.unit?.nama ?? "Semua Prodi"})
+                          </span>
+                          <Badge tone="green">{prodiAuditors.length} Akun</Badge>
+                        </div>
+                        {prodiAuditors.length === 0 ? (
+                          <p className="text-xs text-slate-400">
+                            Belum ada akun Auditor untuk Prodi {p.unit?.nama ?? "ini"}. Tambahkan di menu Super Admin.
+                          </p>
+                        ) : (
+                          <ul className="space-y-1.5 text-xs">
+                            {prodiAuditors.map((a) => (
+                              <li key={a.id} className="flex items-center justify-between rounded bg-white px-2.5 py-1.5 border border-slate-200">
+                                <div>
+                                  <span className="font-semibold text-slate-900">{a.nama}</span>
+                                  {a.nimNuptk && <span className="ml-1.5 text-slate-500">({a.nimNuptk})</span>}
+                                </div>
+                                <code className="text-slate-600">{a.username}</code>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          </div>
+          )}
+        </>
+      ) : (
+        /* TAB 2: PANTAU PEKERJAAN AUDITOR DAN AUDITEE */
+        <div className="space-y-4">
+          {periodes.length === 0 || !activePeriodeForPantau ? (
+            <Empty>Belum ada Sesi AMI untuk dipantau.</Empty>
+          ) : (
+            <>
+              {/* Pilihan Sesi AMI yang Ingin Dipantau */}
+              <div className="card flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-bold text-slate-900">
+                    Pantau Pekerjaan: {activePeriodeForPantau.nama}
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Menampilkan secara langsung apa saja yang telah diisi oleh <strong>Auditee</strong> dan diperiksa oleh <strong>Auditor</strong> pada Prodi <strong>{activePeriodeForPantau.unit?.nama ?? "Terkait"}</strong>.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {periodes.map((p) => (
+                    <Link
+                      key={p.id}
+                      href={`/lpm?tab=pantau&periodeId=${p.id}`}
+                      className={p.id === activePeriodeForPantau.id ? "btn text-xs" : "btn-secondary text-xs"}
+                    >
+                      {p.unit?.nama ?? p.nama} ({p.tahun} {p.semester})
+                    </Link>
+                  ))}
+                </div>
+              </div>
+
+              {/* Info Nama Auditee & Auditor pada Sesi Ini */}
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="card space-y-1.5">
+                  <div className="text-xs font-bold uppercase text-slate-500">Auditee pada Sesi Ini</div>
+                  <div className="text-sm font-semibold text-slate-900">
+                    {allUsers
+                      .filter((u) => u.role === "AUDITEE" && (!activePeriodeForPantau.unitId || u.unitId === activePeriodeForPantau.unitId))
+                      .map((u) => `${u.nama} (${u.nimNuptk || u.username})`)
+                      .join(", ") || "Belum ada akun Auditee"}
+                  </div>
+                </div>
+                <div className="card space-y-1.5">
+                  <div className="text-xs font-bold uppercase text-slate-500">Auditor pada Sesi Ini</div>
+                  <div className="text-sm font-semibold text-slate-900">
+                    {allUsers
+                      .filter((u) => u.role === "AUDITOR" && (!activePeriodeForPantau.unitId || u.unitId === activePeriodeForPantau.unitId))
+                      .map((u) => `${u.nama} (${u.nimNuptk || u.username})`)
+                      .join(", ") || "Belum ada akun Auditor"}
+                  </div>
+                </div>
+              </div>
+
+              {/* Tabel Detail Pekerjaan Auditee vs Pekerjaan Auditor */}
+              <div className="card overflow-x-auto space-y-3">
+                <h3 className="text-sm font-bold text-slate-900">
+                  Tabel Rincian Pekerjaan Auditee &amp; Auditor per Indikator
+                </h3>
+                {activePeriodeForPantau.indikator.length === 0 ? (
+                  <Empty>Belum ada indikator pada sesi ini. Tambahkan di menu Indikator SPMI.</Empty>
+                ) : (
+                  <table>
+                    <thead>
+                      <tr>
+                        <th className="w-56">Indikator SPMI</th>
+                        <th>Pekerjaan Auditee (Evaluasi Diri, Link Drive &amp; RTL)</th>
+                        <th>Pekerjaan Auditor (Desk Audit, Temuan Lapangan &amp; Verifikasi)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {activePeriodeForPantau.indikator.map((ind) => {
+                        const isian =
+                          ind.isian.find((i) =>
+                            activePeriodeForPantau.unitId ? i.unitId === activePeriodeForPantau.unitId : true
+                          ) ?? ind.isian[0];
+
+                        return (
+                          <tr key={ind.id}>
+                            <td>
+                              <code className="rounded bg-blue-50 px-1.5 py-0.5 text-xs font-bold text-blue-700">
+                                {ind.kode}
+                              </code>
+                              <div className="mt-1 font-semibold text-slate-900">{ind.standar}</div>
+                              <div className="mt-0.5 text-xs text-slate-600">{ind.pernyataan}</div>
+                              <div className="mt-1 text-xs font-medium text-slate-500">Target: {ind.target}</div>
+                            </td>
+
+                            {/* Kolom Pekerjaan Auditee */}
+                            <td className="space-y-2 text-xs">
+                              {isian?.klaim || isian?.linkDrive ? (
+                                <>
+                                  <div>
+                                    <span className="font-semibold text-slate-700">Klaim Evaluasi Diri: </span>
+                                    <span className="text-slate-800">{isian.klaim || "—"}</span>
+                                  </div>
+                                  <div>
+                                    <span className="font-semibold text-slate-700">Bukti Google Drive: </span>
+                                    {isian.linkDrive ? (
+                                      <a
+                                        href={isian.linkDrive}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="font-mono font-semibold text-blue-600 underline"
+                                      >
+                                        ↗ Buka Link Google Drive
+                                      </a>
+                                    ) : (
+                                      <Badge tone="amber">Belum Diunggah</Badge>
+                                    )}
+                                  </div>
+                                  {isian.rtlRencana && (
+                                    <div className="rounded border border-amber-200 bg-amber-50 p-2">
+                                      <div>
+                                        <strong>Rencana Tindak Lanjut (RTL):</strong> {isian.rtlRencana}
+                                      </div>
+                                      {isian.rtlLinkBukti && (
+                                        <div className="mt-1">
+                                          <a
+                                            href={isian.rtlLinkBukti}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="font-mono text-blue-600 underline"
+                                          >
+                                            ↗ Bukti Drive Perbaikan (RTL)
+                                          </a>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </>
+                              ) : (
+                                <Badge tone="amber">⏳ Auditee Belum Mengisi</Badge>
+                              )}
+                            </td>
+
+                            {/* Kolom Pekerjaan Auditor */}
+                            <td className="space-y-2 text-xs">
+                              {isian && (isian.statusDokumen !== "BELUM_DICEK" || isian.catatanDokumen || isian.klasifikasi) ? (
+                                <>
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    <Badge
+                                      tone={
+                                        isian.statusDokumen === "LENGKAP"
+                                          ? "green"
+                                          : isian.statusDokumen === "PERLU_KLARIFIKASI"
+                                            ? "amber"
+                                            : "slate"
+                                      }
+                                    >
+                                      Desk Audit: {STATUS_DOK_LABEL[isian.statusDokumen]}
+                                    </Badge>
+                                    {isian.klasifikasi && (
+                                      <Badge
+                                        tone={
+                                          isian.klasifikasi === "MELAMPAUI" || isian.klasifikasi === "MENCAPAI"
+                                            ? "green"
+                                            : isian.klasifikasi === "OBSERVASI"
+                                              ? "blue"
+                                              : isian.klasifikasi === "KTS_MINOR"
+                                                ? "amber"
+                                                : "red"
+                                        }
+                                      >
+                                        Temuan: {KLASIFIKASI_LABEL[isian.klasifikasi]}
+                                      </Badge>
+                                    )}
+                                    <Badge tone={isian.rtlStatus === "TERVERIFIKASI" ? "green" : "slate"}>
+                                      RTL: {RTL_LABEL[isian.rtlStatus]}
+                                    </Badge>
+                                  </div>
+
+                                  {isian.catatanDokumen && (
+                                    <div>
+                                      <strong>Catatan Audit Dokumen:</strong> {isian.catatanDokumen}
+                                    </div>
+                                  )}
+                                  {isian.catatanLapangan && (
+                                    <div>
+                                      <strong>Catatan Audit Lapangan:</strong> {isian.catatanLapangan}
+                                    </div>
+                                  )}
+                                  {isian.rekomendasi && (
+                                    <div>
+                                      <strong>Rekomendasi Auditor:</strong> {isian.rekomendasi}
+                                    </div>
+                                  )}
+                                  {isian.rtlCatatanAuditor && (
+                                    <div>
+                                      <strong>Catatan Verifikasi RTL:</strong> {isian.rtlCatatanAuditor}
+                                    </div>
+                                  )}
+                                  <div className="text-slate-400">
+                                    Terakhir diperbarui: {fmtWaktu(isian.updatedAt)}
+                                  </div>
+                                </>
+                              ) : (
+                                <Badge tone="slate">⏳ Auditor Belum Memeriksa</Badge>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </>
+          )}
         </div>
-      </form>
+      )}
     </>
   );
 }

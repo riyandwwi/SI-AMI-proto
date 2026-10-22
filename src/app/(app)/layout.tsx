@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
-import { getActivePeriode, TAHAP_LABEL } from "@/lib/periode";
 import { ROLE_LABEL } from "@/lib/roles";
 import { NavLinks } from "@/components/NavLinks";
 import { Badge } from "@/components/ui";
@@ -9,20 +8,17 @@ import { logout } from "@/app/login/actions";
 const NAV = {
   SUPER_ADMIN: [{ href: "/admin", label: "Kelola Akun Pengguna" }],
   LPM: [
-    { href: "/lpm", label: "Sesi & Periode" },
-    { href: "/lpm/unit", label: "Prodi / Auditee" },
-    { href: "/lpm/indikator", label: "Indikator" },
-    { href: "/lpm/penugasan", label: "Tim & Jadwal" },
+    { href: "/lpm", label: "Sesi AMI & Pantau Pekerjaan" },
+    { href: "/lpm/indikator", label: "Indikator SPMI" },
     { href: "/lpm/rekap", label: "Rekap & Pengesahan" },
-    { href: "/lpm/log", label: "Log" },
+    { href: "/lpm/log", label: "Log Aktivitas" },
   ],
-  AUDITOR: [{ href: "/auditor", label: "Penugasan Saya" }],
-  AUDITEE: [{ href: "/auditee", label: "Evaluasi Diri & Bukti" }],
+  AUDITOR: [{ href: "/auditor", label: "Sesi Audit Saya" }],
+  AUDITEE: [{ href: "/auditee", label: "Evaluasi Diri & Bukti Drive" }],
 } as const;
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
-  const periode = await getActivePeriode();
 
   return (
     <div className="min-h-screen">
@@ -32,16 +28,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-xs font-bold text-white">AMI</div>
             <div>
               <div className="text-sm font-bold text-slate-900">SI-AMI ITBMP</div>
-              <div className="text-xs text-slate-500">
-                {periode ? (
-                  <>
-                    {periode.nama} · <span className="font-semibold text-blue-700">{TAHAP_LABEL[periode.tahap]}</span>
-                    {periode.sourceLocked && <> · 🔒 source-lock</>}
-                  </>
-                ) : (
-                  "Belum ada periode aktif"
-                )}
-              </div>
+              <div className="text-xs text-slate-500">Sistem Audit Mutu Internal Kampus ITBMP</div>
             </div>
           </div>
           <div className="flex items-center gap-3 text-sm">

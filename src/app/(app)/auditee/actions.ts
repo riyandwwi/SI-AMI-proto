@@ -3,18 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
-import { BUTUH_RTL, getActivePeriode, pengisianTerbuka } from "@/lib/periode";
+import { BUTUH_RTL } from "@/lib/periode";
 import { catat, fail, isGoogleDriveLink, ok, str } from "@/lib/actions";
 
 export async function simpanIsianAuditee(fd: FormData) {
   const user = await requireUser("AUDITEE");
-  if (!user.unitId) fail("/auditee", "Akun Auditee Anda belum terhubung ke Unit / Program Studi ITBMP.");
-
-  const periode = await getActivePeriode();
-  if (!periode) fail("/auditee", "Belum ada periode AMI aktif.");
-  if (!pengisianTerbuka(periode)) {
-    fail("/auditee", "Sesi pengisian bukti Google Drive sedang terkunci atau telah melewati batas Cut-Off LPM.");
-  }
+  if (!user.unitId) fail("/auditee", "Akun Auditee Anda belum terhubung ke Program Studi.");
 
   const indikatorId = str(fd, "indikatorId", 64);
   const klaim = str(fd, "klaim", 2000);
@@ -27,8 +21,14 @@ export async function simpanIsianAuditee(fd: FormData) {
     fail("/auditee", "Tautan bukti wajib berupa link resmi Google Drive / Google Docs (https://drive.google.com/... atau https://docs.google.com/...).");
   }
 
-  const ind = await prisma.indikator.findUnique({ where: { id: indikatorId } });
-  if (!ind || ind.periodeId !== periode.id) fail("/auditee", "Indikator tidak ditemukan pada periode aktif.");
+  const ind = await prisma.indikator.findUnique({
+    where: { id: indikatorId },
+    include: { periode: true },
+  });
+  if (!ind) fail("/auditee", "Indikator tidak ditemukan.");
+  if (!ind.periode.aktif) {
+    fail("/auditee", "Sesi AMI ini sedang dikunci oleh LPM.");
+  }
 
   await prisma.isian.upsert({
     where: { indikatorId_unitId: { indikatorId, unitId: user.unitId } },
@@ -44,20 +44,15 @@ export async function simpanIsianAuditee(fd: FormData) {
     },
   });
 
-  await catat(user.id, "ISI_BUKTI_DRIVE", `${user.unit?.kode ?? ""}: ${ind.kode}`);
+  await catat(user.id, "ISI_BUKTI_DRIVE", `${user.unit?.nama ?? ""}: ${ind.kode}`);
   revalidatePath("/auditee");
+  revalidatePath("/lpm");
   ok("/auditee", `Bukti Google Drive untuk indikator "${ind.kode}" berhasil disimpan.`);
 }
 
 export async function simpanRtlAuditee(fd: FormData) {
   const user = await requireUser("AUDITEE");
-  if (!user.unitId) fail("/auditee", "Akun Auditee Anda belum terhubung ke Unit.");
-
-  const periode = await getActivePeriode();
-  if (!periode) fail("/auditee", "Belum ada periode aktif.");
-  if (periode.tahap !== "PELAPORAN_RTL") {
-    fail("/auditee", "Pengisian Rencana Tindak Lanjut (RTL) hanya dapat dilakukan pada sesi Pelaporan & Tindak Lanjut.");
-  }
+  if (!user.unitId) fail("/auditee", "Akun Auditee Anda belum terhubung ke Program Studi.");
 
   const isianId = str(fd, "isianId", 64);
   const rtlRencana = str(fd, "rtlRencana", 2000);
@@ -70,9 +65,10 @@ export async function simpanRtlAuditee(fd: FormData) {
 
   const isian = await prisma.isian.findUnique({
     where: { id: isianId },
-    include: { indikator: true },
+    include: { indikator: { include: { periode: true } } },
   });
   if (!isian || isian.unitId !== user.unitId) fail("/auditee", "Data isian tidak ditemukan.");
+  if (!isian.indikator.periode.aktif) fail("/auditee", "Sesi AMI sedang dikunci oleh LPM.");
   if (!isian.klasifikasi || !BUTUH_RTL.includes(isian.klasifikasi)) {
     fail("/auditee", "Indikator ini tidak memerlukan tindak lanjut perbaikan.");
   }
@@ -89,5 +85,6 @@ export async function simpanRtlAuditee(fd: FormData) {
 
   await catat(user.id, "ISI_RTL_AUDITEE", `${isian.indikator.kode} -> ${nextStatus}`);
   revalidatePath("/auditee");
+  revalidatePath("/lpm");
   ok("/auditee", `Tindak lanjut (RTL) untuk "${isian.indikator.kode}" berhasil disimpan.`);
 }

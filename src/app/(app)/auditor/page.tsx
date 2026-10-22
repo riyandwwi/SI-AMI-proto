@@ -1,85 +1,92 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getActivePeriode, TAHAP_LABEL } from "@/lib/periode";
-import { fmtTanggal, fmtWaktu } from "@/lib/format";
 import { Badge, Empty, Flash, PageHeader, one, type SP } from "@/components/ui";
 
 export default async function AuditorListPage({ searchParams }: { searchParams: SP }) {
   const user = await requireUser("AUDITOR");
   const sp = await searchParams;
-  const periode = await getActivePeriode();
 
-  if (!periode) return <Empty>Belum ada periode AMI aktif.</Empty>;
-
-  const [tugas, jmlIndikator] = await Promise.all([
-    prisma.penugasanAuditor.findMany({
-      where: { auditorId: user.id, penugasan: { periodeId: periode.id } },
+  // Tampilkan Sesi AMI sesuai Prodi tempat Auditor terdaftar (atau semua sesi jika tidak terikat prodi)
+  const [periodes, auditees] = await Promise.all([
+    prisma.periode.findMany({
+      where: user.unitId ? { unitId: user.unitId } : undefined,
       include: {
-        penugasan: {
-          include: {
-            unit: true,
-            tim: { include: { auditor: true } },
-          },
-        },
+        unit: true,
+        indikator: { include: { isian: true } },
       },
+      orderBy: [{ aktif: "desc" }, { createdAt: "desc" }],
     }),
-    prisma.indikator.count({ where: { periodeId: periode.id } }),
+    prisma.user.findMany({
+      where: { role: "AUDITEE", aktif: true, ...(user.unitId ? { unitId: user.unitId } : {}) },
+      orderBy: { nama: "asc" },
+    }),
   ]);
 
   return (
     <>
       <PageHeader
-        title="Daftar Penugasan Audit Saya (Auditor Internal)"
-        desc={`${periode.nama} — Sesi Saat Ini: ${TAHAP_LABEL[periode.tahap]}. Tim yang memeriksa dokumen dipertahankan untuk audit lapangan (Team Continuity).`}
+        title={`Daftar Sesi Audit Saya — ${user.unit?.nama ?? "Auditor Internal"}`}
+        desc="Sesi AMI otomatis terhubung berdasarkan Program Studi akun Auditor Anda."
       />
       <Flash ok={one(sp.ok)} err={one(sp.err)} />
 
-      {tugas.length === 0 ? (
-        <Empty>Anda belum memiliki penugasan unit auditee pada periode aktif ini.</Empty>
+      {periodes.length === 0 ? (
+        <Empty>
+          Belum ada Sesi AMI yang dibuat oleh LPM untuk Program Studi {user.unit?.nama ?? "Anda"}.
+        </Empty>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {tugas.map(({ peran, penugasan }) => {
-            const rekan = penugasan.tim.filter((t) => t.auditorId !== user.id).map((t) => t.auditor.nama);
+          {periodes.map((p) => {
+            const prodiAuditees = auditees.filter((a) => !p.unitId || a.unitId === p.unitId);
+            const jmlInd = p.indikator.length;
+            const jmlDrive = p.indikator.filter((ind) =>
+              ind.isian.some((i) => (!p.unitId || i.unitId === p.unitId) && i.linkDrive)
+            ).length;
+            const jmlDinilai = p.indikator.filter((ind) =>
+              ind.isian.some((i) => (!p.unitId || i.unitId === p.unitId) && i.klasifikasi)
+            ).length;
+
             return (
-              <div key={penugasan.id} className="card flex flex-col justify-between space-y-4">
+              <div key={p.id} className="card flex flex-col justify-between space-y-4">
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <code className="rounded bg-slate-100 px-2 py-0.5 text-xs font-bold">{penugasan.unit.kode}</code>
-                      <h2 className="text-base font-bold text-slate-900">{penugasan.unit.nama}</h2>
-                    </div>
-                    <Badge tone={peran === "KETUA" ? "blue" : "slate"}>Peran: {peran}</Badge>
+                    <h2 className="text-base font-bold text-slate-900">{p.nama}</h2>
+                    <Badge tone={p.aktif ? "green" : "amber"}>
+                      {p.aktif ? "🟢 Sesi Terbuka" : "🔒 Sesi Terkunci"}
+                    </Badge>
                   </div>
 
-                  <div className="text-xs text-slate-600 space-y-1">
+                  <div className="flex flex-wrap gap-1.5">
+                    <Badge tone="blue">Tahun: {p.tahun}</Badge>
+                    <Badge tone="purple">Semester: {p.semester}</Badge>
+                    {p.unit && <Badge tone="slate">Prodi: {p.unit.nama}</Badge>}
+                  </div>
+
+                  <div className="pt-1 text-xs text-slate-600 space-y-1">
                     <div>
-                      <strong>Rekan Tim Auditor:</strong> {rekan.length ? rekan.join(", ") : "—"}
+                      <strong>Auditee Prodi Ini:</strong>{" "}
+                      {prodiAuditees.length > 0
+                        ? prodiAuditees.map((a) => `${a.nama}${a.nimNuptk ? ` (${a.nimNuptk})` : ""}`).join(", ")
+                        : "Belum ada akun Auditee"}
                     </div>
                     <div>
-                      <strong>Jadwal Audit Dokumen:</strong>{" "}
-                      {penugasan.jadwalDokumenMulai
-                        ? `${fmtTanggal(penugasan.jadwalDokumenMulai)} s.d ${fmtTanggal(penugasan.jadwalDokumenSelesai)}`
-                        : "Perlu verifikasi manual"}
+                      <strong>Bukti Drive Diunggah Auditee:</strong> {jmlDrive} / {jmlInd} Indikator
                     </div>
                     <div>
-                      <strong>Jadwal Visitasi Lapangan:</strong>{" "}
-                      {penugasan.jadwalLapanganMulai ? fmtWaktu(penugasan.jadwalLapanganMulai) : "Perlu verifikasi manual"}
-                    </div>
-                    <div>
-                      <strong>Total Indikator SPMI:</strong> {jmlIndikator} Indikator
+                      <strong>Indikator Selesai Dinilai:</strong> {jmlDinilai} / {jmlInd} Indikator
                     </div>
                   </div>
                 </div>
 
-                <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
-                  <Link href={`/auditor/${penugasan.unitId}?mode=dokumen`} className="btn text-xs">
+                <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-3">
+                  <Link href={`/auditor/${p.id}?mode=dokumen`} className="btn text-xs">
                     📄 1. Audit Dokumen (Cek Link Drive)
                   </Link>
-                  <Link href={`/auditor/${penugasan.unitId}?mode=lapangan`} className="btn-secondary text-xs">
+                  <Link href={`/auditor/${p.id}?mode=lapangan`} className="btn-secondary text-xs">
                     🏛️ 2. Audit Lapangan &amp; Temuan
                   </Link>
-                  <Link href={`/auditor/${penugasan.unitId}?mode=rtl`} className="btn-secondary text-xs">
+                  <Link href={`/auditor/${p.id}?mode=rtl`} className="btn-secondary text-xs">
                     🛠️ 3. Verifikasi RTL
                   </Link>
                 </div>

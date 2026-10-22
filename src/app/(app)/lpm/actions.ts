@@ -1,162 +1,139 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import type { Tahap } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
-import { getActivePeriode, TAHAP_LABEL, TAHAP_URUT } from "@/lib/periode";
-import { parseDate, parseDateTime } from "@/lib/format";
-import { buatUsulanTim } from "@/lib/planner";
-import { cekKonsistensi, isuBlokir } from "@/lib/qc";
+import { PRODI_LIST } from "@/lib/roles";
 import { catat, fail, ok, str } from "@/lib/actions";
 
+const DEFAULT_INDIKATOR = [
+  {
+    kode: "STD-PEND-01",
+    standar: "Standar Isi Pembelajaran",
+    pernyataan:
+      "Ketersediaan dokumen Kurikulum Berbasis OBE dan RPS lengkap untuk seluruh mata kuliah aktif semester berjalan.",
+    target: "100% Mata Kuliah",
+    buktiDiminta: "Folder Google Drive berisi SK Kurikulum OBE, Matriks CPL, dan file RPS seluruh mata kuliah.",
+    urutan: 1,
+  },
+  {
+    kode: "STD-PEND-02",
+    standar: "Standar Proses Pembelajaran",
+    pernyataan:
+      "Pelaksanaan monitoring kehadiran dosen dan kesesuaian materi perkuliahan minimal 14-16 pertemuan per semester beserta berita acara.",
+    target: ">= 95% Kehadiran",
+    buktiDiminta: "Folder Google Drive berisi rekap presensi perkuliahan, jurnal perkuliahan, dan laporan monev pembelajaran.",
+    urutan: 2,
+  },
+  {
+    kode: "STD-PENEL-01",
+    standar: "Standar Penelitian & PKM",
+    pernyataan:
+      "Keterlibatan mahasiswa dalam peta jalan penelitian dosen tetap program studi yang dibuktikan dengan SK/Kontrak atau publikasi bersama.",
+    target: ">= 30% Penelitian Dosen",
+    buktiDiminta: "Folder Google Drive berisi SK/Kontrak penelitian dosen melibatkan mahasiswa dan artikel luaran.",
+    urutan: 3,
+  },
+];
+
 // ====================================================
-// 1. PERIODE, SESI (STAGE GATE), & SOURCE-LOCK
+// 1. KELOLA SESI AMI (TAHUN AKADEMIK, SEMESTER, PRODI)
 // ====================================================
-export async function buatPeriode(fd: FormData) {
+export async function buatSesiAmi(fd: FormData) {
   const user = await requireUser("LPM");
-  const nama = str(fd, "nama", 120);
   const tahun = str(fd, "tahun", 32);
-  if (!nama || !tahun) fail("/lpm", "Nama periode dan tahun wajib diisi.");
+  const semester = str(fd, "semester", 16);
+  const prodiKode = str(fd, "prodiKode", 32);
 
-  await prisma.periode.updateMany({ data: { aktif: false } });
+  if (!tahun || !semester || !prodiKode) {
+    fail("/lpm", "Tahun Akademik, Semester, dan Program Studi wajib diisi.");
+  }
+  if (semester !== "Ganjil" && semester !== "Genap") {
+    fail("/lpm", "Semester harus Ganjil atau Genap.");
+  }
+
+  const prodiDef = PRODI_LIST.find((p) => p.kode === prodiKode);
+  if (!prodiDef) fail("/lpm", "Program Studi tidak valid.");
+
+  const unit = await prisma.unit.upsert({
+    where: { kode: prodiDef.kode },
+    update: { nama: prodiDef.nama },
+    create: { kode: prodiDef.kode, nama: prodiDef.nama, jenis: "PRODI", diaudit: true },
+  });
+
+  // Ambil template indikator dari sesi terakhir jika ada, atau gunakan default
+  const lastPeriode = await prisma.periode.findFirst({
+    include: { indikator: { orderBy: { urutan: "asc" } } },
+    orderBy: { createdAt: "desc" },
+  });
+  const sourceIndikator =
+    lastPeriode && lastPeriode.indikator.length > 0
+      ? lastPeriode.indikator.map((i, idx) => ({
+          kode: i.kode,
+          standar: i.standar,
+          pernyataan: i.pernyataan,
+          target: i.target,
+          buktiDiminta: i.buktiDiminta,
+          urutan: idx + 1,
+        }))
+      : DEFAULT_INDIKATOR;
+
+  const nama = `AMI ${unit.nama} — ${tahun} (${semester})`;
   const p = await prisma.periode.create({
-    data: { nama, tahun, tahap: "PERSIAPAN", sourceLocked: false, aktif: true },
+    data: {
+      nama,
+      tahun,
+      semester,
+      unitId: unit.id,
+      tahap: "PENGISIAN",
+      sourceLocked: false,
+      aktif: true,
+      indikator: {
+        create: sourceIndikator,
+      },
+    },
   });
 
-  await catat(user.id, "BUAT_PERIODE", `${p.nama} (${p.tahun})`);
+  await catat(user.id, "BUAT_SESI_AMI", `${p.nama}`);
   revalidatePath("/lpm");
-  ok("/lpm", `Periode "${p.nama}" dibuat dan diaktifkan.`);
+  ok("/lpm", `Sesi "${p.nama}" berhasil dibuat. Auditor & Auditee dari Prodi ${unit.nama} otomatis terhubung.`);
 }
 
-export async function ubahTahapPeriode(fd: FormData) {
+export async function toggleStatusSesi(fd: FormData) {
   const user = await requireUser("LPM");
-  const tahapBaru = str(fd, "tahap", 40) as Tahap;
-  if (!TAHAP_URUT.includes(tahapBaru)) fail("/lpm", "Tahap tidak valid.");
+  const periodeId = str(fd, "periodeId", 64);
+  const p = await prisma.periode.findUnique({ where: { id: periodeId } });
+  if (!p) fail("/lpm", "Sesi AMI tidak ditemukan.");
 
-  const periode = await getActivePeriode();
-  if (!periode) fail("/lpm", "Belum ada periode aktif.");
-
-  // Jika maju dari PERSIAPAN ke PENGISIAN atau tahap berikutnya, wajib mengunci sumber (source-lock) dulu
-  if (tahapBaru !== "PERSIAPAN" && !periode.sourceLocked) {
-    await prisma.periode.update({
-      where: { id: periode.id },
-      data: { tahap: tahapBaru, sourceLocked: true },
-    });
-    await catat(user.id, "UBAH_TAHAP_DAN_LOCK", `${periode.nama} -> ${TAHAP_LABEL[tahapBaru]} (otomatis Source-Lock)`);
-    revalidatePath("/lpm");
-    ok("/lpm", `Sesi dipindahkan ke "${TAHAP_LABEL[tahapBaru]}" dan Source-Lock otomatis diaktifkan.`);
-  }
-
+  const nextAktif = !p.aktif;
   await prisma.periode.update({
-    where: { id: periode.id },
-    data: { tahap: tahapBaru },
+    where: { id: periodeId },
+    data: { aktif: nextAktif },
   });
-  await catat(user.id, "UBAH_TAHAP_SESI", `${periode.nama} -> ${TAHAP_LABEL[tahapBaru]}`);
+
+  await catat(user.id, nextAktif ? "BUKA_SESI_AMI" : "KUNCI_SESI_AMI", p.nama);
   revalidatePath("/lpm");
-  ok("/lpm", `Sesi aktif berhasil diubah ke "${TAHAP_LABEL[tahapBaru]}".`);
+  ok("/lpm", `Sesi "${p.nama}" sekarang ${nextAktif ? "TERBUKA (Aktif)" : "TERKUNCI (Selesai)"}.`);
 }
 
-export async function toggleSourceLock() {
+export async function hapusSesiAmi(fd: FormData) {
   const user = await requireUser("LPM");
-  const periode = await getActivePeriode();
-  if (!periode) fail("/lpm", "Belum ada periode aktif.");
+  const periodeId = str(fd, "periodeId", 64);
+  const p = await prisma.periode.findUnique({ where: { id: periodeId } });
+  if (!p) fail("/lpm", "Sesi AMI tidak ditemukan.");
 
-  const nextLocked = !periode.sourceLocked;
-  if (nextLocked) {
-    const jmlIndikator = await prisma.indikator.count({ where: { periodeId: periode.id } });
-    if (jmlIndikator === 0) fail("/lpm", "Tambahkan minimal 1 indikator sebelum mengaktifkan Source-Lock.");
-  }
-
-  await prisma.periode.update({
-    where: { id: periode.id },
-    data: { sourceLocked: nextLocked },
-  });
-  await catat(user.id, nextLocked ? "AKTIFKAN_SOURCE_LOCK" : "BUKA_SOURCE_LOCK", periode.nama);
+  await prisma.periode.delete({ where: { id: periodeId } });
+  await catat(user.id, "HAPUS_SESI_AMI", p.nama);
   revalidatePath("/lpm");
-  revalidatePath("/lpm/indikator");
-  revalidatePath("/lpm/unit");
-  ok(
-    "/lpm",
-    nextLocked
-      ? "Source-Lock DIAKTIFKAN: Daftar indikator & unit dikunci sebagai sumber resmi."
-      : "Source-Lock DIBUKA: LPM dapat mengedit kembali indikator dan unit.",
-  );
-}
-
-export async function simpanTanggalPeriode(fd: FormData) {
-  const user = await requireUser("LPM");
-  const periode = await getActivePeriode();
-  if (!periode) fail("/lpm", "Belum ada periode aktif.");
-
-  const tglMulaiPengisian = parseDate(fd.get("tglMulaiPengisian"), false);
-  const tglCutOff = parseDate(fd.get("tglCutOff"), true);
-  const tglOpening = parseDate(fd.get("tglOpening"), false);
-  const tglClosing = parseDate(fd.get("tglClosing"), false);
-
-  await prisma.periode.update({
-    where: { id: periode.id },
-    data: { tglMulaiPengisian, tglCutOff, tglOpening, tglClosing },
-  });
-
-  await catat(user.id, "SIMPAN_KALENDER_AMI", periode.nama);
-  revalidatePath("/lpm");
-  ok("/lpm", "Kalender dan batas cut-off periode AMI berhasil disimpan.");
+  ok("/lpm", `Sesi "${p.nama}" berhasil dihapus.`);
 }
 
 // ====================================================
-// 2. MASTER UNIT / AUDITEE ITBMP
-// ====================================================
-export async function tambahUnit(fd: FormData) {
-  const user = await requireUser("LPM");
-  const periode = await getActivePeriode();
-  if (periode?.sourceLocked) {
-    fail("/lpm/unit", "Data sumber sedang terkunci (Source-Lock). Buka kunci di halaman Sesi & Periode terlebih dahulu.");
-  }
-
-  const kode = str(fd, "kode", 24).toUpperCase().replace(/\s+/g, "-");
-  const nama = str(fd, "nama", 120);
-  const jenis = str(fd, "jenis", 40) || "PRODI";
-  if (!kode || !nama) fail("/lpm/unit", "Kode dan nama unit wajib diisi.");
-
-  const exists = await prisma.unit.findUnique({ where: { kode } });
-  if (exists) fail("/lpm/unit", `Unit dengan kode "${kode}" sudah ada.`);
-
-  await prisma.unit.create({ data: { kode, nama, jenis, diaudit: true } });
-  await catat(user.id, "TAMBAH_UNIT", `[${kode}] ${nama}`);
-  revalidatePath("/lpm/unit");
-  ok("/lpm/unit", `Unit "${nama}" berhasil ditambahkan.`);
-}
-
-export async function toggleUnitDiaudit(fd: FormData) {
-  const user = await requireUser("LPM");
-  const periode = await getActivePeriode();
-  if (periode?.sourceLocked) {
-    fail("/lpm/unit", "Data sumber sedang terkunci (Source-Lock). Buka kunci terlebih dahulu.");
-  }
-
-  const unitId = str(fd, "unitId", 64);
-  const unit = await prisma.unit.findUnique({ where: { id: unitId } });
-  if (!unit) fail("/lpm/unit", "Unit tidak ditemukan.");
-
-  const next = !unit.diaudit;
-  await prisma.unit.update({ where: { id: unitId }, data: { diaudit: next } });
-  await catat(user.id, "UBAH_CAKUPAN_UNIT", `${unit.nama} -> ${next ? "DIAUDIT" : "TIDAK_DIAUDIT"}`);
-  revalidatePath("/lpm/unit");
-  ok("/lpm/unit", `Status cakupan audit "${unit.nama}" diperbarui.`);
-}
-
-// ====================================================
-// 3. MASTER INDIKATOR SPMI ITBMP
+// 2. MASTER INDIKATOR SPMI ITBMP
 // ====================================================
 export async function tambahIndikator(fd: FormData) {
   const user = await requireUser("LPM");
-  const periode = await getActivePeriode();
-  if (!periode) fail("/lpm/indikator", "Belum ada periode aktif.");
-  if (periode.sourceLocked) {
-    fail("/lpm/indikator", "Indikator sedang terkunci (Source-Lock). Buka Source-Lock terlebih dahulu jika ingin menambah indikator.");
-  }
-
+  const targetPeriodeId = str(fd, "periodeId", 64) || "ALL";
   const kode = str(fd, "kode", 32).toUpperCase().replace(/\s+/g, "-");
   const standar = str(fd, "standar", 120);
   const pernyataan = str(fd, "pernyataan", 1000);
@@ -167,32 +144,40 @@ export async function tambahIndikator(fd: FormData) {
     fail("/lpm/indikator", "Kode, standar, pernyataan, dan target wajib diisi.");
   }
 
-  const jml = await prisma.indikator.count({ where: { periodeId: periode.id } });
-  await prisma.indikator.create({
-    data: {
-      periodeId: periode.id,
-      kode,
-      standar,
-      pernyataan,
-      target,
-      buktiDiminta,
-      urutan: jml + 1,
-    },
-  });
+  const periodes =
+    targetPeriodeId === "ALL"
+      ? await prisma.periode.findMany({ orderBy: { createdAt: "desc" } })
+      : await prisma.periode.findMany({ where: { id: targetPeriodeId } });
+
+  if (periodes.length === 0) {
+    fail("/lpm/indikator", "Belum ada Sesi AMI. Buat Sesi AMI terlebih dahulu di menu Sesi AMI.");
+  }
+
+  for (const p of periodes) {
+    const jml = await prisma.indikator.count({ where: { periodeId: p.id } });
+    await prisma.indikator.upsert({
+      where: { periodeId_kode: { periodeId: p.id, kode } },
+      update: { standar, pernyataan, target, buktiDiminta },
+      create: {
+        periodeId: p.id,
+        kode,
+        standar,
+        pernyataan,
+        target,
+        buktiDiminta,
+        urutan: jml + 1,
+      },
+    });
+  }
 
   await catat(user.id, "TAMBAH_INDIKATOR", `[${kode}] ${standar}`);
   revalidatePath("/lpm/indikator");
-  ok("/lpm/indikator", `Indikator "${kode}" berhasil ditambahkan.`);
+  revalidatePath("/lpm");
+  ok("/lpm/indikator", `Indikator "${kode}" berhasil disimpan.`);
 }
 
 export async function hapusIndikator(fd: FormData) {
   const user = await requireUser("LPM");
-  const periode = await getActivePeriode();
-  if (!periode) fail("/lpm/indikator", "Belum ada periode aktif.");
-  if (periode.sourceLocked) {
-    fail("/lpm/indikator", "Indikator sedang terkunci (Source-Lock). Buka Source-Lock terlebih dahulu.");
-  }
-
   const indikatorId = str(fd, "indikatorId", 64);
   const ind = await prisma.indikator.findUnique({ where: { id: indikatorId } });
   if (!ind) fail("/lpm/indikator", "Indikator tidak ditemukan.");
@@ -200,165 +185,21 @@ export async function hapusIndikator(fd: FormData) {
   await prisma.indikator.delete({ where: { id: indikatorId } });
   await catat(user.id, "HAPUS_INDIKATOR", ind.kode);
   revalidatePath("/lpm/indikator");
+  revalidatePath("/lpm");
   ok("/lpm/indikator", `Indikator "${ind.kode}" dihapus.`);
 }
 
 // ====================================================
-// 4. PENUGASAN TIM, VALIDASI CoI, JADWAL, & APPROVAL
+// 3. PENGESAHAN LAPORAN AMI
 // ====================================================
-export async function jalankanUsulanTimOtomatis() {
+export async function sahkanLaporanAkhir(fd: FormData) {
   const user = await requireUser("LPM");
-  const periode = await getActivePeriode();
-  if (!periode) fail("/lpm/penugasan", "Belum ada periode aktif.");
-  if (!periode.sourceLocked) {
-    fail("/lpm/penugasan", "Prinsip Source-Lock: Kunci sumber data (Indikator & Unit) terlebih dahulu sebelum membuat usulan tim otomatis.");
-  }
+  const periodeId = str(fd, "periodeId", 64);
+  const periode = periodeId
+    ? await prisma.periode.findUnique({ where: { id: periodeId } })
+    : await prisma.periode.findFirst({ orderBy: { createdAt: "desc" } });
 
-  const { dibuat, dilewati } = await buatUsulanTim(periode.id);
-  await catat(user.id, "USULAN_TIM_OTOMATIS", `Dibuat: ${dibuat.length} unit, Dilewati: ${dilewati.length}`);
-  revalidatePath("/lpm/penugasan");
-
-  if (dibuat.length === 0 && dilewati.length === 0) {
-    ok("/lpm/penugasan", "Seluruh unit sasaran sudah memiliki tim auditor.");
-  }
-  const msg = [
-    dibuat.length ? `Usulan tim dibuat untuk ${dibuat.length} unit (${dibuat.join(", ")}).` : "",
-    dilewati.length ? `Dilewati: ${dilewati.map((d) => `${d.unit} (${d.alasan})`).join("; ")}.` : "",
-    "Silakan lengkapi tanggal jadwal dan sahkan.",
-  ]
-    .filter(Boolean)
-    .join(" ");
-  ok("/lpm/penugasan", msg);
-}
-
-export async function simpanPenugasanManual(fd: FormData) {
-  const user = await requireUser("LPM");
-  const periode = await getActivePeriode();
-  if (!periode) fail("/lpm/penugasan", "Belum ada periode aktif.");
-
-  const unitId = str(fd, "unitId", 64);
-  const ketuaId = str(fd, "ketuaId", 64);
-  const anggotaId = str(fd, "anggotaId", 64);
-  const alasanPerubahan = str(fd, "alasanPerubahan", 300) || null;
-  const jadwalDokumenMulai = parseDate(fd.get("jadwalDokumenMulai"), false);
-  const jadwalDokumenSelesai = parseDate(fd.get("jadwalDokumenSelesai"), true);
-  const jadwalLapanganMulai = parseDateTime(fd.get("jadwalLapanganMulai"));
-  const jadwalLapanganSelesai = parseDateTime(fd.get("jadwalLapanganSelesai"));
-
-  if (!unitId || !ketuaId || !anggotaId) {
-    fail("/lpm/penugasan", "Unit, Ketua Auditor, dan Anggota Auditor wajib dipilih.");
-  }
-  if (ketuaId === anggotaId) {
-    fail("/lpm/penugasan", "Ketua dan Anggota Auditor tidak boleh orang yang sama.");
-  }
-
-  const [unit, ketua, anggota, existing] = await Promise.all([
-    prisma.unit.findUnique({ where: { id: unitId } }),
-    prisma.user.findUnique({ where: { id: ketuaId } }),
-    prisma.user.findUnique({ where: { id: anggotaId } }),
-    prisma.penugasan.findUnique({
-      where: { periodeId_unitId: { periodeId: periode.id, unitId } },
-      include: { tim: true },
-    }),
-  ]);
-
-  if (!unit || !ketua || !anggota) fail("/lpm/penugasan", "Data unit atau auditor tidak ditemukan.");
-
-  // Validasi Conflict of Interest (CoI) keras
-  if (ketua.unitId === unitId || anggota.unitId === unitId) {
-    fail(
-      "/lpm/penugasan",
-      `Conflict of Interest terdeteksi: Auditor tidak boleh ditugaskan mengaudit unit asalnya sendiri (${unit.nama}).`,
-    );
-  }
-
-  // Prinsip Team Continuity: jika penugasan sudah pernah disahkan dan anggota tim berubah, wajib isi alasan resmi
-  if (existing && existing.disahkan) {
-    const oldKetua = existing.tim.find((t) => t.peran === "KETUA")?.auditorId;
-    const oldAnggota = existing.tim.find((t) => t.peran === "ANGGOTA")?.auditorId;
-    const timBerubah = oldKetua !== ketuaId || oldAnggota !== anggotaId;
-    if (timBerubah && !alasanPerubahan) {
-      fail(
-        "/lpm/penugasan",
-        "Prinsip Team Continuity: Mengubah tim auditor yang sudah disahkan wajib mencantumkan Alasan Resmi Perubahan Tim.",
-      );
-    }
-  }
-
-  if (existing) {
-    await prisma.$transaction([
-      prisma.penugasanAuditor.deleteMany({ where: { penugasanId: existing.id } }),
-      prisma.penugasan.update({
-        where: { id: existing.id },
-        data: {
-          jadwalDokumenMulai,
-          jadwalDokumenSelesai,
-          jadwalLapanganMulai,
-          jadwalLapanganSelesai,
-          alasanPerubahan,
-          sumber: "MANUAL",
-          disahkan: false,
-          tim: {
-            create: [
-              { auditorId: ketuaId, peran: "KETUA" },
-              { auditorId: anggotaId, peran: "ANGGOTA" },
-            ],
-          },
-        },
-      }),
-    ]);
-  } else {
-    await prisma.penugasan.create({
-      data: {
-        periodeId: periode.id,
-        unitId,
-        jadwalDokumenMulai,
-        jadwalDokumenSelesai,
-        jadwalLapanganMulai,
-        jadwalLapanganSelesai,
-        alasanPerubahan,
-        sumber: "MANUAL",
-        disahkan: false,
-        tim: {
-          create: [
-            { auditorId: ketuaId, peran: "KETUA" },
-            { auditorId: anggotaId, peran: "ANGGOTA" },
-          ],
-        },
-      },
-    });
-  }
-
-  await catat(user.id, "SIMPAN_PENUGASAN", `${unit.nama}: ${ketua.nama} (K) & ${anggota.nama} (A)`);
-  revalidatePath("/lpm/penugasan");
-  ok("/lpm/penugasan", `Penugasan dan jadwal untuk "${unit.nama}" disimpan. Silakan klik Sahkan jika sudah diverifikasi.`);
-}
-
-export async function sahkanPenugasan(fd: FormData) {
-  const user = await requireUser("LPM");
-  const periode = await getActivePeriode();
-  if (!periode) fail("/lpm/penugasan", "Belum ada periode aktif.");
-
-  const penugasanId = str(fd, "penugasanId", 64);
-  const p = await prisma.penugasan.findUnique({ where: { id: penugasanId }, include: { unit: true } });
-  if (!p) fail("/lpm/penugasan", "Penugasan tidak ditemukan.");
-
-  const { isu } = await cekKonsistensi(periode.id);
-  const blokir = isuBlokir(isu, p.unitId);
-  if (blokir.length > 0) {
-    fail("/lpm/penugasan", `Belum dapat disahkan: ${blokir.map((b) => b.pesan).join(" | ")}`);
-  }
-
-  await prisma.penugasan.update({ where: { id: penugasanId }, data: { disahkan: true } });
-  await catat(user.id, "SAHKAN_PENUGASAN", p.unit.nama);
-  revalidatePath("/lpm/penugasan");
-  ok("/lpm/penugasan", `Penugasan "${p.unit.nama}" resmi disahkan oleh LPM.`);
-}
-
-export async function sahkanLaporanAkhir() {
-  const user = await requireUser("LPM");
-  const periode = await getActivePeriode();
-  if (!periode) fail("/lpm/rekap", "Belum ada periode AMI aktif.");
+  if (!periode) fail("/lpm/rekap", "Belum ada Sesi AMI.");
 
   await prisma.periode.update({
     where: { id: periode.id },
@@ -368,8 +209,7 @@ export async function sahkanLaporanAkhir() {
     },
   });
 
-  await catat(user.id, "SAHKAN_LAPORAN_AMI", `Laporan AMI ${periode.nama} disahkan oleh ${user.nama}`);
+  await catat(user.id, "SAHKAN_LAPORAN_AMI", `Laporan ${periode.nama} disahkan oleh ${user.nama}`);
   revalidatePath("/lpm/rekap");
-  ok("/lpm/rekap", `Laporan Akhir AMI "${periode.nama}" resmi disahkan oleh ${user.nama}.`);
+  ok("/lpm/rekap", `Laporan AMI "${periode.nama}" resmi disahkan oleh ${user.nama}.`);
 }
-
