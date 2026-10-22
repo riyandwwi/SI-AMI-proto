@@ -31,7 +31,7 @@ export default async function AdminPage({ searchParams }: { searchParams: SP }) 
           <div>
             <h2 className="text-base font-bold text-slate-900">+ Buat Akun Pengguna Baru</h2>
             <p className="text-xs text-slate-500">
-              Masukkan Nama, NIM/NUPTK, Program Studi, Role (LPM / Auditor / Auditee), dan Username.
+              Masukkan Nama, NIDN/NUPTK, Program Studi, Role (LPM / Auditor / Auditee), dan Username.
             </p>
           </div>
           <Badge tone="amber">🔑 Password Otomatis Saat Dibuat: 123</Badge>
@@ -44,8 +44,8 @@ export default async function AdminPage({ searchParams }: { searchParams: SP }) 
           </div>
 
           <div className="space-y-1">
-            <label>NIM / NUPTK</label>
-            <input name="nimNuptk" required placeholder="198705122015041001" className="w-full font-mono" />
+            <label>NIDN / NUPTK</label>
+            <input name="nimNuptk" required placeholder="0412058701" className="w-full font-mono" />
           </div>
 
           <div className="space-y-1">
@@ -108,7 +108,7 @@ export default async function AdminPage({ searchParams }: { searchParams: SP }) 
             <thead>
               <tr>
                 <th>Nama Lengkap</th>
-                <th>NIM / NUPTK</th>
+                <th>NIDN / NUPTK</th>
                 <th>Program Studi</th>
                 <th>Role</th>
                 <th>Username</th>

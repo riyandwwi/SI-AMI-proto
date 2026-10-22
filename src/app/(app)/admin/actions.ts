@@ -19,7 +19,7 @@ export async function tambahUser(fd: FormData) {
   const username = str(fd, "username", 64).toLowerCase().replace(/\s+/g, "");
 
   if (!nama || !nimNuptk || !prodiKode || !roleRaw || !username) {
-    fail("/admin", "Nama, NIM/NUPTK, Prodi, Role, dan Username wajib diisi.");
+    fail("/admin", "Nama, NIDN/NUPTK, Prodi, Role, dan Username wajib diisi.");
   }
 
   // Super Admin tidak boleh membuat akun dengan role Super Admin
