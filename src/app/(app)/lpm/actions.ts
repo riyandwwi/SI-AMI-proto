@@ -96,6 +96,7 @@ export async function buatSesiAmi(fd: FormData) {
 
   await catat(user.id, "BUAT_SESI_AMI", `${p.nama}`);
   revalidatePath("/lpm");
+  revalidatePath("/lpm/indikator");
   ok("/lpm", `Sesi "${p.nama}" berhasil dibuat. Auditor & Auditee dari Prodi ${unit.nama} otomatis terhubung.`);
 }
 
@@ -125,14 +126,16 @@ export async function hapusSesiAmi(fd: FormData) {
   await prisma.periode.delete({ where: { id: periodeId } });
   await catat(user.id, "HAPUS_SESI_AMI", p.nama);
   revalidatePath("/lpm");
+  revalidatePath("/lpm/indikator");
   ok("/lpm", `Sesi "${p.nama}" berhasil dihapus.`);
 }
 
 // ====================================================
-// 2. MASTER INDIKATOR SPMI ITBMP
+// 2. TAMBAH & HAPUS INDIKATOR SPMI (LPM)
 // ====================================================
 export async function tambahIndikator(fd: FormData) {
   const user = await requireUser("LPM");
+  const returnTo = str(fd, "returnTo", 200) || "/lpm/indikator";
   const targetPeriodeId = str(fd, "periodeId", 64) || "ALL";
   const kode = str(fd, "kode", 32).toUpperCase().replace(/\s+/g, "-");
   const standar = str(fd, "standar", 120);
@@ -141,7 +144,7 @@ export async function tambahIndikator(fd: FormData) {
   const buktiDiminta = str(fd, "buktiDiminta", 400) || null;
 
   if (!kode || !standar || !pernyataan || !target) {
-    fail("/lpm/indikator", "Kode, standar, pernyataan, dan target wajib diisi.");
+    fail(returnTo, "Kode, standar, pernyataan, dan target indikator wajib diisi.");
   }
 
   const periodes =
@@ -150,7 +153,7 @@ export async function tambahIndikator(fd: FormData) {
       : await prisma.periode.findMany({ where: { id: targetPeriodeId } });
 
   if (periodes.length === 0) {
-    fail("/lpm/indikator", "Belum ada Sesi AMI. Buat Sesi AMI terlebih dahulu di menu Sesi AMI.");
+    fail(returnTo, "Belum ada Sesi AMI. Buat Sesi AMI terlebih dahulu.");
   }
 
   for (const p of periodes) {
@@ -173,20 +176,25 @@ export async function tambahIndikator(fd: FormData) {
   await catat(user.id, "TAMBAH_INDIKATOR", `[${kode}] ${standar}`);
   revalidatePath("/lpm/indikator");
   revalidatePath("/lpm");
-  ok("/lpm/indikator", `Indikator "${kode}" berhasil disimpan.`);
+  revalidatePath("/auditee");
+  revalidatePath("/auditor");
+  ok(returnTo, `Indikator "${kode}" berhasil ditambahkan.`);
 }
 
 export async function hapusIndikator(fd: FormData) {
   const user = await requireUser("LPM");
+  const returnTo = str(fd, "returnTo", 200) || "/lpm/indikator";
   const indikatorId = str(fd, "indikatorId", 64);
   const ind = await prisma.indikator.findUnique({ where: { id: indikatorId } });
-  if (!ind) fail("/lpm/indikator", "Indikator tidak ditemukan.");
+  if (!ind) fail(returnTo, "Indikator tidak ditemukan.");
 
   await prisma.indikator.delete({ where: { id: indikatorId } });
   await catat(user.id, "HAPUS_INDIKATOR", ind.kode);
   revalidatePath("/lpm/indikator");
   revalidatePath("/lpm");
-  ok("/lpm/indikator", `Indikator "${ind.kode}" dihapus.`);
+  revalidatePath("/auditee");
+  revalidatePath("/auditor");
+  ok(returnTo, `Indikator "${ind.kode}" berhasil dihapus.`);
 }
 
 // ====================================================

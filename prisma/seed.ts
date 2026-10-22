@@ -25,7 +25,7 @@ async function main() {
     units[u.kode] = saved.id;
   }
 
-  // 2. Buat Akun untuk 4 Role (SUPER_ADMIN, LPM, AUDITOR, AUDITEE) dengan password default "123"
+  // 2. Buat Akun untuk 4 Role (SUPER_ADMIN, LPM, AUDITOR, AUDITEE) jika belum ada
   const akunAwal: {
     username: string;
     nama: string;
@@ -92,31 +92,24 @@ async function main() {
   ];
 
   for (const a of akunAwal) {
-    await prisma.user.upsert({
-      where: { username: a.username },
-      update: {
-        nama: a.nama,
-        nimNuptk: a.nimNuptk,
-        role: a.role,
-        unitId: units[a.prodiKode],
-        passwordHash: await bcrypt.hash(DEFAULT_PASS, 10),
-        passwordEnc: encryptPassword(DEFAULT_PASS),
-        aktif: true,
-      },
-      create: {
-        nama: a.nama,
-        nimNuptk: a.nimNuptk,
-        username: a.username,
-        role: a.role,
-        unitId: units[a.prodiKode],
-        passwordHash: await bcrypt.hash(DEFAULT_PASS, 10),
-        passwordEnc: encryptPassword(DEFAULT_PASS),
-        aktif: true,
-      },
-    });
+    const existing = await prisma.user.findUnique({ where: { username: a.username } });
+    if (!existing) {
+      await prisma.user.create({
+        data: {
+          nama: a.nama,
+          nimNuptk: a.nimNuptk,
+          username: a.username,
+          role: a.role,
+          unitId: units[a.prodiKode],
+          passwordHash: await bcrypt.hash(DEFAULT_PASS, 10),
+          passwordEnc: encryptPassword(DEFAULT_PASS),
+          aktif: true,
+        },
+      });
+    }
   }
 
-  // 3. Buat Sesi AMI Awal untuk 3 Prodi jika belum ada
+  // 3. Buat Sesi AMI Awal & Indikator Contoh HANYA jika belum ada Sesi AMI untuk Prodi tersebut
   const daftarIndikator = [
     {
       kode: "STD-PEND-01",
@@ -147,14 +140,11 @@ async function main() {
     },
   ];
 
-  // Hapus periode lama yang belum memiliki unitId agar bersih
-  await prisma.periode.deleteMany({ where: { unitId: null } });
-
   for (const prodi of prodiData) {
     const unitId = units[prodi.kode];
-    let p = await prisma.periode.findFirst({ where: { unitId } });
-    if (!p) {
-      p = await prisma.periode.create({
+    const existingPeriode = await prisma.periode.findFirst({ where: { unitId } });
+    if (!existingPeriode) {
+      const p = await prisma.periode.create({
         data: {
           nama: `AMI ${prodi.nama} — 2026/2027 (Ganjil)`,
           tahun: "2026/2027",
@@ -165,36 +155,31 @@ async function main() {
           aktif: true,
         },
       });
-    }
 
-    for (const ind of daftarIndikator) {
-      const savedInd = await prisma.indikator.upsert({
-        where: { periodeId_kode: { periodeId: p.id, kode: ind.kode } },
-        update: ind,
-        create: { ...ind, periodeId: p.id },
-      });
-
-      // Isi contoh pekerjaan Auditee & Auditor pada Prodi Bisnis Digital
-      if (prodi.kode === "PRODI-BD" && ind.kode === "STD-PEND-01") {
-        await prisma.isian.upsert({
-          where: { indikatorId_unitId: { indikatorId: savedInd.id, unitId } },
-          update: {},
-          create: {
-            indikatorId: savedInd.id,
-            unitId,
-            klaim: "Seluruh mata kuliah aktif Prodi Bisnis Digital telah memiliki RPS OBE di Google Drive.",
-            linkDrive: "https://drive.google.com/drive/folders/1ITBMP_RPS_OBE_2026_BD",
-            statusDokumen: "LENGKAP",
-            catatanDokumen: "Dokumen SK Kurikulum dan seluruh file RPS di Google Drive lengkap dan sesuai template SPMI.",
-            klasifikasi: "MENCAPAI",
-            catatanLapangan: "Terverifikasi sesuai saat pemeriksaan lapangan.",
-          },
+      for (const ind of daftarIndikator) {
+        const savedInd = await prisma.indikator.create({
+          data: { ...ind, periodeId: p.id },
         });
+
+        if (prodi.kode === "PRODI-BD" && ind.kode === "STD-PEND-01") {
+          await prisma.isian.create({
+            data: {
+              indikatorId: savedInd.id,
+              unitId,
+              klaim: "Seluruh mata kuliah aktif Prodi Bisnis Digital telah memiliki RPS OBE di Google Drive.",
+              linkDrive: "https://drive.google.com/drive/folders/1ITBMP_RPS_OBE_2026_BD",
+              statusDokumen: "LENGKAP",
+              catatanDokumen: "Dokumen SK Kurikulum dan seluruh file RPS di Google Drive lengkap dan sesuai template SPMI.",
+              klasifikasi: "MENCAPAI",
+              catatanLapangan: "Terverifikasi sesuai saat pemeriksaan lapangan.",
+            },
+          });
+        }
       }
     }
   }
 
-  console.log("✅ Seed selesai! Sesi AMI 3 Prodi & Akun Awal (password: 123) siap digunakan.");
+  console.log("✅ Seed selesai!");
 }
 
 main()

@@ -5,7 +5,7 @@ import { PRODI_LIST } from "@/lib/roles";
 import { KLASIFIKASI_LABEL, RTL_LABEL, STATUS_DOK_LABEL } from "@/lib/periode";
 import { fmtWaktu } from "@/lib/format";
 import { Badge, Empty, Flash, PageHeader, one, type SP } from "@/components/ui";
-import { buatSesiAmi, hapusSesiAmi, toggleStatusSesi } from "./actions";
+import { buatSesiAmi, hapusIndikator, hapusSesiAmi, tambahIndikator, toggleStatusSesi } from "./actions";
 
 export default async function LpmPage({ searchParams }: { searchParams: SP }) {
   await requireUser("LPM");
@@ -37,12 +37,12 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
   return (
     <>
       <PageHeader
-        title="Manajemen Sesi AMI & Pantau Pekerjaan (LPM)"
-        desc="Buat sesi AMI cukup dengan mengisi Tahun Akademik, Semester, dan Prodi. Nama Auditee & Auditor dari Prodi terkait otomatis muncul."
+        title="Manajemen Sesi AMI, Indikator & Pantau Pekerjaan (LPM)"
+        desc="Buat sesi AMI dengan mengisi Tahun Akademik, Semester, dan Prodi. LPM dapat menambah/menghapus indikator serta memantau pekerjaan Auditor & Auditee."
       />
       <Flash ok={one(sp.ok)} err={one(sp.err)} />
 
-      {/* 2 Tab Utama: 1. Kelola Sesi AMI | 2. Pantau Pekerjaan Auditor & Auditee */}
+      {/* Navigasi Tab di Halaman LPM */}
       <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
         <Link
           href="/lpm?tab=sesi"
@@ -54,7 +54,10 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
           href={`/lpm?tab=pantau${activePeriodeForPantau ? `&periodeId=${activePeriodeForPantau.id}` : ""}`}
           className={tab === "pantau" ? "btn text-xs" : "btn-secondary text-xs"}
         >
-          👀 2. Pantau Pekerjaan Auditor &amp; Auditee
+          👀 2. Kelola Indikator &amp; Pantau Pekerjaan Auditor / Auditee
+        </Link>
+        <Link href="/lpm/indikator" className="btn-secondary text-xs">
+          📋 Master Semua Indikator SPMI
         </Link>
       </div>
 
@@ -130,7 +133,7 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                           </Badge>
                         </div>
                         <p className="mt-1 text-xs text-slate-500">
-                          Progres Bukti Auditee: <strong>{terisiDrive}/{totalInd} Indikator</strong> · Progres Penilaian Auditor: <strong>{dinilaiAuditor}/{totalInd} Indikator</strong>
+                          Jumlah Indikator: <strong>{totalInd} Indikator</strong> · Progres Bukti Auditee: <strong>{terisiDrive}/{totalInd}</strong> · Progres Penilaian Auditor: <strong>{dinilaiAuditor}/{totalInd}</strong>
                         </p>
                       </div>
 
@@ -139,7 +142,7 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                           href={`/lpm?tab=pantau&periodeId=${p.id}`}
                           className="btn text-xs"
                         >
-                          👀 Lihat Pekerjaan Auditor &amp; Auditee
+                          👀 Kelola Indikator &amp; Lihat Pekerjaan
                         </Link>
                         <form action={toggleStatusSesi}>
                           <input type="hidden" name="periodeId" value={p.id} />
@@ -149,7 +152,7 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                         </form>
                         <form action={hapusSesiAmi}>
                           <input type="hidden" name="periodeId" value={p.id} />
-                          <button className="btn-danger text-xs">Hapus</button>
+                          <button className="btn-danger text-xs">Hapus Sesi</button>
                         </form>
                       </div>
                     </div>
@@ -215,7 +218,7 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
           )}
         </>
       ) : (
-        /* TAB 2: PANTAU PEKERJAAN AUDITOR DAN AUDITEE */
+        /* TAB 2: KELOLA INDIKATOR & PANTAU PEKERJAAN AUDITOR DAN AUDITEE */
         <div className="space-y-4">
           {periodes.length === 0 || !activePeriodeForPantau ? (
             <Empty>Belum ada Sesi AMI untuk dipantau.</Empty>
@@ -225,10 +228,10 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
               <div className="card flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h2 className="text-base font-bold text-slate-900">
-                    Pantau Pekerjaan: {activePeriodeForPantau.nama}
+                    Sesi Aktif: {activePeriodeForPantau.nama}
                   </h2>
                   <p className="text-xs text-slate-500">
-                    Menampilkan secara langsung apa saja yang telah diisi oleh <strong>Auditee</strong> dan diperiksa oleh <strong>Auditor</strong> pada Prodi <strong>{activePeriodeForPantau.unit?.nama ?? "Terkait"}</strong>.
+                    Tambah atau hapus indikator pada sesi ini, serta pantau apa saja yang dikerjakan <strong>Auditee</strong> dan <strong>Auditor</strong>.
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
@@ -266,20 +269,73 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                 </div>
               </div>
 
-              {/* Tabel Detail Pekerjaan Auditee vs Pekerjaan Auditor */}
+              {/* Form Cepat Tambah Indikator oleh LPM */}
+              <form action={tambahIndikator} className="card space-y-3">
+                <input type="hidden" name="returnTo" value={`/lpm?tab=pantau&periodeId=${activePeriodeForPantau.id}`} />
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                  <h3 className="text-sm font-bold text-slate-900">+ Tambah Indikator Baru (Oleh LPM)</h3>
+                  <span className="text-xs text-slate-500">Pilih apakah indikator ditambahkan ke sesi ini saja atau semua sesi</span>
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+                  <div className="space-y-1">
+                    <label>Terapkan ke Sesi</label>
+                    <select name="periodeId" defaultValue={activePeriodeForPantau.id} className="w-full">
+                      <option value={activePeriodeForPantau.id}>Hanya Sesi Ini ({activePeriodeForPantau.unit?.nama})</option>
+                      <option value="ALL">Semua Sesi AMI</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label>Kode Indikator</label>
+                    <input name="kode" required placeholder="STD-PEND-04" className="w-full font-mono" />
+                  </div>
+                  <div className="space-y-1">
+                    <label>Standar SPMI</label>
+                    <input name="standar" required placeholder="Standar Isi Pembelajaran" className="w-full" />
+                  </div>
+                  <div className="space-y-1">
+                    <label>Target Capaian</label>
+                    <input name="target" required placeholder="100% Mata Kuliah" className="w-full" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <label>Pernyataan Indikator Mutu</label>
+                    <input
+                      name="pernyataan"
+                      required
+                      placeholder="Uraian indikator yang harus dipenuhi oleh Auditee..."
+                      className="w-full"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label>Bukti Google Drive yang Diminta (Opsional)</label>
+                    <div className="flex gap-2">
+                      <input
+                        name="buktiDiminta"
+                        placeholder="Contoh: Folder Drive berisi SK Kurikulum & RPS..."
+                        className="w-full"
+                      />
+                      <button className="btn shrink-0">+ Tambah Indikator</button>
+                    </div>
+                  </div>
+                </div>
+              </form>
+
+              {/* Tabel Detail Indikator + Pekerjaan Auditee + Pekerjaan Auditor + Tombol Hapus Indikator */}
               <div className="card overflow-x-auto space-y-3">
                 <h3 className="text-sm font-bold text-slate-900">
-                  Tabel Rincian Pekerjaan Auditee &amp; Auditor per Indikator
+                  Daftar Indikator ({activePeriodeForPantau.indikator.length}) &amp; Rincian Pekerjaan Auditee / Auditor
                 </h3>
                 {activePeriodeForPantau.indikator.length === 0 ? (
-                  <Empty>Belum ada indikator pada sesi ini. Tambahkan di menu Indikator SPMI.</Empty>
+                  <Empty>Belum ada indikator pada sesi ini. Silakan tambahkan menggunakan form di atas.</Empty>
                 ) : (
                   <table>
                     <thead>
                       <tr>
-                        <th className="w-56">Indikator SPMI</th>
+                        <th className="w-60">Indikator SPMI</th>
                         <th>Pekerjaan Auditee (Evaluasi Diri, Link Drive &amp; RTL)</th>
                         <th>Pekerjaan Auditor (Desk Audit, Temuan Lapangan &amp; Verifikasi)</th>
+                        <th className="w-28 text-right">Aksi LPM</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -411,6 +467,15 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                               ) : (
                                 <Badge tone="slate">⏳ Auditor Belum Memeriksa</Badge>
                               )}
+                            </td>
+
+                            {/* Kolom Hapus Indikator */}
+                            <td className="text-right">
+                              <form action={hapusIndikator}>
+                                <input type="hidden" name="returnTo" value={`/lpm?tab=pantau&periodeId=${activePeriodeForPantau.id}`} />
+                                <input type="hidden" name="indikatorId" value={ind.id} />
+                                <button className="btn-danger text-xs">Hapus</button>
+                              </form>
                             </td>
                           </tr>
                         );
