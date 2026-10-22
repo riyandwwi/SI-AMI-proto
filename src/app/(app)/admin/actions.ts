@@ -5,42 +5,59 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { encryptPassword } from "@/lib/crypto";
-import { isRole } from "@/lib/roles";
+import { isCreatableRole, PRODI_LIST } from "@/lib/roles";
 import { catat, fail, ok, str } from "@/lib/actions";
+
+const DEFAULT_PASSWORD = "123";
 
 export async function tambahUser(fd: FormData) {
   const admin = await requireUser("SUPER_ADMIN");
   const nama = str(fd, "nama", 120);
-  const username = str(fd, "username", 64).toLowerCase().replace(/\s+/g, "");
-  const password = str(fd, "password", 200);
+  const nimNuptk = str(fd, "nimNuptk", 64);
+  const prodiKode = str(fd, "prodiKode", 32);
   const roleRaw = str(fd, "role", 32);
-  const unitId = str(fd, "unitId", 64) || null;
+  const username = str(fd, "username", 64).toLowerCase().replace(/\s+/g, "");
 
-  if (!nama || !username || !password) fail("/admin", "Nama, username, dan password wajib diisi.");
-  if (password.length < 6) fail("/admin", "Password minimal 6 karakter.");
-  if (!isRole(roleRaw)) fail("/admin", "Role tidak valid.");
-  if ((roleRaw === "AUDITEE" || roleRaw === "AUDITOR") && !unitId) {
-    fail("/admin", "Role Auditor dan Auditee wajib memilih Unit / Homebase ITBMP.");
+  if (!nama || !nimNuptk || !prodiKode || !roleRaw || !username) {
+    fail("/admin", "Nama, NIM/NUPTK, Prodi, Role, dan Username wajib diisi.");
+  }
+
+  // Super Admin tidak boleh membuat akun dengan role Super Admin
+  if (!isCreatableRole(roleRaw)) {
+    fail("/admin", "Super Admin hanya dapat membuat akun dengan role LPM, Auditor, atau Auditee.");
+  }
+
+  const prodiDef = PRODI_LIST.find((p) => p.kode === prodiKode);
+  if (!prodiDef) {
+    fail("/admin", "Program Studi tidak valid. Pilih Bisnis Digital, Aktuaria, atau Perancangan Wilayah dan Kota.");
   }
 
   const exists = await prisma.user.findUnique({ where: { username } });
   if (exists) fail("/admin", `Username "${username}" sudah digunakan.`);
 
+  // Pastikan unit Prodi terdaftar di tabel Unit
+  const unit = await prisma.unit.upsert({
+    where: { kode: prodiDef.kode },
+    update: { nama: prodiDef.nama },
+    create: { kode: prodiDef.kode, nama: prodiDef.nama, jenis: "PRODI", diaudit: true },
+  });
+
   await prisma.user.create({
     data: {
       nama,
+      nimNuptk,
       username,
-      passwordHash: await bcrypt.hash(password, 10),
-      passwordEnc: encryptPassword(password),
+      passwordHash: await bcrypt.hash(DEFAULT_PASSWORD, 10),
+      passwordEnc: encryptPassword(DEFAULT_PASSWORD),
       role: roleRaw,
-      unitId,
+      unitId: unit.id,
       aktif: true,
     },
   });
 
-  await catat(admin.id, "TAMBAH_USER", `Tambah akun ${username} (${roleRaw})`);
+  await catat(admin.id, "TAMBAH_USER", `Tambah akun ${username} (${roleRaw} - ${prodiDef.nama}, NIM/NUPTK: ${nimNuptk})`);
   revalidatePath("/admin");
-  ok("/admin", `Akun "${username}" berhasil ditambahkan dan langsung aktif.`);
+  ok("/admin", `Akun "${username}" berhasil dibuat dengan password default "${DEFAULT_PASSWORD}".`);
 }
 
 export async function gantiPasswordUser(fd: FormData) {
@@ -48,8 +65,8 @@ export async function gantiPasswordUser(fd: FormData) {
   const userId = str(fd, "userId", 64);
   const passwordBaru = str(fd, "passwordBaru", 200);
 
-  if (!userId || passwordBaru.length < 6) {
-    fail("/admin", "Password baru minimal 6 karakter.");
+  if (!userId || passwordBaru.length < 3) {
+    fail("/admin", "Password baru minimal 3 karakter.");
   }
 
   const target = await prisma.user.findUnique({ where: { id: userId } });
@@ -65,24 +82,23 @@ export async function gantiPasswordUser(fd: FormData) {
 
   await catat(admin.id, "RESET_PASSWORD_USER", `Ubah password akun ${target.username}`);
   revalidatePath("/admin");
-  ok("/admin", `Password untuk "${target.username}" berhasil diperbarui.`);
+  ok("/admin", `Password untuk "${target.username}" berhasil diubah menjadi "${passwordBaru}".`);
 }
 
-export async function toggleAktifUser(fd: FormData) {
+export async function hapusUser(fd: FormData) {
   const admin = await requireUser("SUPER_ADMIN");
   const userId = str(fd, "userId", 64);
-  if (userId === admin.id) fail("/admin", "Tidak dapat menonaktifkan akun Super Admin sendiri.");
+  if (!userId) fail("/admin", "ID akun tidak valid.");
+  if (userId === admin.id) fail("/admin", "Tidak dapat menghapus akun Super Admin Anda sendiri.");
 
   const target = await prisma.user.findUnique({ where: { id: userId } });
   if (!target) fail("/admin", "Pengguna tidak ditemukan.");
+  if (target.role === "SUPER_ADMIN") {
+    fail("/admin", "Akun dengan role Super Admin tidak dapat dihapus.");
+  }
 
-  const nextStatus = !target.aktif;
-  await prisma.user.update({
-    where: { id: userId },
-    data: { aktif: nextStatus },
-  });
-
-  await catat(admin.id, "UBAH_STATUS_USER", `${target.username} -> ${nextStatus ? "AKTIF" : "NONAKTIF"}`);
+  await prisma.user.delete({ where: { id: userId } });
+  await catat(admin.id, "HAPUS_USER", `Hapus akun ${target.username} (${target.nama})`);
   revalidatePath("/admin");
-  ok("/admin", `Status akun "${target.username}" diubah menjadi ${nextStatus ? "Aktif" : "Nonaktif"}.`);
+  ok("/admin", `Akun "${target.username}" (${target.nama}) berhasil dihapus.`);
 }

@@ -13,7 +13,7 @@ export async function gantiPasswordSendiri(fd: FormData) {
   const ulang = str(fd, "ulang", 200);
 
   if (!(await bcrypt.compare(lama, user.passwordHash))) fail("/akun", "Password lama salah.");
-  if (baru.length < 6) fail("/akun", "Password baru minimal 6 karakter.");
+  if (baru.length < 3) fail("/akun", "Password baru minimal 3 karakter.");
   if (baru !== ulang) fail("/akun", "Konfirmasi password tidak sama.");
 
   await prisma.user.update({

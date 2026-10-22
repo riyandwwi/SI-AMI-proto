@@ -1,9 +1,6 @@
 // Skema database SI-AMI ITBMP
-// Prinsip buku panduan yang dicerminkan di skema:
-// - Source-lock      : Periode.sourceLocked mengunci indikator & daftar unit
-// - One workflow     : satu baris Isian membawa bukti auditee -> audit dokumen -> audit lapangan -> RTL
-// - Team continuity  : satu Penugasan per (periode, unit) dipakai untuk audit dokumen DAN lapangan
-// - Human approval   : Penugasan.disahkan & Periode.disahkanAt diisi manusia, bukan otomatis
+// 4 Role: SUPER_ADMIN, LPM, AUDITOR, AUDITEE
+// 3 Prodi: Bisnis Digital, Aktuaria, Perancangan Wilayah dan Kota
 
 generator client {
   provider = "prisma-client-js"
@@ -20,7 +17,6 @@ enum Role {
   LPM
   AUDITOR
   AUDITEE
-  PIMPINAN
 }
 
 enum Tahap {
@@ -63,7 +59,7 @@ model Unit {
   id        String      @id @default(cuid())
   kode      String      @unique
   nama      String
-  jenis     String
+  jenis     String      @default("PRODI")
   diaudit   Boolean     @default(true)
   createdAt DateTime    @default(now())
   users     User[]
@@ -74,13 +70,14 @@ model Unit {
 model User {
   id           String             @id @default(cuid())
   nama         String
+  nimNuptk     String             @default("")
   username     String             @unique
   passwordHash String
-  /// Salinan password terenkripsi AES-256-GCM agar Super Admin bisa melihatnya (permintaan pengguna).
+  /// Salinan password terenkripsi AES-256-GCM agar Super Admin bisa melihatnya.
   passwordEnc  String
   role         Role
   unitId       String?
-  unit         Unit?              @relation(fields: [unitId], references: [id])
+  unit         Unit?              @relation(fields: [unitId], references: [id], onDelete: SetNull)
   aktif        Boolean            @default(true)
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
@@ -126,14 +123,13 @@ model Penugasan {
   periodeId             String
   periode               Periode            @relation(fields: [periodeId], references: [id], onDelete: Cascade)
   unitId                String
-  unit                  Unit               @relation(fields: [unitId], references: [id])
+  unit                  Unit               @relation(fields: [unitId], references: [id], onDelete: Cascade)
   jadwalDokumenMulai    DateTime?
   jadwalDokumenSelesai  DateTime?
   jadwalLapanganMulai   DateTime?
   jadwalLapanganSelesai DateTime?
   disahkan              Boolean            @default(false)
   alasanPerubahan       String?
-  /// "USULAN_OTOMATIS" atau "MANUAL"
   sumber                String             @default("MANUAL")
   updatedAt             DateTime           @updatedAt
   tim                   PenugasanAuditor[]
@@ -146,7 +142,7 @@ model PenugasanAuditor {
   penugasanId String
   penugasan   Penugasan @relation(fields: [penugasanId], references: [id], onDelete: Cascade)
   auditorId   String
-  auditor     User      @relation(fields: [auditorId], references: [id])
+  auditor     User      @relation(fields: [auditorId], references: [id], onDelete: Cascade)
   peran       PeranTim
 
   @@unique([penugasanId, auditorId])
@@ -157,7 +153,7 @@ model Isian {
   indikatorId       String
   indikator         Indikator     @relation(fields: [indikatorId], references: [id], onDelete: Cascade)
   unitId            String
-  unit              Unit          @relation(fields: [unitId], references: [id])
+  unit              Unit          @relation(fields: [unitId], references: [id], onDelete: Cascade)
   klaim             String?
   linkDrive         String?
   statusDokumen     StatusDokumen @default(BELUM_DICEK)

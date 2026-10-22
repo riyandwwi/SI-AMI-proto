@@ -7,18 +7,17 @@ import { Badge } from "@/components/ui";
 import { logout } from "@/app/login/actions";
 
 const NAV = {
-  SUPER_ADMIN: [{ href: "/admin", label: "Akun Pengguna" }],
+  SUPER_ADMIN: [{ href: "/admin", label: "Kelola Akun Pengguna" }],
   LPM: [
     { href: "/lpm", label: "Sesi & Periode" },
-    { href: "/lpm/unit", label: "Unit / Auditee" },
+    { href: "/lpm/unit", label: "Prodi / Auditee" },
     { href: "/lpm/indikator", label: "Indikator" },
     { href: "/lpm/penugasan", label: "Tim & Jadwal" },
-    { href: "/lpm/rekap", label: "Rekap" },
+    { href: "/lpm/rekap", label: "Rekap & Pengesahan" },
     { href: "/lpm/log", label: "Log" },
   ],
   AUDITOR: [{ href: "/auditor", label: "Penugasan Saya" }],
   AUDITEE: [{ href: "/auditee", label: "Evaluasi Diri & Bukti" }],
-  PIMPINAN: [{ href: "/pimpinan", label: "Dashboard Mutu" }],
 } as const;
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -47,7 +46,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </div>
           <div className="flex items-center gap-3 text-sm">
             <div className="text-right">
-              <div className="font-semibold text-slate-800">{user.nama}</div>
+              <div className="font-semibold text-slate-800">
+                {user.nama} {user.nimNuptk ? <span className="text-xs font-normal text-slate-500">({user.nimNuptk})</span> : null}
+              </div>
               <div className="flex items-center justify-end gap-1 text-xs text-slate-500">
                 <Badge tone="blue">{ROLE_LABEL[user.role]}</Badge>
                 {user.unit && <span>{user.unit.nama}</span>}

@@ -354,3 +354,22 @@ export async function sahkanPenugasan(fd: FormData) {
   revalidatePath("/lpm/penugasan");
   ok("/lpm/penugasan", `Penugasan "${p.unit.nama}" resmi disahkan oleh LPM.`);
 }
+
+export async function sahkanLaporanAkhir() {
+  const user = await requireUser("LPM");
+  const periode = await getActivePeriode();
+  if (!periode) fail("/lpm/rekap", "Belum ada periode AMI aktif.");
+
+  await prisma.periode.update({
+    where: { id: periode.id },
+    data: {
+      disahkanAt: new Date(),
+      disahkanOleh: user.nama,
+    },
+  });
+
+  await catat(user.id, "SAHKAN_LAPORAN_AMI", `Laporan AMI ${periode.nama} disahkan oleh ${user.nama}`);
+  revalidatePath("/lpm/rekap");
+  ok("/lpm/rekap", `Laporan Akhir AMI "${periode.nama}" resmi disahkan oleh ${user.nama}.`);
+}
+

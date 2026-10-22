@@ -1,76 +1,80 @@
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { decryptPassword } from "@/lib/crypto";
-import { ROLE_LABEL, ROLES, isRole } from "@/lib/roles";
+import { CREATABLE_ROLES, PRODI_LIST, ROLE_LABEL, ROLES, isRole } from "@/lib/roles";
 import { Badge, Flash, PageHeader, one, type SP } from "@/components/ui";
 import { PasswordCell } from "./PasswordCell";
-import { gantiPasswordUser, tambahUser, toggleAktifUser } from "./actions";
+import { gantiPasswordUser, hapusUser, tambahUser } from "./actions";
 
 export default async function AdminPage({ searchParams }: { searchParams: SP }) {
   const admin = await requireUser("SUPER_ADMIN");
   const sp = await searchParams;
   const roleFilter = one(sp.role);
 
-  const [users, units] = await Promise.all([
-    prisma.user.findMany({
-      where: isRole(roleFilter) ? { role: roleFilter } : undefined,
-      include: { unit: true },
-      orderBy: [{ role: "asc" }, { nama: "asc" }],
-    }),
-    prisma.unit.findMany({ orderBy: { kode: "asc" } }),
-  ]);
+  const users = await prisma.user.findMany({
+    where: isRole(roleFilter) ? { role: roleFilter } : undefined,
+    include: { unit: true },
+    orderBy: [{ role: "asc" }, { nama: "asc" }],
+  });
 
   return (
     <>
       <PageHeader
         title="Manajemen Akun Pengguna (Super Admin)"
-        desc="Tambah akun baru, lihat username & password jika pengguna lupa, serta ganti password langsung tanpa OTP."
+        desc="Buat akun baru (otomatis password default: 123), lihat username & password, ganti password, serta hapus akun."
       />
       <Flash ok={one(sp.ok)} err={one(sp.err)} />
 
       {/* Form Tambah Akun */}
       <form action={tambahUser} className="card space-y-4">
-        <div className="border-b border-slate-100 pb-2">
-          <h2 className="text-base font-bold text-slate-900">+ Tambah Akun Pengguna Baru</h2>
-          <p className="text-xs text-slate-500">
-            Akun langsung aktif tanpa verifikasi OTP. Untuk Auditor &amp; Auditee, wajib memilih Unit / Homebase ITBMP.
-          </p>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
+          <div>
+            <h2 className="text-base font-bold text-slate-900">+ Buat Akun Pengguna Baru</h2>
+            <p className="text-xs text-slate-500">
+              Masukkan Nama, NIM/NUPTK, Program Studi, Role (LPM / Auditor / Auditee), dan Username.
+            </p>
+          </div>
+          <Badge tone="amber">🔑 Password Otomatis Saat Dibuat: 123</Badge>
         </div>
+
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <div className="space-y-1">
-            <label>Nama Lengkap &amp; Gelar</label>
+            <label>Nama Lengkap</label>
             <input name="nama" required placeholder="Dr. Hendra Wijaya, M.M" className="w-full" />
           </div>
+
           <div className="space-y-1">
-            <label>Role</label>
+            <label>NIM / NUPTK</label>
+            <input name="nimNuptk" required placeholder="198705122015041001" className="w-full font-mono" />
+          </div>
+
+          <div className="space-y-1">
+            <label>Program Studi</label>
+            <select name="prodiKode" required className="w-full" defaultValue="PRODI-BD">
+              {PRODI_LIST.map((p) => (
+                <option key={p.kode} value={p.kode}>
+                  {p.nama}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-1">
+            <label>Pilih Role Akun</label>
             <select name="role" required className="w-full" defaultValue="AUDITOR">
-              {ROLES.map((r) => (
+              {CREATABLE_ROLES.map((r) => (
                 <option key={r} value={r}>
                   {ROLE_LABEL[r]}
                 </option>
               ))}
             </select>
           </div>
-          <div className="space-y-1">
-            <label>Unit / Homebase ITBMP</label>
-            <select name="unitId" className="w-full" defaultValue="">
-              <option value="">— Pilih Unit (Wajib utk Auditor/Auditee) —</option>
-              {units.map((u) => (
-                <option key={u.id} value={u.id}>
-                  [{u.kode}] {u.nama}
-                </option>
-              ))}
-            </select>
-          </div>
+
           <div className="space-y-1">
             <label>Username Login</label>
-            <input name="username" required placeholder="auditor_baru" className="w-full font-mono" />
-          </div>
-          <div className="space-y-1">
-            <label>Password Awal (min. 6 karakter)</label>
             <div className="flex gap-2">
-              <input name="password" type="text" required minLength={6} placeholder="itbmp2026" className="w-full font-mono" />
-              <button className="btn shrink-0">Simpan</button>
+              <input name="username" required placeholder="hendra_bd" className="w-full font-mono" />
+              <button className="btn shrink-0">+ Buat Akun</button>
             </div>
           </div>
         </div>
@@ -82,13 +86,13 @@ export default async function AdminPage({ searchParams }: { searchParams: SP }) 
           <div>
             <h2 className="text-base font-bold text-slate-900">Daftar Akun Terdaftar ({users.length} akun)</h2>
             <p className="text-xs text-slate-500">
-              Klik <strong>👁️ Lihat</strong> untuk melihat password saat ini, atau ketik password baru lalu klik <strong>Ubah Password</strong>.
+              Klik <strong>👁️ Lihat</strong> untuk melihat password saat ini, ubah password, atau klik <strong>Hapus</strong> untuk menghapus akun.
             </p>
           </div>
           <form method="GET" className="flex items-center gap-2">
             <label>Filter Role:</label>
             <select name="role" defaultValue={roleFilter ?? ""} className="text-xs">
-              <option value="">Semua Role</option>
+              <option value="">Semua Role (4 Role)</option>
               {ROLES.map((r) => (
                 <option key={r} value={r}>
                   {ROLE_LABEL[r]}
@@ -104,24 +108,27 @@ export default async function AdminPage({ searchParams }: { searchParams: SP }) 
             <thead>
               <tr>
                 <th>Nama Lengkap</th>
+                <th>NIM / NUPTK</th>
+                <th>Program Studi</th>
                 <th>Role</th>
-                <th>Unit / Homebase</th>
                 <th>Username</th>
                 <th>Password Saat Ini</th>
-                <th>Ganti Password Langsung</th>
-                <th>Status</th>
+                <th>Ganti Password</th>
+                <th>Hapus Akun</th>
               </tr>
             </thead>
             <tbody>
               {users.map((u) => {
                 const plain = decryptPassword(u.passwordEnc);
+                const isSuperAdmin = u.role === "SUPER_ADMIN" || u.id === admin.id;
                 return (
                   <tr key={u.id}>
                     <td className="font-semibold text-slate-900">{u.nama}</td>
+                    <td className="font-mono text-xs text-slate-700">{u.nimNuptk || "—"}</td>
+                    <td className="text-slate-700">{u.unit ? u.unit.nama : "—"}</td>
                     <td>
-                      <Badge tone="blue">{ROLE_LABEL[u.role]}</Badge>
+                      <Badge tone={u.role === "SUPER_ADMIN" ? "purple" : "blue"}>{ROLE_LABEL[u.role]}</Badge>
                     </td>
-                    <td className="text-slate-600">{u.unit ? `${u.unit.nama} (${u.unit.kode})` : "—"}</td>
                     <td>
                       <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-bold text-slate-800">{u.username}</code>
                     </td>
@@ -135,25 +142,22 @@ export default async function AdminPage({ searchParams }: { searchParams: SP }) 
                           name="passwordBaru"
                           type="text"
                           required
-                          minLength={6}
+                          minLength={3}
                           placeholder="Password baru..."
-                          className="w-36 font-mono text-xs"
+                          className="w-32 font-mono text-xs"
                         />
-                        <button className="btn-secondary text-xs">Ubah Password</button>
+                        <button className="btn-secondary text-xs">Simpan</button>
                       </form>
                     </td>
                     <td>
-                      <div className="flex items-center gap-2">
-                        <Badge tone={u.aktif ? "green" : "red"}>{u.aktif ? "Aktif" : "Nonaktif"}</Badge>
-                        {u.id !== admin.id && (
-                          <form action={toggleAktifUser}>
-                            <input type="hidden" name="userId" value={u.id} />
-                            <button className="text-xs text-slate-500 underline hover:text-slate-800">
-                              {u.aktif ? "Nonaktifkan" : "Aktifkan"}
-                            </button>
-                          </form>
-                        )}
-                      </div>
+                      {isSuperAdmin ? (
+                        <span className="text-xs text-slate-400">Akun Utama</span>
+                      ) : (
+                        <form action={hapusUser}>
+                          <input type="hidden" name="userId" value={u.id} />
+                          <button className="btn-danger text-xs">Hapus</button>
+                        </form>
+                      )}
                     </td>
                   </tr>
                 );
