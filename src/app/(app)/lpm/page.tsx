@@ -5,7 +5,15 @@ import { PRODI_LIST } from "@/lib/roles";
 import { KLASIFIKASI_LABEL, RTL_LABEL, STATUS_DOK_LABEL } from "@/lib/periode";
 import { fmtWaktu } from "@/lib/format";
 import { Badge, Empty, Flash, PageHeader, one, type SP } from "@/components/ui";
-import { buatSesiAmi, hapusIndikator, hapusSesiAmi, tambahIndikator, toggleStatusSesi } from "./actions";
+import {
+  buatSesiAmi,
+  hapusAuditorOlehLpm,
+  hapusIndikator,
+  hapusSesiAmi,
+  tambahAuditorOlehLpm,
+  tambahIndikator,
+  toggleStatusSesi,
+} from "./actions";
 
 export default async function LpmPage({ searchParams }: { searchParams: SP }) {
   await requireUser("LPM");
@@ -65,9 +73,9 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
         <>
           {/* Form Buat Sesi AMI */}
           <form action={buatSesiAmi} className="card space-y-4">
-            <div>
-              <h2 className="text-base font-bold text-slate-900">+ Buat Sesi AMI Baru</h2>
-              <p className="text-xs text-slate-500">
+            <div className="border-b-2 border-black pb-2">
+              <h2 className="text-base font-black text-black">+ Buat Sesi AMI Baru</h2>
+              <p className="text-xs font-semibold text-slate-600">
                 Pilih Tahun Akademik, Semester (Ganjil/Genap), dan Program Studi. Akun Auditor &amp; Auditee dari Prodi tersebut akan otomatis terdaftar pada sesi ini.
               </p>
             </div>
@@ -94,6 +102,47 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                     ))}
                   </select>
                   <button className="btn shrink-0">+ Buat Sesi</button>
+                </div>
+              </div>
+            </div>
+          </form>
+
+          {/* Form Tambah Akun Auditor oleh LPM */}
+          <form action={tambahAuditorOlehLpm} className="card space-y-4">
+            <input type="hidden" name="returnTo" value="/lpm?tab=sesi" />
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-black pb-2">
+              <div>
+                <h2 className="text-base font-black text-black">+ Tambah Akun Auditor Baru (Oleh LPM)</h2>
+                <p className="text-xs font-semibold text-slate-600">
+                  Tambahkan Auditor untuk Program Studi tertentu. Auditor yang ditambahkan akan otomatis terhubung ke Sesi AMI Prodi tersebut.
+                </p>
+              </div>
+              <Badge tone="amber">🔑 Password Default Otomatis: 123</Badge>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="space-y-1">
+                <label>Nama Lengkap Auditor</label>
+                <input name="nama" required placeholder="Dr. Hendra Wijaya, M.M" className="w-full" />
+              </div>
+              <div className="space-y-1">
+                <label>NIDN / NUPTK</label>
+                <input name="nimNuptk" required placeholder="0412058701" className="w-full font-mono" />
+              </div>
+              <div className="space-y-1">
+                <label>Program Studi yang Diaudit</label>
+                <select name="prodiKode" required defaultValue="PRODI-BD" className="w-full">
+                  {PRODI_LIST.map((p) => (
+                    <option key={p.kode} value={p.kode}>
+                      {p.nama}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label>Username Login</label>
+                <div className="flex gap-2">
+                  <input name="username" required placeholder="auditor_bd2" className="w-full font-mono" />
+                  <button className="btn shrink-0">+ Tambah Auditor</button>
                 </div>
               </div>
             </div>
@@ -194,17 +243,24 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                         </div>
                         {prodiAuditors.length === 0 ? (
                           <p className="text-xs font-semibold text-slate-500">
-                            Belum ada akun Auditor untuk Prodi {p.unit?.nama ?? "ini"}. Tambahkan di menu Super Admin.
+                            Belum ada akun Auditor untuk Prodi {p.unit?.nama ?? "ini"}. Tambahkan melalui form Tambah Auditor di atas.
                           </p>
                         ) : (
                           <ul className="space-y-1.5 text-xs">
                             {prodiAuditors.map((a) => (
-                              <li key={a.id} className="flex items-center justify-between rounded-xl bg-white px-3 py-2 border-2 border-black shadow-[1.5px_1.5px_0px_#000]">
+                              <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white px-3 py-2 border-2 border-black shadow-[1.5px_1.5px_0px_#000]">
                                 <div>
                                   <span className="font-bold text-black">{a.nama}</span>
                                   {a.nimNuptk && <span className="ml-1.5 font-mono text-slate-600">({a.nimNuptk})</span>}
                                 </div>
-                                <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono font-bold text-slate-800">{a.username}</code>
+                                <div className="flex items-center gap-2">
+                                  <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono font-bold text-slate-800">{a.username}</code>
+                                  <form action={hapusAuditorOlehLpm}>
+                                    <input type="hidden" name="userId" value={a.id} />
+                                    <input type="hidden" name="returnTo" value="/lpm?tab=sesi" />
+                                    <button className="btn-danger px-2 py-0.5 text-[11px]">Hapus</button>
+                                  </form>
+                                </div>
                               </li>
                             ))}
                           </ul>
@@ -231,7 +287,7 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                     Sesi Aktif: {activePeriodeForPantau.nama}
                   </h2>
                   <p className="text-xs text-slate-500">
-                    Tambah atau hapus indikator pada sesi ini, serta pantau apa saja yang dikerjakan <strong>Auditee</strong> dan <strong>Auditor</strong>.
+                    Tambah atau hapus indikator pada sesi ini, kelola Auditor, serta pantau apa saja yang dikerjakan <strong>Auditee</strong> dan <strong>Auditor</strong>.
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
@@ -247,10 +303,10 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                 </div>
               </div>
 
-              {/* Info Nama Auditee & Auditor pada Sesi Ini */}
+              {/* Info Nama Auditee & Kelola Auditor pada Sesi Ini */}
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="card space-y-1.5">
-                  <div className="text-xs font-bold uppercase text-slate-500">Auditee pada Sesi Ini</div>
+                <div className="card space-y-2">
+                  <div className="text-xs font-black uppercase text-black">👤 Auditee pada Sesi Ini ({activePeriodeForPantau.unit?.nama})</div>
                   <div className="text-sm font-semibold text-slate-900">
                     {allUsers
                       .filter((u) => u.role === "AUDITEE" && (!activePeriodeForPantau.unitId || u.unitId === activePeriodeForPantau.unitId))
@@ -258,14 +314,39 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                       .join(", ") || "Belum ada akun Auditee"}
                   </div>
                 </div>
-                <div className="card space-y-1.5">
-                  <div className="text-xs font-bold uppercase text-slate-500">Auditor pada Sesi Ini</div>
-                  <div className="text-sm font-semibold text-slate-900">
+                <div className="card space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs font-black uppercase text-black">🕵️ Auditor pada Sesi Ini ({activePeriodeForPantau.unit?.nama})</div>
+                    <Badge tone="amber">Password Default: 123</Badge>
+                  </div>
+                  <div className="space-y-1.5">
                     {allUsers
                       .filter((u) => u.role === "AUDITOR" && (!activePeriodeForPantau.unitId || u.unitId === activePeriodeForPantau.unitId))
-                      .map((u) => `${u.nama} (${u.nimNuptk || u.username})`)
-                      .join(", ") || "Belum ada akun Auditor"}
+                      .map((u) => (
+                        <div key={u.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border-2 border-black bg-[#FAF7EE] px-3 py-1.5 text-xs">
+                          <span className="font-bold text-black">
+                            {u.nama} {u.nimNuptk ? `(${u.nimNuptk})` : ""} — <code className="font-mono">{u.username}</code>
+                          </span>
+                          <form action={hapusAuditorOlehLpm}>
+                            <input type="hidden" name="userId" value={u.id} />
+                            <input type="hidden" name="returnTo" value={`/lpm?tab=pantau&periodeId=${activePeriodeForPantau.id}`} />
+                            <button className="btn-danger px-2 py-0.5 text-[11px]">Hapus Auditor</button>
+                          </form>
+                        </div>
+                      ))}
                   </div>
+                  {activePeriodeForPantau.unit && (
+                    <form action={tambahAuditorOlehLpm} className="grid grid-cols-1 gap-2 pt-1 sm:grid-cols-3">
+                      <input type="hidden" name="returnTo" value={`/lpm?tab=pantau&periodeId=${activePeriodeForPantau.id}`} />
+                      <input type="hidden" name="prodiKode" value={activePeriodeForPantau.unit.kode} />
+                      <input name="nama" required placeholder="Nama Auditor baru..." className="text-xs" />
+                      <input name="nimNuptk" required placeholder="NIDN / NUPTK..." className="font-mono text-xs" />
+                      <div className="flex gap-1.5">
+                        <input name="username" required placeholder="Username..." className="w-full font-mono text-xs" />
+                        <button className="btn shrink-0 px-2.5 py-1 text-xs">+ Auditor</button>
+                      </div>
+                    </form>
+                  )}
                 </div>
               </div>
 

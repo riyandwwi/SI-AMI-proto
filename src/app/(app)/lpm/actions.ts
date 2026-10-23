@@ -1,10 +1,14 @@
 "use server";
 
+import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
+import { encryptPassword } from "@/lib/crypto";
 import { PRODI_LIST } from "@/lib/roles";
 import { catat, fail, ok, str } from "@/lib/actions";
+
+const DEFAULT_PASSWORD = "123";
 
 const DEFAULT_INDIKATOR = [
   {
@@ -220,4 +224,78 @@ export async function sahkanLaporanAkhir(fd: FormData) {
   await catat(user.id, "SAHKAN_LAPORAN_AMI", `Laporan ${periode.nama} disahkan oleh ${user.nama}`);
   revalidatePath("/lpm/rekap");
   ok("/lpm/rekap", `Laporan AMI "${periode.nama}" resmi disahkan oleh ${user.nama}.`);
+}
+
+// ====================================================
+// 4. TAMBAH & HAPUS AKUN AUDITOR (OLEH LPM)
+// ====================================================
+export async function tambahAuditorOlehLpm(fd: FormData) {
+  const lpm = await requireUser("LPM");
+  const returnTo = str(fd, "returnTo", 200) || "/lpm";
+  const nama = str(fd, "nama", 120);
+  const nimNuptk = str(fd, "nimNuptk", 64);
+  const prodiKode = str(fd, "prodiKode", 32);
+  const username = str(fd, "username", 64).toLowerCase().replace(/\s+/g, "");
+
+  if (!nama || !nimNuptk || !prodiKode || !username) {
+    fail(returnTo, "Nama Lengkap, NIDN/NUPTK, Program Studi, dan Username Auditor wajib diisi.");
+  }
+
+  const prodiDef = PRODI_LIST.find((p) => p.kode === prodiKode);
+  if (!prodiDef) {
+    fail(returnTo, "Program Studi tidak valid. Pilih Bisnis Digital, Aktuaria, atau Perancangan Wilayah dan Kota.");
+  }
+
+  const exists = await prisma.user.findUnique({ where: { username } });
+  if (exists) {
+    fail(returnTo, `Username "${username}" sudah digunakan oleh akun lain.`);
+  }
+
+  const unit = await prisma.unit.upsert({
+    where: { kode: prodiDef.kode },
+    update: { nama: prodiDef.nama },
+    create: { kode: prodiDef.kode, nama: prodiDef.nama, jenis: "PRODI", diaudit: true },
+  });
+
+  await prisma.user.create({
+    data: {
+      nama,
+      nimNuptk,
+      username,
+      passwordHash: await bcrypt.hash(DEFAULT_PASSWORD, 10),
+      passwordEnc: encryptPassword(DEFAULT_PASSWORD),
+      role: "AUDITOR",
+      unitId: unit.id,
+      aktif: true,
+    },
+  });
+
+  await catat(lpm.id, "LPM_TAMBAH_AUDITOR", `Tambah Auditor ${nama} (${username} - Prodi ${prodiDef.nama}, NIDN/NUPTK: ${nimNuptk})`);
+  revalidatePath("/lpm");
+  revalidatePath("/admin");
+  revalidatePath("/auditor");
+  revalidatePath("/auditee");
+  ok(returnTo, `Auditor "${nama}" (username: ${username}, Prodi ${prodiDef.nama}) berhasil ditambahkan dengan password default "${DEFAULT_PASSWORD}".`);
+}
+
+export async function hapusAuditorOlehLpm(fd: FormData) {
+  const lpm = await requireUser("LPM");
+  const returnTo = str(fd, "returnTo", 200) || "/lpm";
+  const userId = str(fd, "userId", 64);
+
+  if (!userId) fail(returnTo, "ID Auditor tidak valid.");
+
+  const target = await prisma.user.findUnique({ where: { id: userId }, include: { unit: true } });
+  if (!target) fail(returnTo, "Akun Auditor tidak ditemukan.");
+  if (target.role !== "AUDITOR") {
+    fail(returnTo, "LPM hanya dapat menghapus akun dengan role Auditor.");
+  }
+
+  await prisma.user.delete({ where: { id: userId } });
+  await catat(lpm.id, "LPM_HAPUS_AUDITOR", `Hapus Auditor ${target.nama} (${target.username})`);
+  revalidatePath("/lpm");
+  revalidatePath("/admin");
+  revalidatePath("/auditor");
+  revalidatePath("/auditee");
+  ok(returnTo, `Auditor "${target.nama}" (${target.username}) berhasil dihapus.`);
 }
