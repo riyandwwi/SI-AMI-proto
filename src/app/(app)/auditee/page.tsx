@@ -11,20 +11,28 @@ export default async function AuditeePage({ searchParams }: { searchParams: SP }
     return <Empty>Akun Auditee belum dihubungkan ke Program Studi.</Empty>;
   }
 
-  const periode =
-    (await prisma.periode.findFirst({
-      where: { unitId: user.unitId },
-      orderBy: [{ aktif: "desc" }, { createdAt: "desc" }],
-    })) ??
-    (await prisma.periode.findFirst({
-      orderBy: [{ aktif: "desc" }, { createdAt: "desc" }],
-    }));
+  // Auditee WAJIB satu prodi dengan Sesi AMI
+  const periode = await prisma.periode.findFirst({
+    where: { unitId: user.unitId },
+    include: {
+      penugasan: {
+        include: {
+          tim: {
+            include: {
+              auditor: { include: { unit: true } },
+            },
+          },
+        },
+      },
+    },
+    orderBy: [{ aktif: "desc" }, { createdAt: "desc" }],
+  });
 
   if (!periode) {
     return <Empty>Belum ada Sesi AMI untuk Program Studi {user.unit.nama}.</Empty>;
   }
 
-  const [indikator, isianList, prodiAuditors] = await Promise.all([
+  const [indikator, isianList, crossAuditorsFallback] = await Promise.all([
     prisma.indikator.findMany({
       where: { periodeId: periode.id },
       orderBy: [{ urutan: "asc" }, { kode: "asc" }],
@@ -33,10 +41,17 @@ export default async function AuditeePage({ searchParams }: { searchParams: SP }
       where: { unitId: user.unitId, indikator: { periodeId: periode.id } },
     }),
     prisma.user.findMany({
-      where: { role: "AUDITOR", unitId: user.unitId, aktif: true },
+      where: { role: "AUDITOR", NOT: { unitId: user.unitId }, aktif: true },
+      include: { unit: true },
       orderBy: { nama: "asc" },
     }),
   ]);
+
+  const assignedAuditors = periode.penugasan
+    .flatMap((pg) => pg.tim.map((t) => t.auditor))
+    .filter((a) => a.aktif && a.unitId !== user.unitId);
+
+  const displayAuditors = assignedAuditors.length > 0 ? assignedAuditors : crossAuditorsFallback;
 
   const isianByInd = new Map(isianList.map((i) => [i.indikatorId, i]));
   const buka = periode.aktif;
@@ -75,9 +90,9 @@ export default async function AuditeePage({ searchParams }: { searchParams: SP }
     <>
       <PageHeader title={`Prodi ${user.unit.nama} — ${periode.tahun} (${periode.semester})`}>
         <div className="flex flex-wrap items-center gap-2">
-          {prodiAuditors.length > 0 && (
+          {displayAuditors.length > 0 && (
             <Badge tone="purple">
-              🕵️ Auditor: {prodiAuditors.map((a) => a.nama).join(", ")}
+              🕵️ Auditor: {displayAuditors.map((a) => `${a.nama}${a.unit ? ` (${a.unit.nama})` : ""}`).join(", ")}
             </Badge>
           )}
           <Badge tone={buka ? "green" : "amber"}>

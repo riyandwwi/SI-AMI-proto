@@ -7,32 +7,45 @@ export default async function AuditorListPage({ searchParams }: { searchParams: 
   const user = await requireUser("AUDITOR");
   const sp = await searchParams;
 
-  const [periodes, auditees] = await Promise.all([
+  // Ambil semua Sesi AMI yang BUKAN dari prodi asal Auditor (Independensi AMI: tidak boleh satu prodi)
+  const [allPeriodes, auditees] = await Promise.all([
     prisma.periode.findMany({
-      where: user.unitId ? { unitId: user.unitId } : undefined,
+      where: user.unitId ? { NOT: { unitId: user.unitId } } : undefined,
       include: {
         unit: true,
+        penugasan: { include: { tim: true } },
         indikator: { include: { isian: true } },
       },
       orderBy: [{ aktif: "desc" }, { createdAt: "desc" }],
     }),
     prisma.user.findMany({
-      where: { role: "AUDITEE", aktif: true, ...(user.unitId ? { unitId: user.unitId } : {}) },
+      where: { role: "AUDITEE", aktif: true },
       orderBy: { nama: "asc" },
     }),
   ]);
 
+  // Utamakan sesi di mana Auditor ditugaskan secara spesifik, atau tampilkan sesi lintas-prodi jika belum ada penugasan spesifik
+  const periodes = allPeriodes.filter((p) => {
+    const allTim = p.penugasan.flatMap((pg) => pg.tim);
+    if (allTim.length === 0) return true;
+    return allTim.some((t) => t.auditorId === user.id);
+  });
+
+  const displayPeriodes = periodes.length > 0 ? periodes : allPeriodes;
+
   return (
     <>
-      <PageHeader title={`Sesi Audit — ${user.unit?.nama ?? "Auditor"}`} />
+      <PageHeader title="Sesi Audit Lintas Prodi">
+        {user.unit && <Badge tone="purple">Asal Auditor: {user.unit.nama}</Badge>}
+      </PageHeader>
       <Flash ok={one(sp.ok)} err={one(sp.err)} />
 
-      {periodes.length === 0 ? (
-        <Empty>Belum ada Sesi AMI untuk Program Studi {user.unit?.nama ?? "Anda"}.</Empty>
+      {displayPeriodes.length === 0 ? (
+        <Empty>Belum ada Sesi AMI lintas prodi yang ditugaskan kepada Anda.</Empty>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {periodes.map((p) => {
-            const prodiAuditees = auditees.filter((a) => !p.unitId || a.unitId === p.unitId);
+          {displayPeriodes.map((p) => {
+            const prodiAuditees = auditees.filter((a) => a.unitId === p.unitId);
 
             return (
               <div key={p.id} className="card flex flex-col justify-between space-y-4">
@@ -47,11 +60,11 @@ export default async function AuditorListPage({ searchParams }: { searchParams: 
                   <div className="flex flex-wrap gap-1.5">
                     <Badge tone="blue">{p.tahun}</Badge>
                     <Badge tone="purple">{p.semester}</Badge>
-                    {p.unit && <Badge tone="slate">{p.unit.nama}</Badge>}
+                    {p.unit && <Badge tone="amber">Diaudit: {p.unit.nama}</Badge>}
                   </div>
 
                   <div className="pt-1 text-xs font-bold text-slate-700">
-                    👤 Auditee:{" "}
+                    👤 Auditee ({p.unit?.nama}):{" "}
                     {prodiAuditees.length > 0
                       ? prodiAuditees.map((a) => a.nama).join(", ")
                       : "—"}

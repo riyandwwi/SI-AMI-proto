@@ -6,12 +6,14 @@ import { KLASIFIKASI_LABEL, RTL_LABEL, STATUS_DOK_LABEL } from "@/lib/periode";
 import { Badge, Empty, Flash, PageHeader, one, type SP } from "@/components/ui";
 import {
   buatSesiAmi,
-  hapusAuditorOlehLpm,
   hapusIndikator,
   hapusSesiAmi,
-  tambahAuditorOlehLpm,
+  hapusUserEmergencyOlehLpm,
+  lepasAuditorDariSesi,
   tambahIndikator,
+  tambahUserEmergencyOlehLpm,
   toggleStatusSesi,
+  tugaskanAuditorKeSesi,
 } from "./actions";
 
 export default async function LpmPage({ searchParams }: { searchParams: SP }) {
@@ -24,6 +26,15 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
     prisma.periode.findMany({
       include: {
         unit: true,
+        penugasan: {
+          include: {
+            tim: {
+              include: {
+                auditor: { include: { unit: true } },
+              },
+            },
+          },
+        },
         indikator: {
           orderBy: [{ urutan: "asc" }, { kode: "asc" }],
           include: { isian: true },
@@ -52,7 +63,7 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
           href="/lpm?tab=sesi"
           className={tab === "sesi" ? "btn text-xs" : "btn-secondary text-xs"}
         >
-          📅 1. Sesi AMI &amp; Auditor
+          📅 1. Sesi AMI, Auditor &amp; Auditee
         </Link>
         <Link
           href={`/lpm?tab=pantau${activePeriodeForPantau ? `&periodeId=${activePeriodeForPantau.id}` : ""}`}
@@ -97,16 +108,23 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
             </div>
           </form>
 
-          {/* Form Tambah Akun Auditor oleh LPM */}
-          <form action={tambahAuditorOlehLpm} className="card space-y-4">
+          {/* Form Emergency LPM: Tambah Akun Auditor / Auditee */}
+          <form action={tambahUserEmergencyOlehLpm} className="card space-y-4">
             <input type="hidden" name="returnTo" value="/lpm?tab=sesi" />
             <div className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-black pb-2">
-              <h2 className="text-base font-black text-black">+ Tambah Auditor</h2>
+              <h2 className="text-base font-black text-black">🚨 Emergency: + Buat Akun Auditor / Auditee</h2>
               <Badge tone="amber">🔑 Password Default: 123</Badge>
             </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
               <div className="space-y-1">
-                <label>Nama Auditor</label>
+                <label>Role</label>
+                <select name="role" required defaultValue="AUDITOR" className="w-full font-bold">
+                  <option value="AUDITOR">Auditor (Lintas Prodi)</option>
+                  <option value="AUDITEE">Auditee (Satu Prodi)</option>
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label>Nama Lengkap</label>
                 <input name="nama" required placeholder="Nama..." className="w-full" />
               </div>
               <div className="space-y-1">
@@ -114,7 +132,7 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                 <input name="nimNuptk" required placeholder="NIDN / NUPTK..." className="w-full font-mono" />
               </div>
               <div className="space-y-1">
-                <label>Program Studi</label>
+                <label>Asal Program Studi</label>
                 <select name="prodiKode" required defaultValue="PRODI-BD" className="w-full">
                   {PRODI_LIST.map((p) => (
                     <option key={p.kode} value={p.kode}>
@@ -139,11 +157,28 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
           ) : (
             <div className="space-y-4">
               {periodes.map((p) => {
+                // 1. Auditee WAJIB satu prodi dengan Sesi AMI ini
                 const prodiAuditees = allUsers.filter(
-                  (u) => u.role === "AUDITEE" && (p.unitId ? u.unitId === p.unitId : true)
+                  (u) => u.role === "AUDITEE" && u.unitId === p.unitId
                 );
-                const prodiAuditors = allUsers.filter(
-                  (u) => u.role === "AUDITOR" && (p.unitId ? u.unitId === p.unitId : true)
+
+                // 2. Auditor TIDAK BOLEH satu prodi dengan Sesi AMI ini (Lintas Prodi)
+                const assignedFromPenugasan = p.penugasan
+                  .flatMap((pg) => pg.tim.map((t) => t.auditor))
+                  .filter((a) => a.aktif && a.unitId !== p.unitId);
+
+                const fallbackCrossAuditors = allUsers.filter(
+                  (u) => u.role === "AUDITOR" && u.unitId !== p.unitId
+                );
+
+                const assignedAuditors =
+                  assignedFromPenugasan.length > 0 ? assignedFromPenugasan : fallbackCrossAuditors;
+
+                const assignedIds = new Set(assignedAuditors.map((a) => a.id));
+
+                // Pilihan Auditor lintas-prodi yang belum ditugaskan ke sesi ini
+                const availableCrossAuditors = allUsers.filter(
+                  (u) => u.role === "AUDITOR" && u.unitId !== p.unitId && !assignedIds.has(u.id)
                 );
 
                 return (
@@ -179,48 +214,28 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                     </div>
 
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                      <div className="rounded-2xl border-2 border-black bg-[#FAF7EE] p-4 space-y-2 shadow-[2px_2px_0px_#000]">
+                      {/* KOTAK KIRI: AUDITEE (SATU PRODI) + EMERGENCY TAMBAH/HAPUS */}
+                      <div className="rounded-2xl border-2 border-black bg-[#FAF7EE] p-4 space-y-3 shadow-[2px_2px_0px_#000]">
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-black uppercase text-black">
-                            👤 Auditee ({p.unit?.nama})
+                            👤 Auditee Satu Prodi ({p.unit?.nama})
                           </span>
-                          <Badge tone="blue">{prodiAuditees.length}</Badge>
+                          <Badge tone="blue">{prodiAuditees.length} Auditee</Badge>
                         </div>
+
                         {prodiAuditees.length === 0 ? (
-                          <p className="text-xs font-semibold text-slate-400">Belum ada</p>
+                          <p className="text-xs font-semibold text-slate-400">Belum ada Auditee</p>
                         ) : (
                           <ul className="space-y-1.5 text-xs">
                             {prodiAuditees.map((a) => (
-                              <li key={a.id} className="flex items-center justify-between rounded-xl bg-white px-3 py-2 border-2 border-black shadow-[1.5px_1.5px_0px_#000]">
-                                <span className="font-bold text-black">
-                                  {a.nama} {a.nimNuptk && <span className="font-mono text-slate-500">({a.nimNuptk})</span>}
-                                </span>
-                                <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono font-bold text-slate-800">{a.username}</code>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-
-                      <div className="rounded-2xl border-2 border-black bg-[#FAF7EE] p-4 space-y-2 shadow-[2px_2px_0px_#000]">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-black uppercase text-black">
-                            🕵️ Auditor ({p.unit?.nama})
-                          </span>
-                          <Badge tone="green">{prodiAuditors.length}</Badge>
-                        </div>
-                        {prodiAuditors.length === 0 ? (
-                          <p className="text-xs font-semibold text-slate-400">Belum ada</p>
-                        ) : (
-                          <ul className="space-y-1.5 text-xs">
-                            {prodiAuditors.map((a) => (
                               <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white px-3 py-2 border-2 border-black shadow-[1.5px_1.5px_0px_#000]">
-                                <span className="font-bold text-black">
-                                  {a.nama} {a.nimNuptk && <span className="font-mono text-slate-500">({a.nimNuptk})</span>}
-                                </span>
-                                <div className="flex items-center gap-2">
+                                <div>
+                                  <span className="font-bold text-black">{a.nama}</span>
+                                  {a.nimNuptk && <span className="ml-1 font-mono text-slate-500">({a.nimNuptk})</span>}
+                                </div>
+                                <div className="flex items-center gap-1.5">
                                   <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono font-bold text-slate-800">{a.username}</code>
-                                  <form action={hapusAuditorOlehLpm}>
+                                  <form action={hapusUserEmergencyOlehLpm}>
                                     <input type="hidden" name="userId" value={a.id} />
                                     <input type="hidden" name="returnTo" value="/lpm?tab=sesi" />
                                     <button className="btn-danger px-2 py-0.5 text-[11px]">Hapus</button>
@@ -229,6 +244,78 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                               </li>
                             ))}
                           </ul>
+                        )}
+
+                        {/* Emergency Tambah Auditee Langsung ke Prodi Ini */}
+                        {p.unit && (
+                          <form action={tambahUserEmergencyOlehLpm} className="grid grid-cols-1 gap-1.5 pt-1 sm:grid-cols-3">
+                            <input type="hidden" name="returnTo" value="/lpm?tab=sesi" />
+                            <input type="hidden" name="role" value="AUDITEE" />
+                            <input type="hidden" name="prodiKode" value={p.unit.kode} />
+                            <input name="nama" required placeholder="Nama Auditee..." className="text-xs" />
+                            <input name="nimNuptk" required placeholder="NIDN/NUPTK..." className="font-mono text-xs" />
+                            <div className="flex gap-1">
+                              <input name="username" required placeholder="Username..." className="w-full font-mono text-xs" />
+                              <button className="btn shrink-0 px-2.5 py-1 text-xs">+ Auditee</button>
+                            </div>
+                          </form>
+                        )}
+                      </div>
+
+                      {/* KOTAK KANAN: AUDITOR (WAJIB LINTAS PRODI / BEDA PRODI) + EMERGENCY TAMBAH/HAPUS */}
+                      <div className="rounded-2xl border-2 border-black bg-[#FAF7EE] p-4 space-y-3 shadow-[2px_2px_0px_#000]">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-black uppercase text-black">
+                            🕵️ Auditor Lintas Prodi (Bukan {p.unit?.nama})
+                          </span>
+                          <Badge tone="green">{assignedAuditors.length} Auditor</Badge>
+                        </div>
+
+                        {assignedAuditors.length === 0 ? (
+                          <p className="text-xs font-semibold text-slate-400">Belum ada Auditor lintas prodi</p>
+                        ) : (
+                          <ul className="space-y-1.5 text-xs">
+                            {assignedAuditors.map((a) => (
+                              <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white px-3 py-2 border-2 border-black shadow-[1.5px_1.5px_0px_#000]">
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  <span className="font-bold text-black">{a.nama}</span>
+                                  {a.unit && <Badge tone="purple">Asal: {a.unit.nama}</Badge>}
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono font-bold text-slate-800">{a.username}</code>
+                                  {assignedFromPenugasan.length > 0 && (
+                                    <form action={lepasAuditorDariSesi}>
+                                      <input type="hidden" name="periodeId" value={p.id} />
+                                      <input type="hidden" name="auditorId" value={a.id} />
+                                      <input type="hidden" name="returnTo" value="/lpm?tab=sesi" />
+                                      <button className="btn-secondary px-2 py-0.5 text-[11px]">Lepas</button>
+                                    </form>
+                                  )}
+                                  <form action={hapusUserEmergencyOlehLpm}>
+                                    <input type="hidden" name="userId" value={a.id} />
+                                    <input type="hidden" name="returnTo" value="/lpm?tab=sesi" />
+                                    <button className="btn-danger px-2 py-0.5 text-[11px]">Hapus</button>
+                                  </form>
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+
+                        {/* Pilih / Tugaskan Auditor dari Prodi Lain yang Sudah Ada */}
+                        {availableCrossAuditors.length > 0 && (
+                          <form action={tugaskanAuditorKeSesi} className="flex gap-1.5 pt-1">
+                            <input type="hidden" name="periodeId" value={p.id} />
+                            <input type="hidden" name="returnTo" value="/lpm?tab=sesi" />
+                            <select name="auditorId" required className="w-full text-xs">
+                              {availableCrossAuditors.map((a) => (
+                                <option key={a.id} value={a.id}>
+                                  {a.nama} — Asal Prodi: {a.unit?.nama ?? "-"}
+                                </option>
+                              ))}
+                            </select>
+                            <button className="btn shrink-0 px-2.5 py-1 text-xs">+ Tugaskan</button>
+                          </form>
                         )}
                       </div>
                     </div>
@@ -335,13 +422,12 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                               <div className="mt-0.5 text-xs text-slate-700">{ind.pernyataan}</div>
                             </td>
 
-                            {/* Kolom Pekerjaan Auditee */}
                             <td className="space-y-1.5 text-xs">
                               {isian?.klaim || isian?.linkDrive ? (
                                 <>
                                   {isian.diisiOleh && (
                                     <div>
-                                      <Badge tone="blue">👤 Disimpan: {isian.diisiOleh}</Badge>
+                                      <Badge tone="blue">👤 {isian.diisiOleh}</Badge>
                                     </div>
                                   )}
                                   <div>{isian.klaim || "—"}</div>
@@ -380,7 +466,6 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                               )}
                             </td>
 
-                            {/* Kolom Pekerjaan Auditor */}
                             <td className="space-y-1.5 text-xs">
                               {isian ? (
                                 <>
@@ -446,7 +531,6 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                               )}
                             </td>
 
-                            {/* Aksi Hapus Indikator */}
                             <td className="text-right">
                               <form action={hapusIndikator}>
                                 <input type="hidden" name="indikatorId" value={ind.id} />

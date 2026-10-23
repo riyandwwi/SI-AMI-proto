@@ -29,7 +29,16 @@ export default async function AuditorUnitWorkspacePage({
 
   if (!periode) return <Empty>Sesi AMI tidak ditemukan.</Empty>;
 
-  const targetUnitId = periode.unitId ?? user.unitId;
+  // ATURAN INDEPENDENSI: Auditor TIDAK BOLEH mengaudit prodinya sendiri
+  if (user.unitId && periode.unitId && user.unitId === periode.unitId) {
+    return (
+      <Empty>
+        Independensi AMI: Anda berasal dari Prodi {user.unit?.nama} sehingga tidak diperbolehkan mengaudit Prodi sendiri.
+      </Empty>
+    );
+  }
+
+  const targetUnitId = periode.unitId;
   if (!targetUnitId) return <Empty>Program Studi belum ditentukan.</Empty>;
 
   const [indikator, isianList] = await Promise.all([
