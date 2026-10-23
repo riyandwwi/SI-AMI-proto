@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { HOMEBASE_LIST, PRODI_LIST } from "@/lib/roles";
 import { KLASIFIKASI_LABEL, RTL_LABEL, STATUS_DOK_LABEL } from "@/lib/periode";
 import { Badge, Empty, Flash, PageHeader, one, type SP } from "@/components/ui";
+import { ImportIndikatorExcel } from "./ImportIndikatorExcel";
 import {
   buatSesiAmi,
   editIndikator,
@@ -349,6 +350,16 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                   ))}
                 </div>
               </div>
+
+              {/* Import Indikator via Excel (Aman & Anti Tumpang Tindih) */}
+              <ImportIndikatorExcel
+                periodes={periodes.map((p) => ({
+                  id: p.id,
+                  nama: p.nama,
+                  existingCodes: p.indikator.map((i) => i.kode),
+                }))}
+                defaultPeriodeId={activePeriodeForPantau.id}
+              />
 
               {/* Form Cepat Tambah Indikator oleh LPM */}
               <form action={tambahIndikator} className="card space-y-3">

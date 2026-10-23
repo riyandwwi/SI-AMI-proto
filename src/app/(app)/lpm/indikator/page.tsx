@@ -1,6 +1,7 @@
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Badge, Empty, Flash, PageHeader, one, type SP } from "@/components/ui";
+import { ImportIndikatorExcel } from "../ImportIndikatorExcel";
 import { editIndikator, hapusIndikator, tambahIndikator } from "../actions";
 
 export default async function LpmIndikatorPage({ searchParams }: { searchParams: SP }) {
@@ -11,10 +12,18 @@ export default async function LpmIndikatorPage({ searchParams }: { searchParams:
     orderBy: { createdAt: "desc" },
   });
 
+  const periodeOptions = periodes.map((p) => ({
+    id: p.id,
+    nama: p.nama,
+    existingCodes: p.indikator.map((i) => i.kode),
+  }));
+
   return (
     <>
       <PageHeader title="Master Indikator SPMI" />
       <Flash ok={one(sp.ok)} err={one(sp.err)} />
+
+      {periodes.length > 0 && <ImportIndikatorExcel periodes={periodeOptions} defaultPeriodeId="ALL" />}
 
       <form action={tambahIndikator} className="card space-y-3">
         <h2 className="border-b border-black/15 pb-2 text-base font-black text-black">

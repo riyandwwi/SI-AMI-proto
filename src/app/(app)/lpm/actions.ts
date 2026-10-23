@@ -492,6 +492,113 @@ export async function hapusIndikator(fd: FormData) {
   ok(returnTo, `Indikator "${ind.kode}" dihapus.`);
 }
 
+export interface ExcelIndikatorRowInput {
+  kode: string;
+  standar: string;
+  pernyataan: string;
+  buktiDiminta: string;
+}
+
+export async function importBatchIndikatorExcel(
+  targetPeriodeId: string,
+  rows: ExcelIndikatorRowInput[],
+  mode: "SKIP_EXISTING" | "UPDATE_EXISTING" = "SKIP_EXISTING"
+): Promise<{
+  ok: boolean;
+  message?: string;
+  error?: string;
+  addedCount?: number;
+  updatedCount?: number;
+  skippedCount?: number;
+}> {
+  const user = await requireUser("LPM");
+  if (!rows || rows.length === 0) {
+    return { ok: false, error: "Tidak ada baris indikator yang valid untuk diimport." };
+  }
+
+  const periodes =
+    targetPeriodeId === "ALL"
+      ? await prisma.periode.findMany({
+          include: { indikator: true },
+          orderBy: { createdAt: "desc" },
+        })
+      : await prisma.periode.findMany({
+          where: { id: targetPeriodeId },
+          include: { indikator: true },
+        });
+
+  if (periodes.length === 0) {
+    return { ok: false, error: "Sesi AMI belum ditemukan. Buat Sesi AMI terlebih dahulu." };
+  }
+
+  let addedCount = 0;
+  let updatedCount = 0;
+  let skippedCount = 0;
+
+  for (const p of periodes) {
+    const existingMap = new Map(p.indikator.map((ind) => [ind.kode.toUpperCase(), ind]));
+    let nextUrutan = p.indikator.length + 1;
+
+    for (const raw of rows) {
+      const kode = (raw.kode || "").trim().toUpperCase().replace(/\s+/g, "-").slice(0, 32);
+      const standar = (raw.standar || "").trim().slice(0, 120);
+      const pernyataan = (raw.pernyataan || "").trim().slice(0, 1000);
+      const buktiDiminta = (raw.buktiDiminta || "").trim().slice(0, 500) || null;
+
+      if (!kode || !standar || !pernyataan) {
+        skippedCount++;
+        continue;
+      }
+
+      const existing = existingMap.get(kode);
+      if (existing) {
+        if (mode === "SKIP_EXISTING") {
+          skippedCount++;
+          continue;
+        } else {
+          await prisma.indikator.update({
+            where: { id: existing.id },
+            data: { standar, pernyataan, buktiDiminta },
+          });
+          updatedCount++;
+        }
+      } else {
+        const created = await prisma.indikator.create({
+          data: {
+            periodeId: p.id,
+            kode,
+            standar,
+            pernyataan,
+            target: "-",
+            buktiDiminta,
+            urutan: nextUrutan++,
+          },
+        });
+        existingMap.set(kode, created);
+        addedCount++;
+      }
+    }
+  }
+
+  await catat(
+    user.id,
+    "IMPORT_EXCEL_INDIKATOR",
+    `Import Excel: +${addedCount} baru, ${updatedCount} diperbarui, ${skippedCount} dilewati`
+  );
+  revalidatePath("/lpm/indikator");
+  revalidatePath("/lpm");
+  revalidatePath("/auditee");
+  revalidatePath("/auditor");
+
+  return {
+    ok: true,
+    addedCount,
+    updatedCount,
+    skippedCount,
+    message: `Import selesai: ${addedCount} indikator baru ditambahkan, ${updatedCount} diperbarui, ${skippedCount} dilewati (indikator manual aman).`,
+  };
+}
+
 // ====================================================
 // 5. PENGESAHAN LAPORAN AMI
 // ====================================================

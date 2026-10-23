@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { ROLE_LABEL } from "@/lib/roles";
 import { NavLinks } from "@/components/NavLinks";
+import { LiveSync } from "@/components/LiveSync";
 import { Badge } from "@/components/ui";
 import { logout } from "@/app/login/actions";
 
@@ -59,6 +60,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               AMI
             </div>
             <div className="text-lg font-black tracking-tight text-black">SI-AMI ITBMP</div>
+            <LiveSync />
           </div>
 
           <div className="flex items-center gap-2.5 text-sm">

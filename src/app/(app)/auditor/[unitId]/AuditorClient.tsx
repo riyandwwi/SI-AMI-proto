@@ -167,6 +167,53 @@ export default function AuditorClient({
     }
   }, [storageKey, indikator]);
 
+  // Sinkronisasi Real-Time: Saat prop `indikator` berubah dari server (misal Auditee upload bukti atau Auditor lain menyimpan),
+  // perbarui status verifikasi dan isian yang tidak sedang diketik oleh Auditor ini.
+  useEffect(() => {
+    setVerifiedMap(() => {
+      const m: Record<string, boolean> = {};
+      for (const ind of indikator) m[ind.id] = Boolean(ind.isian?.terverifikasiAuditor);
+      return m;
+    });
+    setVerifiedLapanganMap(() => {
+      const m: Record<string, boolean> = {};
+      for (const ind of indikator) m[ind.id] = Boolean(ind.isian?.terverifikasiLapangan);
+      return m;
+    });
+    setVerifiedRtlMap(() => {
+      const m: Record<string, boolean> = {};
+      for (const ind of indikator) m[ind.id] = ind.isian?.rtlStatus === "TERVERIFIKASI";
+      return m;
+    });
+
+    const freshMap = buildInitialMap(indikator);
+    setSavedValues(freshMap);
+    setValues((prev) => {
+      const next = { ...prev };
+      for (const ind of indikator) {
+        const cur = prev[ind.id];
+        const prevSav = savedValues[ind.id];
+        const dirty =
+          cur &&
+          prevSav &&
+          (cur.buktiDiminta.trim() !== prevSav.buktiDiminta.trim() ||
+            cur.statusDokumen !== prevSav.statusDokumen ||
+            cur.catatanDokumen.trim() !== prevSav.catatanDokumen.trim() ||
+            cur.klasifikasi !== prevSav.klasifikasi ||
+            cur.catatanLapangan.trim() !== prevSav.catatanLapangan.trim() ||
+            cur.rekomendasi.trim() !== prevSav.rekomendasi.trim() ||
+            cur.rtlStatus !== prevSav.rtlStatus ||
+            cur.rtlCatatanAuditor.trim() !== prevSav.rtlCatatanAuditor.trim());
+
+        if (!cur || !dirty) {
+          next[ind.id] = freshMap[ind.id];
+        }
+      }
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [indikator]);
+
   const updateField = <K extends keyof AuditorDraftEntry>(
     indId: string,
     field: K,

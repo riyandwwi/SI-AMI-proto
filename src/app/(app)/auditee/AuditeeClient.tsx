@@ -115,6 +115,48 @@ export default function AuditeeClient({
     }
   }, [storageKey, indikator]);
 
+  // Sinkronisasi Real-Time: Saat prop `indikator` berubah dari server (misal Auditee lain menyimpan atau Auditor mengunci),
+  // perbarui savedValues dan values (untuk indikator yang tidak sedang diketik oleh user ini).
+  useEffect(() => {
+    setSavedValues((prevSaved) => {
+      const nextSaved = { ...prevSaved };
+      for (const ind of indikator) {
+        nextSaved[ind.id] = {
+          klaim: ind.isian?.klaim ?? "",
+          linkDrive: ind.isian?.linkDrive ?? "",
+          diisiOleh: ind.isian?.diisiOleh ?? null,
+        };
+      }
+      return nextSaved;
+    });
+
+    setValues((prevValues) => {
+      const nextValues = { ...prevValues };
+      for (const ind of indikator) {
+        const cur = prevValues[ind.id];
+        const prevSav = savedValues[ind.id];
+        const isCurrentlyDirty =
+          cur &&
+          prevSav &&
+          !ind.isian?.terverifikasiAuditor &&
+          !ind.isian?.terverifikasiLapangan &&
+          (cur.klaim.trim() !== prevSav.klaim.trim() ||
+            cur.linkDrive.trim() !== prevSav.linkDrive.trim());
+
+        if (!cur || !isCurrentlyDirty) {
+          nextValues[ind.id] = {
+            klaim: ind.isian?.klaim ?? "",
+            linkDrive: ind.isian?.linkDrive ?? "",
+            rtlRencana: cur?.rtlRencana || ind.isian?.rtlRencana || "",
+            rtlLinkBukti: cur?.rtlLinkBukti || ind.isian?.rtlLinkBukti || "",
+          };
+        }
+      }
+      return nextValues;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [indikator]);
+
   const updateField = (indId: string, field: keyof DraftEntry, val: string) => {
     setValues((prev) => {
       const current = prev[indId] ?? { klaim: "", linkDrive: "", rtlRencana: "", rtlLinkBukti: "" };
