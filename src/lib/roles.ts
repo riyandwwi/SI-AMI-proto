@@ -27,6 +27,13 @@ export const PRODI_LIST = [
   { kode: "PRODI-PWK", nama: "Perancangan Wilayah dan Kota" },
 ] as const;
 
+export const HOMEBASE_LIST = [
+  { kode: "PRODI-BD", nama: "Bisnis Digital", jenis: "PRODI" },
+  { kode: "PRODI-AKT", nama: "Aktuaria", jenis: "PRODI" },
+  { kode: "PRODI-PWK", nama: "Perancangan Wilayah dan Kota", jenis: "PRODI" },
+  { kode: "TENDIK", nama: "Tenaga Pendidik (Tendik)", jenis: "TENDIK" },
+] as const;
+
 export function isRole(v: unknown): v is RoleName {
   return typeof v === "string" && (ROLES as readonly string[]).includes(v);
 }

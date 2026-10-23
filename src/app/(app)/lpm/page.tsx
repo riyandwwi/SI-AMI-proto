@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { PRODI_LIST } from "@/lib/roles";
+import { HOMEBASE_LIST, PRODI_LIST } from "@/lib/roles";
 import { KLASIFIKASI_LABEL, RTL_LABEL, STATUS_DOK_LABEL } from "@/lib/periode";
 import { Badge, Empty, Flash, PageHeader, one, type SP } from "@/components/ui";
 import {
@@ -132,9 +132,9 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                 <input name="nimNuptk" required placeholder="NIDN / NUPTK..." className="w-full font-mono" />
               </div>
               <div className="space-y-1">
-                <label>Asal Program Studi</label>
+                <label>Homebase / Prodi</label>
                 <select name="prodiKode" required defaultValue="PRODI-BD" className="w-full">
-                  {PRODI_LIST.map((p) => (
+                  {HOMEBASE_LIST.map((p) => (
                     <option key={p.kode} value={p.kode}>
                       {p.nama}
                     </option>

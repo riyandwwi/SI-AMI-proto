@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { encryptPassword } from "@/lib/crypto";
-import { isCreatableRole, PRODI_LIST } from "@/lib/roles";
+import { isCreatableRole, HOMEBASE_LIST } from "@/lib/roles";
 import { catat, fail, ok, str } from "@/lib/actions";
 
 const DEFAULT_PASSWORD = "123";
@@ -19,7 +19,7 @@ export async function tambahUser(fd: FormData) {
   const username = str(fd, "username", 64).toLowerCase().replace(/\s+/g, "");
 
   if (!nama || !nimNuptk || !prodiKode || !roleRaw || !username) {
-    fail("/admin", "Nama, NIDN/NUPTK, Prodi, Role, dan Username wajib diisi.");
+    fail("/admin", "Nama, NIDN/NUPTK, Homebase/Prodi, Role, dan Username wajib diisi.");
   }
 
   // Super Admin tidak boleh membuat akun dengan role Super Admin
@@ -27,19 +27,24 @@ export async function tambahUser(fd: FormData) {
     fail("/admin", "Super Admin hanya dapat membuat akun dengan role LPM, Auditor, atau Auditee.");
   }
 
-  const prodiDef = PRODI_LIST.find((p) => p.kode === prodiKode);
-  if (!prodiDef) {
-    fail("/admin", "Program Studi tidak valid. Pilih Bisnis Digital, Aktuaria, atau Perancangan Wilayah dan Kota.");
+  const homebaseDef = HOMEBASE_LIST.find((p) => p.kode === prodiKode);
+  if (!homebaseDef) {
+    fail("/admin", "Homebase / Program Studi tidak valid.");
   }
 
   const exists = await prisma.user.findUnique({ where: { username } });
   if (exists) fail("/admin", `Username "${username}" sudah digunakan.`);
 
-  // Pastikan unit Prodi terdaftar di tabel Unit
+  // Pastikan unit Homebase/Prodi terdaftar di tabel Unit
   const unit = await prisma.unit.upsert({
-    where: { kode: prodiDef.kode },
-    update: { nama: prodiDef.nama },
-    create: { kode: prodiDef.kode, nama: prodiDef.nama, jenis: "PRODI", diaudit: true },
+    where: { kode: homebaseDef.kode },
+    update: { nama: homebaseDef.nama },
+    create: {
+      kode: homebaseDef.kode,
+      nama: homebaseDef.nama,
+      jenis: homebaseDef.jenis,
+      diaudit: homebaseDef.jenis === "PRODI",
+    },
   });
 
   await prisma.user.create({
@@ -55,9 +60,51 @@ export async function tambahUser(fd: FormData) {
     },
   });
 
-  await catat(admin.id, "TAMBAH_USER", `Tambah akun ${username} (${roleRaw} - ${prodiDef.nama}, NIM/NUPTK: ${nimNuptk})`);
+  await catat(admin.id, "TAMBAH_USER", `Tambah akun ${username} (${roleRaw} - ${homebaseDef.nama}, NIM/NUPTK: ${nimNuptk})`);
   revalidatePath("/admin");
+  revalidatePath("/lpm");
   ok("/admin", `Akun "${username}" berhasil dibuat dengan password default "${DEFAULT_PASSWORD}".`);
+}
+
+export async function ubahHomebaseUser(fd: FormData) {
+  const admin = await requireUser("SUPER_ADMIN");
+  const userId = str(fd, "userId", 64);
+  const prodiKode = str(fd, "prodiKode", 32);
+
+  if (!userId || !prodiKode) {
+    fail("/admin", "Pilih pengguna dan Homebase terlebih dahulu.");
+  }
+
+  const homebaseDef = HOMEBASE_LIST.find((p) => p.kode === prodiKode);
+  if (!homebaseDef) {
+    fail("/admin", "Homebase / Program Studi tidak valid.");
+  }
+
+  const target = await prisma.user.findUnique({ where: { id: userId } });
+  if (!target) fail("/admin", "Pengguna tidak ditemukan.");
+
+  const unit = await prisma.unit.upsert({
+    where: { kode: homebaseDef.kode },
+    update: { nama: homebaseDef.nama },
+    create: {
+      kode: homebaseDef.kode,
+      nama: homebaseDef.nama,
+      jenis: homebaseDef.jenis,
+      diaudit: homebaseDef.jenis === "PRODI",
+    },
+  });
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { unitId: unit.id },
+  });
+
+  await catat(admin.id, "UBAH_HOMEBASE_USER", `Ubah homebase ${target.username} -> ${homebaseDef.nama}`);
+  revalidatePath("/admin");
+  revalidatePath("/lpm");
+  revalidatePath("/auditor");
+  revalidatePath("/auditee");
+  ok("/admin", `Homebase untuk "${target.nama}" berhasil diubah ke "${homebaseDef.nama}".`);
 }
 
 export async function gantiPasswordUser(fd: FormData) {

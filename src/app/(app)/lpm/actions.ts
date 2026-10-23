@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { encryptPassword } from "@/lib/crypto";
-import { PRODI_LIST } from "@/lib/roles";
+import { HOMEBASE_LIST, PRODI_LIST } from "@/lib/roles";
 import { catat, fail, ok, str } from "@/lib/actions";
 
 const DEFAULT_PASSWORD = "123";
@@ -276,9 +276,9 @@ export async function tambahUserEmergencyOlehLpm(fd: FormData) {
     fail(returnTo, "Nama, NIDN/NUPTK, Prodi, dan Username wajib diisi.");
   }
 
-  const prodiDef = PRODI_LIST.find((p) => p.kode === prodiKode);
+  const prodiDef = HOMEBASE_LIST.find((p) => p.kode === prodiKode);
   if (!prodiDef) {
-    fail(returnTo, "Program Studi tidak valid.");
+    fail(returnTo, "Homebase / Program Studi tidak valid.");
   }
 
   const exists = await prisma.user.findUnique({ where: { username } });
@@ -289,7 +289,12 @@ export async function tambahUserEmergencyOlehLpm(fd: FormData) {
   const unit = await prisma.unit.upsert({
     where: { kode: prodiDef.kode },
     update: { nama: prodiDef.nama },
-    create: { kode: prodiDef.kode, nama: prodiDef.nama, jenis: "PRODI", diaudit: true },
+    create: {
+      kode: prodiDef.kode,
+      nama: prodiDef.nama,
+      jenis: prodiDef.jenis,
+      diaudit: prodiDef.jenis === "PRODI",
+    },
   });
 
   // Jika LPM membuat Auditor langsung dari kartu Sesi AMI tertentu, pastikan tidak satu prodi!

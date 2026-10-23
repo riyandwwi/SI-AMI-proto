@@ -8,7 +8,7 @@ const DEFAULT_PASS = "123";
 async function main() {
   console.log("🌱 Seeding data awal SI-AMI ITBMP (3 Prodi, 4 Role, password default: 123)...");
 
-  // 1. Buat 3 Program Studi Resmi Kampus ITBMP
+  // 1. Buat 3 Program Studi Resmi + Homebase Tenaga Pendidik (Tendik) Kampus ITBMP
   const prodiData = [
     { kode: "PRODI-BD", nama: "Bisnis Digital", jenis: "PRODI", diaudit: true },
     { kode: "PRODI-AKT", nama: "Aktuaria", jenis: "PRODI", diaudit: true },
@@ -24,6 +24,12 @@ async function main() {
     });
     units[u.kode] = saved.id;
   }
+
+  await prisma.unit.upsert({
+    where: { kode: "TENDIK" },
+    update: { nama: "Tenaga Pendidik (Tendik)", jenis: "TENDIK", diaudit: false },
+    create: { kode: "TENDIK", nama: "Tenaga Pendidik (Tendik)", jenis: "TENDIK", diaudit: false },
+  });
 
   // Jika di database SUDAH ADA akun (misal sudah disiapkan untuk testing/produksi),
   // JANGAN pernah membuat ulang akun dummy atau sesi AMI dummy saat deploy update!
