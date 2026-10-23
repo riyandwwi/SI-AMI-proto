@@ -81,6 +81,41 @@ export async function GET(req: NextRequest) {
 
   // Ambil data tanda tangan dari sesi yang dicetak (atau sesi terakhir jika semua)
   const targetSignPeriode = periodes[periodes.length - 1] ?? null;
+
+  let auditeeNama = targetSignPeriode?.ketuaAuditeeNama ?? "";
+  let auditeeNuptk = targetSignPeriode?.ketuaAuditeeNip ?? "";
+  let auditorNama = targetSignPeriode?.ketuaAuditorNama ?? "";
+  let auditorNuptk = targetSignPeriode?.ketuaAuditorNip ?? "";
+  let lpmNama = targetSignPeriode?.kepalaLpmNama || targetSignPeriode?.disahkanOleh || "";
+  let lpmNuptk = targetSignPeriode?.kepalaLpmNip ?? "";
+
+  if (isPrint && targetSignPeriode) {
+    const [ketuaAuditeeUser, ketuaAuditorUser, lpmUser] = await Promise.all([
+      targetSignPeriode.ketuaAuditeeId
+        ? prisma.user.findUnique({ where: { id: targetSignPeriode.ketuaAuditeeId } })
+        : targetSignPeriode.unitId
+          ? prisma.user.findFirst({
+              where: { role: "AUDITEE", unitId: targetSignPeriode.unitId, aktif: true },
+              orderBy: { createdAt: "asc" },
+            })
+          : null,
+      targetSignPeriode.ketuaAuditorId
+        ? prisma.user.findUnique({ where: { id: targetSignPeriode.ketuaAuditorId } })
+        : null,
+      prisma.user.findFirst({
+        where: { role: "LPM", aktif: true },
+        orderBy: { createdAt: "asc" },
+      }),
+    ]);
+
+    if (!auditeeNama && ketuaAuditeeUser) auditeeNama = ketuaAuditeeUser.nama;
+    if (!auditeeNuptk && ketuaAuditeeUser) auditeeNuptk = ketuaAuditeeUser.nimNuptk;
+    if (!auditorNama && ketuaAuditorUser) auditorNama = ketuaAuditorUser.nama;
+    if (!auditorNuptk && ketuaAuditorUser) auditorNuptk = ketuaAuditorUser.nimNuptk;
+    if (!lpmNama && lpmUser) lpmNama = lpmUser.nama;
+    if (!lpmNuptk && lpmUser) lpmNuptk = lpmUser.nimNuptk;
+  }
+
   const signatureHtml =
     isPrint && targetSignPeriode
       ? `
@@ -97,8 +132,8 @@ export async function GET(req: NextRequest) {
                   : `<div class="sig-empty">( Belum TTD )</div>`
               }
             </div>
-            <div class="sig-name">${esc(targetSignPeriode.ketuaAuditeeNama || "........................................")}</div>
-            <div class="sig-nip">NIDN/NUPTK: ${esc(targetSignPeriode.ketuaAuditeeNip || "........................")}</div>
+            <div class="sig-name">${esc(auditeeNama || "........................................")}</div>
+            <div class="sig-nip">NUPTK: ${esc(auditeeNuptk || "........................")}</div>
           </div>
 
           <!-- KANAN: KETUA AUDITOR -->
@@ -112,8 +147,8 @@ export async function GET(req: NextRequest) {
                   : `<div class="sig-empty">( Belum TTD )</div>`
               }
             </div>
-            <div class="sig-name">${esc(targetSignPeriode.ketuaAuditorNama || "........................................")}</div>
-            <div class="sig-nip">NIDN/NUPTK: ${esc(targetSignPeriode.ketuaAuditorNip || "........................")}</div>
+            <div class="sig-name">${esc(auditorNama || "........................................")}</div>
+            <div class="sig-nip">NUPTK: ${esc(auditorNuptk || "........................")}</div>
           </div>
         </div>
 
@@ -129,8 +164,8 @@ export async function GET(req: NextRequest) {
                   : `<div class="sig-empty">( Belum TTD )</div>`
               }
             </div>
-            <div class="sig-name">${esc(targetSignPeriode.kepalaLpmNama || targetSignPeriode.disahkanOleh || "........................................")}</div>
-            <div class="sig-nip">NIDN/NUPTK: ${esc(targetSignPeriode.kepalaLpmNip || "........................")}</div>
+            <div class="sig-name">${esc(lpmNama || "........................................")}</div>
+            <div class="sig-nip">NUPTK: ${esc(lpmNuptk || "........................")}</div>
           </div>
         </div>
       </div>
