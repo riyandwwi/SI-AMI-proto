@@ -55,8 +55,16 @@ export default async function LpmRekapPage({ searchParams }: { searchParams: SP 
   return (
     <>
       <PageHeader title="Rekap & Pengesahan">
+        <a
+          href="/api/rekap-excel?print=1"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn-secondary text-xs"
+        >
+          🖨️ Print Semua
+        </a>
         <a href="/api/rekap-excel" className="btn text-xs">
-          📥 Download Semua Rekap Excel (.xls)
+          📥 Download Semua Excel (.xls)
         </a>
       </PageHeader>
       <Flash ok={one(sp.ok)} err={one(sp.err)} />
@@ -147,10 +155,18 @@ export default async function LpmRekapPage({ searchParams }: { searchParams: SP 
                         <>
                           <Badge tone="green">✓ Disahkan ({p.disahkanOleh})</Badge>
                           <a
+                            href={`/api/rekap-excel?periodeId=${p.id}&print=1`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn-secondary text-xs"
+                          >
+                            🖨️ Print
+                          </a>
+                          <a
                             href={`/api/rekap-excel?periodeId=${p.id}`}
                             className="btn-success text-xs"
                           >
-                            📥 Download Excel
+                            📥 Excel
                           </a>
                         </>
                       ) : (
@@ -159,6 +175,14 @@ export default async function LpmRekapPage({ searchParams }: { searchParams: SP 
                             <input type="hidden" name="periodeId" value={p.id} />
                             <button className="btn text-xs">Sahkan</button>
                           </form>
+                          <a
+                            href={`/api/rekap-excel?periodeId=${p.id}&print=1`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn-secondary text-xs"
+                          >
+                            🖨️ Print
+                          </a>
                           <a
                             href={`/api/rekap-excel?periodeId=${p.id}`}
                             className="btn-secondary text-xs"

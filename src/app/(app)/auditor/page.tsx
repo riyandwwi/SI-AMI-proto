@@ -81,6 +81,20 @@ export default async function AuditorListPage({ searchParams }: { searchParams: 
                   <Link href={`/auditor/${p.id}?mode=rtl`} className="btn-secondary text-xs">
                     🛠️ 3. Verifikasi RTL
                   </Link>
+                  <a
+                    href={`/api/rekap-excel?periodeId=${p.id}&print=1`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn-secondary text-xs"
+                  >
+                    🖨️ Print
+                  </a>
+                  <a
+                    href={`/api/rekap-excel?periodeId=${p.id}`}
+                    className="btn-secondary text-xs"
+                  >
+                    📥 Excel
+                  </a>
                 </div>
               </div>
             );

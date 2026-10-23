@@ -14,9 +14,10 @@ function esc(val: unknown): string {
 }
 
 export async function GET(req: NextRequest) {
-  await requireUser("LPM", "SUPER_ADMIN");
+  await requireUser("LPM", "SUPER_ADMIN", "AUDITOR");
 
   const periodeId = req.nextUrl.searchParams.get("periodeId");
+  const isPrint = req.nextUrl.searchParams.get("print") === "1";
 
   const periodes = await prisma.periode.findMany({
     where: periodeId ? { id: periodeId } : undefined,
@@ -71,17 +72,40 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  const excelHref = `/api/rekap-excel${periodeId ? `?periodeId=${encodeURIComponent(periodeId)}` : ""}`;
+
   const html = `
+    <!DOCTYPE html>
     <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
       <head>
         <meta charset="utf-8" />
+        <title>Rekap Hasil AMI ITBMP</title>
         <style>
-          table { border-collapse: collapse; font-family: Arial, sans-serif; font-size: 11pt; }
-          th { background-color: #FEF08A; color: #000000; font-weight: bold; border: 1px solid #000000; padding: 8px; }
-          td { border: 1px solid #000000; padding: 6px; vertical-align: top; }
+          @page { size: landscape; margin: 12mm; }
+          body { font-family: Arial, sans-serif; font-size: 10pt; color: #000; background: #fff; margin: 16px; }
+          h2 { margin: 0 0 12px 0; font-size: 14pt; }
+          .toolbar { display: flex; gap: 10px; margin-bottom: 16px; align-items: center; }
+          .btn-print { background: #FF5C38; color: #fff; border: 2px solid #000; padding: 8px 14px; border-radius: 8px; font-weight: bold; cursor: pointer; text-decoration: none; font-size: 10pt; box-shadow: 2px 2px 0 #000; }
+          .btn-excel { background: #D9F99D; color: #000; border: 2px solid #000; padding: 8px 14px; border-radius: 8px; font-weight: bold; cursor: pointer; text-decoration: none; font-size: 10pt; box-shadow: 2px 2px 0 #000; }
+          table { width: 100%; border-collapse: collapse; font-size: 9pt; }
+          th { background-color: #FEF08A; color: #000000; font-weight: bold; border: 1px solid #000000; padding: 6px; text-align: left; }
+          td { border: 1px solid #000000; padding: 5px; vertical-align: top; word-break: break-word; }
+          @media print {
+            .no-print { display: none !important; }
+            body { margin: 0; }
+          }
         </style>
       </head>
       <body>
+        ${
+          isPrint
+            ? `<div class="toolbar no-print">
+                <button type="button" class="btn-print" onclick="window.print()">🖨️ Print / Simpan PDF</button>
+                <a class="btn-excel" href="${excelHref}">📥 Download Excel (.xls)</a>
+              </div>
+              <script>window.onload = function() { setTimeout(function() { window.print(); }, 300); };</script>`
+            : ""
+        }
         <h2>REKAPITULASI HASIL AUDIT MUTU INTERNAL (SI-AMI ITBMP)</h2>
         <table>
           <thead>
@@ -119,6 +143,14 @@ export async function GET(req: NextRequest) {
       </body>
     </html>
   `;
+
+  if (isPrint) {
+    return new NextResponse(html, {
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+      },
+    });
+  }
 
   return new NextResponse(html, {
     headers: {

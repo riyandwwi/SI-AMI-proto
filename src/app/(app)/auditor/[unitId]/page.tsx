@@ -114,6 +114,20 @@ export default async function AuditorUnitWorkspacePage({
           >
             🛠️ 3. Verifikasi RTL
           </Link>
+          <a
+            href={`/api/rekap-excel?periodeId=${periode.id}&print=1`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-secondary text-xs"
+          >
+            🖨️ Print Rekap
+          </a>
+          <a
+            href={`/api/rekap-excel?periodeId=${periode.id}`}
+            className="btn-secondary text-xs"
+          >
+            📥 Excel
+          </a>
         </div>
         <Badge tone={buka ? "green" : "amber"}>
           {buka ? "🟢 Sesi Terbuka" : "🔒 Sesi Terkunci"}
