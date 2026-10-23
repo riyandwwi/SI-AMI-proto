@@ -286,9 +286,9 @@ export default function AuditeeClient({
             key={ind.id}
             className={`card space-y-3 transition ${dirty ? "ring-2 ring-amber-300" : ""}`}
           >
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-black pb-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/15 pb-3">
               <div className="flex flex-wrap items-center gap-2">
-                <code className="rounded-xl border-2 border-black bg-[#BAE6FD] px-2.5 py-0.5 text-xs font-black text-black shadow-[1.5px_1.5px_0px_#000]">
+                <code className="rounded-xl border border-black/30 bg-[#BAE6FD] px-2.5 py-0.5 text-xs font-black text-black">
                   {ind.kode}
                 </code>
                 <span className="text-sm font-black text-black">{ind.standar}</span>
@@ -392,7 +392,7 @@ export default function AuditeeClient({
 
             {/* Catatan Auditor (Jika sudah diperiksa) */}
             {(isian?.catatanDokumen || isian?.catatanLapangan || isian?.rekomendasi) && (
-              <div className="rounded-2xl border-2 border-black bg-[#FAF7EE] p-3.5 text-xs space-y-1 shadow-[2px_2px_0px_#000]">
+              <div className="rounded-2xl border border-black/15 bg-[#FAF7EE] p-3.5 text-xs space-y-1">
                 {isian.diperiksaOleh && (
                   <div className="font-black text-slate-700">🕵️ Auditor: {isian.diperiksaOleh}</div>
                 )}
@@ -421,7 +421,7 @@ export default function AuditeeClient({
                   e.preventDefault();
                   handleSaveRtl(ind.id, isian.id);
                 }}
-                className="rounded-2xl border-2 border-black bg-[#FEF08A]/30 p-3.5 space-y-2.5 shadow-[2.5px_2.5px_0px_#000]"
+                className="rounded-2xl border border-black/20 bg-[#FEF08A]/35 p-3.5 space-y-2.5"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="text-xs font-black text-black">

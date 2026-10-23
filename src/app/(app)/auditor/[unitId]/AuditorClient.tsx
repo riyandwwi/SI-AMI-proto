@@ -635,9 +635,9 @@ export default function AuditorClient({
               mode === "lapangan" && isFokus ? "border-amber-400 bg-amber-50/30" : ""
             } ${dirty ? "ring-2 ring-amber-300" : ""}`}
           >
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-black pb-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/15 pb-3">
               <div className="flex flex-wrap items-center gap-2">
-                <code className="rounded-xl border-2 border-black bg-[#BAE6FD] px-2.5 py-0.5 text-xs font-black text-black shadow-[1.5px_1.5px_0px_#000]">
+                <code className="rounded-xl border border-black/30 bg-[#BAE6FD] px-2.5 py-0.5 text-xs font-black text-black">
                   {ind.kode}
                 </code>
                 <span className="text-sm font-black text-black">{ind.standar}</span>
@@ -700,7 +700,7 @@ export default function AuditorClient({
             <p className="text-sm font-semibold text-slate-900">{ind.pernyataan}</p>
 
             {/* Kotak Klaim & Link Drive Auditee */}
-            <div className="rounded-2xl border-2 border-black bg-[#FAF7EE] p-3.5 text-xs space-y-1 shadow-[2px_2px_0px_#000]">
+            <div className="rounded-2xl border border-black/15 bg-[#FAF7EE] p-3.5 text-xs space-y-1">
               <div>
                 <strong>Evaluasi Diri Auditee{isian?.diisiOleh ? ` (${isian.diisiOleh})` : ""}:</strong>{" "}
                 {isian?.klaim ? (
@@ -794,7 +794,7 @@ export default function AuditorClient({
             {/* MODE 2: AUDIT LAPANGAN & KLASIFIKASI TEMUAN */}
             {mode === "lapangan" && (
               <>
-                <div className="rounded-2xl border-2 border-black bg-[#BAE6FD]/40 p-3.5 text-xs whitespace-pre-wrap shadow-[2px_2px_0px_#000]">
+                <div className="rounded-2xl border border-black/15 bg-[#BAE6FD]/45 p-3.5 text-xs whitespace-pre-wrap">
                   <strong className="font-black text-black">
                     Catatan Dokumen ({STATUS_DOK_LABEL[sav.statusDokumen]}):
                   </strong>{" "}
@@ -880,7 +880,7 @@ export default function AuditorClient({
             {/* MODE 3: VERIFIKASI TINDAK LANJUT (RTL) */}
             {mode === "rtl" && isian && (
               <div className="space-y-3 pt-1">
-                <div className="rounded-2xl border-2 border-black bg-[#FEF08A]/40 p-3.5 text-xs space-y-1 shadow-[2px_2px_0px_#000]">
+                <div className="rounded-2xl border border-black/15 bg-[#FEF08A]/45 p-3.5 text-xs space-y-1">
                   <div>
                     <strong>Temuan:</strong> {KLASIFIKASI_LABEL[isian.klasifikasi!]} — {isian.catatanLapangan}
                   </div>

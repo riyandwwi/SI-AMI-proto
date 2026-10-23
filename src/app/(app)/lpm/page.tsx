@@ -77,7 +77,7 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
         <>
           {/* Form Buat Sesi AMI */}
           <form action={buatSesiAmi} className="card space-y-4">
-            <h2 className="border-b-2 border-black pb-2 text-base font-black text-black">
+            <h2 className="border-b border-black/15 pb-2 text-base font-black text-black">
               + Buat Sesi AMI
             </h2>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -111,7 +111,7 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
           {/* Form Emergency LPM: Tambah Akun Auditor / Auditee */}
           <form action={tambahUserEmergencyOlehLpm} className="card space-y-4">
             <input type="hidden" name="returnTo" value="/lpm?tab=sesi" />
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-black pb-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/15 pb-2">
               <h2 className="text-base font-black text-black">🚨 Emergency: + Buat Akun Auditor / Auditee</h2>
               <Badge tone="amber">🔑 Password Default: 123</Badge>
             </div>
@@ -183,7 +183,7 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
 
                 return (
                   <div key={p.id} className="card space-y-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-black pb-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/15 pb-3">
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="text-base font-black text-black">{p.nama}</h3>
                         <Badge tone="blue">{p.tahun}</Badge>
@@ -215,7 +215,7 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
 
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                       {/* KOTAK KIRI: AUDITEE (SATU PRODI) + EMERGENCY TAMBAH/HAPUS */}
-                      <div className="rounded-2xl border-2 border-black bg-[#FAF7EE] p-4 space-y-3 shadow-[2px_2px_0px_#000]">
+                      <div className="rounded-2xl border border-black/15 bg-[#FAF7EE] p-4 space-y-3">
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-black uppercase text-black">
                             👤 Auditee Satu Prodi ({p.unit?.nama})
@@ -228,7 +228,7 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                         ) : (
                           <ul className="space-y-1.5 text-xs">
                             {prodiAuditees.map((a) => (
-                              <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white px-3 py-2 border-2 border-black shadow-[1.5px_1.5px_0px_#000]">
+                              <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white px-3 py-2 border border-black/15">
                                 <div>
                                   <span className="font-bold text-black">{a.nama}</span>
                                   {a.nimNuptk && <span className="ml-1 font-mono text-slate-500">({a.nimNuptk})</span>}
@@ -263,7 +263,7 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                       </div>
 
                       {/* KOTAK KANAN: AUDITOR (WAJIB LINTAS PRODI / BEDA PRODI) + EMERGENCY TAMBAH/HAPUS */}
-                      <div className="rounded-2xl border-2 border-black bg-[#FAF7EE] p-4 space-y-3 shadow-[2px_2px_0px_#000]">
+                      <div className="rounded-2xl border border-black/15 bg-[#FAF7EE] p-4 space-y-3">
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-black uppercase text-black">
                             🕵️ Auditor Lintas Prodi (Bukan {p.unit?.nama})
@@ -276,7 +276,7 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                         ) : (
                           <ul className="space-y-1.5 text-xs">
                             {assignedAuditors.map((a) => (
-                              <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white px-3 py-2 border-2 border-black shadow-[1.5px_1.5px_0px_#000]">
+                              <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white px-3 py-2 border border-black/15">
                                 <div className="flex flex-wrap items-center gap-1.5">
                                   <span className="font-bold text-black">{a.nama}</span>
                                   {a.unit && <Badge tone="purple">Asal: {a.unit.nama}</Badge>}

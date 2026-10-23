@@ -34,12 +34,12 @@ export function PageHeader({ title, children }: { title: string; desc?: ReactNod
 }
 
 const TONES = {
-  slate: "bg-white text-black border-2 border-black shadow-[2px_2px_0px_#000000]",
-  blue: "bg-[#BAE6FD] text-black border-2 border-black shadow-[2px_2px_0px_#000000]",
-  green: "bg-[#D9F99D] text-black border-2 border-black shadow-[2px_2px_0px_#000000]",
-  amber: "bg-[#FEF08A] text-black border-2 border-black shadow-[2px_2px_0px_#000000]",
-  red: "bg-[#FECDD3] text-black border-2 border-black shadow-[2px_2px_0px_#000000]",
-  purple: "bg-[#E9D5FF] text-black border-2 border-black shadow-[2px_2px_0px_#000000]",
+  slate: "bg-white/90 text-black border border-black/25",
+  blue: "bg-[#BAE6FD] text-black border border-black/25",
+  green: "bg-[#D9F99D] text-black border border-black/25",
+  amber: "bg-[#FEF08A] text-black border border-black/25",
+  red: "bg-[#FECDD3] text-black border border-black/25",
+  purple: "bg-[#E9D5FF] text-black border border-black/25",
 } as const;
 export type Tone = keyof typeof TONES;
 
