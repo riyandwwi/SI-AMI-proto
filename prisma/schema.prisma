@@ -153,23 +153,26 @@ model PenugasanAuditor {
 }
 
 model Isian {
-  id                String        @id @default(cuid())
-  indikatorId       String
-  indikator         Indikator     @relation(fields: [indikatorId], references: [id], onDelete: Cascade)
-  unitId            String
-  unit              Unit          @relation(fields: [unitId], references: [id], onDelete: Cascade)
-  klaim             String?
-  linkDrive         String?
-  statusDokumen     StatusDokumen @default(BELUM_DICEK)
-  catatanDokumen    String?
-  catatanLapangan   String?
-  klasifikasi       Klasifikasi?
-  rekomendasi       String?
-  rtlRencana        String?
-  rtlLinkBukti      String?
-  rtlStatus         StatusRtl     @default(BELUM)
-  rtlCatatanAuditor String?
-  updatedAt         DateTime      @updatedAt
+  id                   String        @id @default(cuid())
+  indikatorId          String
+  indikator            Indikator     @relation(fields: [indikatorId], references: [id], onDelete: Cascade)
+  unitId               String
+  unit                 Unit          @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  klaim                String?
+  linkDrive            String?
+  diisiOleh            String?
+  statusDokumen        StatusDokumen @default(BELUM_DICEK)
+  catatanDokumen       String?
+  catatanLapangan      String?
+  klasifikasi          Klasifikasi?
+  rekomendasi          String?
+  diperiksaOleh        String?
+  terverifikasiAuditor Boolean       @default(false)
+  rtlRencana           String?
+  rtlLinkBukti         String?
+  rtlStatus            StatusRtl     @default(BELUM)
+  rtlCatatanAuditor    String?
+  updatedAt            DateTime      @updatedAt
 
   @@unique([indikatorId, unitId])
 }

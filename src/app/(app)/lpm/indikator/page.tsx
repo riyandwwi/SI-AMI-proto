@@ -13,18 +13,14 @@ export default async function LpmIndikatorPage({ searchParams }: { searchParams:
 
   return (
     <>
-      <PageHeader
-        title="Master Standar & Indikator Mutu SPMI ITBMP"
-        desc="Kelola daftar indikator standar SPMI yang akan diisi oleh Auditee dan diperiksa oleh Auditor."
-      />
+      <PageHeader title="Master Indikator SPMI" />
       <Flash ok={one(sp.ok)} err={one(sp.err)} />
 
-      {/* Form Tambah Indikator */}
       <form action={tambahIndikator} className="card space-y-3">
-        <h2 className="text-base font-bold text-slate-900">+ Tambah Indikator Standar SPMI</h2>
+        <h2 className="border-b-2 border-black pb-2 text-base font-black text-black">+ Tambah Indikator</h2>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
           <div className="space-y-1">
-            <label>Terapkan ke Sesi AMI</label>
+            <label>Sesi AMI</label>
             <select name="periodeId" defaultValue="ALL" className="w-full">
               <option value="ALL">Semua Sesi AMI</option>
               {periodes.map((p) => (
@@ -35,63 +31,47 @@ export default async function LpmIndikatorPage({ searchParams }: { searchParams:
             </select>
           </div>
           <div className="space-y-1">
-            <label>Kode Indikator</label>
+            <label>Kode</label>
             <input name="kode" required placeholder="STD-PEND-04" className="w-full font-mono" />
           </div>
           <div className="space-y-1">
-            <label>Kategori Standar SPMI</label>
-            <input name="standar" required placeholder="Standar Isi Pembelajaran" className="w-full" />
+            <label>Standar</label>
+            <input name="standar" required placeholder="Standar Isi..." className="w-full" />
           </div>
           <div className="space-y-1">
-            <label>Target Capaian</label>
-            <input name="target" required placeholder="100% Mata Kuliah" className="w-full" />
+            <label>Target</label>
+            <input name="target" required placeholder="100%" className="w-full" />
           </div>
         </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="space-y-1">
-            <label>Pernyataan Indikator Mutu</label>
-            <textarea
-              name="pernyataan"
-              rows={2}
-              required
-              placeholder="Ketersediaan dokumen kurikulum OBE dan RPS lengkap untuk seluruh mata kuliah aktif..."
-              className="w-full"
-            />
-          </div>
-          <div className="space-y-1">
-            <label>Dokumen Bukti Google Drive yang Diminta dari Auditee</label>
-            <textarea
-              name="buktiDiminta"
-              rows={2}
-              placeholder="Folder Google Drive berisi SK Kurikulum, Matriks CPL-MK, dan file RPS seluruh MK."
-              className="w-full"
-            />
-          </div>
+        <div className="flex gap-2">
+          <input
+            name="pernyataan"
+            required
+            placeholder="Pernyataan indikator..."
+            className="w-full"
+          />
+          <button className="btn shrink-0">+ Tambah</button>
         </div>
-        <button className="btn">Tambahkan Indikator</button>
       </form>
 
-      {/* Daftar Indikator per Sesi AMI */}
       {periodes.length === 0 ? (
-        <Empty>Belum ada Sesi AMI. Buat Sesi AMI terlebih dahulu di menu Sesi AMI.</Empty>
+        <Empty>Belum ada Sesi AMI.</Empty>
       ) : (
         periodes.map((p) => (
           <div key={p.id} className="card space-y-3 overflow-x-auto">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <h3 className="text-base font-bold text-slate-900">{p.nama}</h3>
-                <Badge tone="blue">{p.indikator.length} Indikator</Badge>
-              </div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-base font-black text-black">{p.nama}</h3>
+              <Badge tone="blue">{p.indikator.length} Indikator</Badge>
             </div>
             {p.indikator.length === 0 ? (
-              <Empty>Belum ada indikator untuk sesi ini.</Empty>
+              <Empty>Belum ada indikator.</Empty>
             ) : (
               <table>
                 <thead>
                   <tr>
                     <th>Kode</th>
-                    <th>Standar SPMI</th>
-                    <th>Pernyataan Indikator &amp; Bukti Google Drive yang Diminta</th>
+                    <th>Standar</th>
+                    <th>Pernyataan Indikator</th>
                     <th>Target</th>
                     <th>Aksi</th>
                   </tr>
@@ -100,18 +80,13 @@ export default async function LpmIndikatorPage({ searchParams }: { searchParams:
                   {p.indikator.map((ind) => (
                     <tr key={ind.id}>
                       <td>
-                        <code className="rounded-xl border-2 border-black bg-[#BAE6FD] px-2.5 py-0.5 text-xs font-black text-black shadow-[1.5px_1.5px_0px_#000]">{ind.kode}</code>
+                        <code className="rounded-xl border-2 border-black bg-[#BAE6FD] px-2.5 py-0.5 text-xs font-black text-black shadow-[1.5px_1.5px_0px_#000]">
+                          {ind.kode}
+                        </code>
                       </td>
-                      <td className="font-semibold text-slate-900">{ind.standar}</td>
-                      <td>
-                        <div className="text-slate-800">{ind.pernyataan}</div>
-                        {ind.buktiDiminta && (
-                          <div className="mt-1 text-xs text-slate-500">
-                            <strong>Bukti Drive:</strong> {ind.buktiDiminta}
-                          </div>
-                        )}
-                      </td>
-                      <td className="font-semibold text-slate-800">{ind.target}</td>
+                      <td className="font-bold text-black">{ind.standar}</td>
+                      <td className="text-slate-800">{ind.pernyataan}</td>
+                      <td className="font-bold text-black">{ind.target}</td>
                       <td>
                         <form action={hapusIndikator}>
                           <input type="hidden" name="indikatorId" value={ind.id} />

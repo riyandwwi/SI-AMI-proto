@@ -17,44 +17,38 @@ export interface ActionResult {
   message?: string;
   error?: string;
   savedIds?: string[];
+  diisiOleh?: string;
 }
 
-/**
- * Menyimpan satu atau beberapa isian indikator Auditee sekaligus tanpa redirect
- * agar input di indikator lain yang sedang diketik tidak pernah hilang/ter-reset.
- */
 export async function simpanBatchIsianAuditee(
   items: IsianInputItem[],
   targetIndikatorId?: string
 ): Promise<ActionResult> {
   const user = await requireUser("AUDITEE");
   if (!user.unitId) {
-    return { ok: false, error: "Akun Auditee Anda belum terhubung ke Program Studi." };
+    return { ok: false, error: "Akun Auditee belum terhubung ke Program Studi." };
   }
 
   if (!items || items.length === 0) {
-    return { ok: false, error: "Tidak ada data indikator yang dikirim untuk disimpan." };
+    return { ok: false, error: "Tidak ada data indikator untuk disimpan." };
   }
 
-  // Jika user klik tombol Simpan pada satu indikator spesifik, validasi indikator tersebut terlebih dahulu
   if (targetIndikatorId) {
     const target = items.find((i) => i.indikatorId === targetIndikatorId);
     if (!target || !target.klaim.trim() || !target.linkDrive.trim()) {
       return {
         ok: false,
-        error: "Klaim evaluasi diri dan tautan Google Drive pada indikator ini wajib diisi.",
+        error: "Klaim evaluasi diri dan link Google Drive wajib diisi.",
       };
     }
     if (!isGoogleDriveLink(target.linkDrive.trim())) {
       return {
         ok: false,
-        error:
-          "Tautan bukti wajib berupa link resmi Google Drive / Google Docs (https://drive.google.com/... atau https://docs.google.com/...).",
+        error: "Link wajib berupa tautan Google Drive / Google Docs (https://drive.google.com/...).",
       };
     }
   }
 
-  // Filter semua item yang sudah lengkap & valid untuk ikut disimpan sekaligus
   const validItems = items
     .map((item) => ({
       indikatorId: item.indikatorId.trim().slice(0, 64),
@@ -66,23 +60,36 @@ export async function simpanBatchIsianAuditee(
   if (validItems.length === 0) {
     return {
       ok: false,
-      error:
-        "Pastikan Klaim Evaluasi Diri telah diisi dan Tautan Bukti menggunakan link Google Drive / Google Docs yang valid (https://drive.google.com/...).",
+      error: "Pastikan Klaim dan Link Google Drive sudah diisi dengan benar.",
     };
   }
 
   const indikatorList = await prisma.indikator.findMany({
     where: { id: { in: validItems.map((v) => v.indikatorId) } },
-    include: { periode: true },
+    include: {
+      periode: true,
+      isian: { where: { unitId: user.unitId } },
+    },
   });
 
   if (indikatorList.length === 0) {
     return { ok: false, error: "Indikator tidak ditemukan." };
   }
 
-  const locked = indikatorList.find((ind) => !ind.periode.aktif);
-  if (locked) {
-    return { ok: false, error: "Sesi AMI ini sedang dikunci oleh LPM." };
+  const lockedPeriode = indikatorList.find((ind) => !ind.periode.aktif);
+  if (lockedPeriode) {
+    return { ok: false, error: "Sesi AMI sedang dikunci oleh LPM." };
+  }
+
+  // Cek apakah indikator yang diklik sudah diverifikasi Auditor
+  if (targetIndikatorId) {
+    const targetInd = indikatorList.find((ind) => ind.id === targetIndikatorId);
+    if (targetInd?.isian[0]?.terverifikasiAuditor) {
+      return {
+        ok: false,
+        error: `Indikator "${targetInd.kode}" sudah diverifikasi oleh Auditor dan tidak dapat diubah lagi.`,
+      };
+    }
   }
 
   const validIndMap = new Map(indikatorList.map((ind) => [ind.id, ind]));
@@ -92,6 +99,8 @@ export async function simpanBatchIsianAuditee(
   for (const item of validItems) {
     const ind = validIndMap.get(item.indikatorId);
     if (!ind) continue;
+    // Lewati indikator yang sudah diverifikasi/dikunci oleh Auditor
+    if (ind.isian[0]?.terverifikasiAuditor) continue;
 
     await prisma.isian.upsert({
       where: { indikatorId_unitId: { indikatorId: item.indikatorId, unitId: user.unitId } },
@@ -100,10 +109,12 @@ export async function simpanBatchIsianAuditee(
         unitId: user.unitId,
         klaim: item.klaim,
         linkDrive: item.linkDrive,
+        diisiOleh: user.nama,
       },
       update: {
         klaim: item.klaim,
         linkDrive: item.linkDrive,
+        diisiOleh: user.nama,
       },
     });
 
@@ -111,22 +122,28 @@ export async function simpanBatchIsianAuditee(
     savedIds.push(ind.id);
   }
 
+  if (savedIds.length === 0) {
+    return {
+      ok: false,
+      error: "Indikator sudah diverifikasi oleh Auditor sehingga tidak dapat diubah.",
+    };
+  }
+
   await catat(
     user.id,
     "ISI_BUKTI_DRIVE",
-    `${user.unit?.nama ?? ""}: ${savedCodes.join(", ")}`
+    `${user.nama} (${user.unit?.nama ?? ""}): ${savedCodes.join(", ")}`
   );
 
   revalidatePath("/auditee");
+  revalidatePath("/auditor");
   revalidatePath("/lpm");
 
   return {
     ok: true,
     savedIds,
-    message:
-      savedCodes.length === 1
-        ? `Bukti Google Drive untuk indikator "${savedCodes[0]}" berhasil disimpan.`
-        : `${savedCodes.length} indikator (${savedCodes.join(", ")}) berhasil disimpan sekaligus.`,
+    diisiOleh: user.nama,
+    message: `Tersimpan (${savedCodes.join(", ")}) oleh ${user.nama}.`,
   };
 }
 
@@ -137,7 +154,7 @@ export async function simpanRtlAuditeeClient(payload: {
 }): Promise<ActionResult> {
   const user = await requireUser("AUDITEE");
   if (!user.unitId) {
-    return { ok: false, error: "Akun Auditee Anda belum terhubung ke Program Studi." };
+    return { ok: false, error: "Akun Auditee belum terhubung ke Program Studi." };
   }
 
   const isianId = payload.isianId.trim().slice(0, 64);
@@ -150,7 +167,7 @@ export async function simpanRtlAuditeeClient(payload: {
   if (rtlLinkBukti && !isGoogleDriveLink(rtlLinkBukti)) {
     return {
       ok: false,
-      error: "Bukti tindak lanjut wajib menggunakan link Google Drive / Google Docs.",
+      error: "Link bukti wajib menggunakan Google Drive / Google Docs.",
     };
   }
 
@@ -165,7 +182,7 @@ export async function simpanRtlAuditeeClient(payload: {
     return { ok: false, error: "Sesi AMI sedang dikunci oleh LPM." };
   }
   if (!isian.klasifikasi || !BUTUH_RTL.includes(isian.klasifikasi)) {
-    return { ok: false, error: "Indikator ini tidak memerlukan tindak lanjut perbaikan." };
+    return { ok: false, error: "Indikator ini tidak memerlukan RTL." };
   }
 
   const nextStatus = rtlLinkBukti ? "SELESAI_AUDITEE" : "PROSES";
@@ -175,20 +192,22 @@ export async function simpanRtlAuditeeClient(payload: {
       rtlRencana,
       rtlLinkBukti: rtlLinkBukti || null,
       rtlStatus: nextStatus,
+      diisiOleh: user.nama,
     },
   });
 
-  await catat(user.id, "ISI_RTL_AUDITEE", `${isian.indikator.kode} -> ${nextStatus}`);
+  await catat(user.id, "ISI_RTL_AUDITEE", `${user.nama}: ${isian.indikator.kode} -> ${nextStatus}`);
   revalidatePath("/auditee");
+  revalidatePath("/auditor");
   revalidatePath("/lpm");
 
   return {
     ok: true,
-    message: `Tindak lanjut (RTL) untuk "${isian.indikator.kode}" berhasil disimpan.`,
+    diisiOleh: user.nama,
+    message: `RTL "${isian.indikator.kode}" disimpan oleh ${user.nama}.`,
   };
 }
 
-// Fallback form actions jika dipanggil via progressive enhancement
 export async function simpanIsianAuditee(fd: FormData) {
   const indikatorId = str(fd, "indikatorId", 64);
   const klaim = str(fd, "klaim", 2000);

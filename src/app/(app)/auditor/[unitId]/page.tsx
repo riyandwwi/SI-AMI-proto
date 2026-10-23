@@ -14,9 +14,8 @@ export default async function AuditorUnitWorkspacePage({
   const user = await requireUser("AUDITOR");
   const { unitId: paramId } = await params;
   const sp = await searchParams;
-  const mode = one(sp.mode) ?? "dokumen"; // dokumen | lapangan | rtl
+  const mode = one(sp.mode) ?? "dokumen";
 
-  // Cari Sesi AMI berdasarkan ID periode (atau unitId sebagai fallback)
   const periode =
     (await prisma.periode.findUnique({
       where: { id: paramId },
@@ -31,19 +30,15 @@ export default async function AuditorUnitWorkspacePage({
   if (!periode) return <Empty>Sesi AMI tidak ditemukan.</Empty>;
 
   const targetUnitId = periode.unitId ?? user.unitId;
-  if (!targetUnitId) return <Empty>Program Studi untuk sesi ini belum ditentukan.</Empty>;
+  if (!targetUnitId) return <Empty>Program Studi belum ditentukan.</Empty>;
 
-  const [indikator, isianList, prodiAuditees] = await Promise.all([
+  const [indikator, isianList] = await Promise.all([
     prisma.indikator.findMany({
       where: { periodeId: periode.id },
       orderBy: [{ urutan: "asc" }, { kode: "asc" }],
     }),
     prisma.isian.findMany({
       where: { unitId: targetUnitId, indikator: { periodeId: periode.id } },
-    }),
-    prisma.user.findMany({
-      where: { role: "AUDITEE", unitId: targetUnitId, aktif: true },
-      orderBy: { nama: "asc" },
     }),
   ]);
 
@@ -64,11 +59,14 @@ export default async function AuditorUnitWorkspacePage({
             id: isian.id,
             klaim: isian.klaim,
             linkDrive: isian.linkDrive,
+            diisiOleh: isian.diisiOleh,
             statusDokumen: isian.statusDokumen,
             catatanDokumen: isian.catatanDokumen,
             klasifikasi: isian.klasifikasi,
             catatanLapangan: isian.catatanLapangan,
             rekomendasi: isian.rekomendasi,
+            diperiksaOleh: isian.diperiksaOleh,
+            terverifikasiAuditor: isian.terverifikasiAuditor,
             rtlRencana: isian.rtlRencana,
             rtlLinkBukti: isian.rtlLinkBukti,
             rtlStatus: isian.rtlStatus,
@@ -80,47 +78,41 @@ export default async function AuditorUnitWorkspacePage({
 
   return (
     <>
-      <PageHeader
-        title={`Meja Kerja Auditor — ${periode.nama}`}
-        desc={`Auditee Prodi ${periode.unit?.nama ?? ""}: ${
-          prodiAuditees.map((a) => `${a.nama}${a.nimNuptk ? ` (${a.nimNuptk})` : ""}`).join(", ") || "Belum ada akun Auditee"
-        }`}
-      >
+      <PageHeader title={periode.nama}>
         <Link href="/auditor" className="btn-secondary text-xs">
-          ← Kembali ke Daftar Sesi
+          ← Kembali
         </Link>
       </PageHeader>
       <Flash ok={one(sp.ok)} err={one(sp.err)} />
 
-      {/* Sub-Navigasi 3 Mode Pemeriksaan Auditor */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-black pb-3">
         <div className="flex flex-wrap gap-2">
           <Link
             href={`/auditor/${periode.id}?mode=dokumen`}
             className={mode === "dokumen" ? "btn text-xs" : "btn-secondary text-xs"}
           >
-            📄 1. Audit Dokumen (Cek Link Drive)
+            📄 1. Audit Dokumen
           </Link>
           <Link
             href={`/auditor/${periode.id}?mode=lapangan`}
             className={mode === "lapangan" ? "btn text-xs" : "btn-secondary text-xs"}
           >
-            🏛️ 2. Audit Lapangan &amp; Klasifikasi Temuan ({jmlFokusLapangan} Fokus)
+            🏛️ 2. Audit Lapangan ({jmlFokusLapangan})
           </Link>
           <Link
             href={`/auditor/${periode.id}?mode=rtl`}
             className={mode === "rtl" ? "btn text-xs" : "btn-secondary text-xs"}
           >
-            🛠️ 3. Verifikasi Tindak Lanjut (RTL)
+            🛠️ 3. Verifikasi RTL
           </Link>
         </div>
         <Badge tone={buka ? "green" : "amber"}>
-          {buka ? "🟢 Sesi Terbuka" : "🔒 Sesi Terkunci oleh LPM"}
+          {buka ? "🟢 Sesi Terbuka" : "🔒 Sesi Terkunci"}
         </Badge>
       </div>
 
       {clientItems.length === 0 ? (
-        <Empty>LPM belum menambahkan indikator pada sesi ini.</Empty>
+        <Empty>Belum ada indikator.</Empty>
       ) : (
         <AuditorClient
           periodeId={periode.id}

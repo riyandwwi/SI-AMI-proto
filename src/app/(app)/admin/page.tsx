@@ -19,33 +19,25 @@ export default async function AdminPage({ searchParams }: { searchParams: SP }) 
 
   return (
     <>
-      <PageHeader
-        title="Manajemen Akun Pengguna (Super Admin)"
-        desc="Buat akun baru (otomatis password default: 123), lihat username & password, ganti password, serta hapus akun."
-      />
+      <PageHeader title="Kelola Akun Pengguna" />
       <Flash ok={one(sp.ok)} err={one(sp.err)} />
 
       {/* Form Tambah Akun */}
       <form action={tambahUser} className="card space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-black pb-3">
-          <div>
-            <h2 className="text-base font-black text-black">+ Buat Akun Pengguna Baru</h2>
-            <p className="text-xs font-semibold text-slate-600">
-              Masukkan Nama, NIDN/NUPTK, Program Studi, Role (LPM / Auditor / Auditee), dan Username.
-            </p>
-          </div>
-          <Badge tone="amber">🔑 Password Default Otomatis: 123</Badge>
+          <h2 className="text-base font-black text-black">+ Buat Akun Baru</h2>
+          <Badge tone="amber">🔑 Password Default: 123</Badge>
         </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <div className="space-y-1">
             <label>Nama Lengkap</label>
-            <input name="nama" required placeholder="Dr. Hendra Wijaya, M.M" className="w-full" />
+            <input name="nama" required placeholder="Nama..." className="w-full" />
           </div>
 
           <div className="space-y-1">
             <label>NIDN / NUPTK</label>
-            <input name="nimNuptk" required placeholder="0412058701" className="w-full font-mono" />
+            <input name="nimNuptk" required placeholder="NIDN / NUPTK..." className="w-full font-mono" />
           </div>
 
           <div className="space-y-1">
@@ -60,7 +52,7 @@ export default async function AdminPage({ searchParams }: { searchParams: SP }) 
           </div>
 
           <div className="space-y-1">
-            <label>Pilih Role Akun</label>
+            <label>Role</label>
             <select name="role" required className="w-full font-bold" defaultValue="AUDITOR">
               {CREATABLE_ROLES.map((r) => (
                 <option key={r} value={r}>
@@ -71,10 +63,10 @@ export default async function AdminPage({ searchParams }: { searchParams: SP }) 
           </div>
 
           <div className="space-y-1">
-            <label>Username Login</label>
+            <label>Username</label>
             <div className="flex gap-2">
-              <input name="username" required placeholder="hendra_bd" className="w-full font-mono" />
-              <button className="btn shrink-0">+ Buat Akun</button>
+              <input name="username" required placeholder="Username..." className="w-full font-mono" />
+              <button className="btn shrink-0">+ Buat</button>
             </div>
           </div>
         </div>
@@ -83,23 +75,17 @@ export default async function AdminPage({ searchParams }: { searchParams: SP }) 
       {/* Tabel Daftar Akun */}
       <div className="card space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-black pb-3">
-          <div>
-            <h2 className="text-base font-black text-black">Daftar Akun Terdaftar ({users.length} akun)</h2>
-            <p className="text-xs font-semibold text-slate-600">
-              Klik <strong>👁️ Lihat</strong> untuk melihat password saat ini, ubah password, atau klik <strong>Hapus</strong> untuk menghapus akun.
-            </p>
-          </div>
+          <h2 className="text-base font-black text-black">Daftar Akun ({users.length})</h2>
           <form method="GET" className="flex items-center gap-2">
-            <label>Filter Role:</label>
             <select name="role" defaultValue={roleFilter ?? ""} className="text-xs">
-              <option value="">Semua Role (4 Role)</option>
+              <option value="">Semua Role</option>
               {ROLES.map((r) => (
                 <option key={r} value={r}>
                   {ROLE_LABEL[r]}
                 </option>
               ))}
             </select>
-            <button className="btn-secondary text-xs">Terapkan</button>
+            <button className="btn-secondary text-xs">Filter</button>
           </form>
         </div>
 
@@ -107,14 +93,14 @@ export default async function AdminPage({ searchParams }: { searchParams: SP }) 
           <table>
             <thead>
               <tr>
-                <th>Nama Lengkap</th>
+                <th>Nama</th>
                 <th>NIDN / NUPTK</th>
-                <th>Program Studi</th>
+                <th>Prodi</th>
                 <th>Role</th>
                 <th>Username</th>
-                <th>Password Saat Ini</th>
+                <th>Password</th>
                 <th>Ganti Password</th>
-                <th>Hapus Akun</th>
+                <th>Hapus</th>
               </tr>
             </thead>
             <tbody>
@@ -156,7 +142,7 @@ export default async function AdminPage({ searchParams }: { searchParams: SP }) 
                     <td>
                       {isSuperAdmin ? (
                         <span className="rounded-full border border-black bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">
-                          Akun Utama
+                          Utama
                         </span>
                       ) : (
                         <form action={hapusUser}>

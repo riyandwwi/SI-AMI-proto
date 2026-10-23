@@ -19,7 +19,7 @@ export function LoginForm({ initialError }: { initialError?: string }) {
           name="username"
           autoComplete="username"
           required
-          placeholder="Masukkan username..."
+          placeholder="Username..."
           className="w-full"
         />
       </div>
@@ -31,16 +31,13 @@ export function LoginForm({ initialError }: { initialError?: string }) {
           type="password"
           autoComplete="current-password"
           required
-          placeholder="Masukkan password..."
+          placeholder="Password..."
           className="w-full"
         />
       </div>
       <button className="btn w-full py-3 text-base shadow-[4px_4px_0px_#000000]" disabled={pending}>
-        {pending ? "Memproses Masuk..." : "Masuk ke Sistem AMI →"}
+        {pending ? "Memproses..." : "Masuk →"}
       </button>
-      <p className="text-center text-xs font-semibold text-slate-600">
-        Lupa password? Hubungi Super Admin untuk melihat atau mereset password akun Anda.
-      </p>
     </form>
   );
 }

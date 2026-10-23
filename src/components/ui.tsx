@@ -24,13 +24,10 @@ export function Flash({ ok, err }: { ok?: string; err?: string }) {
   );
 }
 
-export function PageHeader({ title, desc, children }: { title: string; desc?: ReactNode; children?: ReactNode }) {
+export function PageHeader({ title, children }: { title: string; desc?: ReactNode; children?: ReactNode }) {
   return (
-    <div className="flex flex-wrap items-end justify-between gap-3 pt-1">
-      <div>
-        <h1 className="text-2xl font-black tracking-tight text-black sm:text-3xl">{title}</h1>
-        {desc && <div className="mt-1 text-sm font-semibold text-slate-700">{desc}</div>}
-      </div>
+    <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+      <h1 className="text-2xl font-black tracking-tight text-black sm:text-3xl">{title}</h1>
       {children}
     </div>
   );
@@ -59,7 +56,6 @@ export function Badge({ tone = "slate", children }: { tone?: Tone; children: Rea
 export function Stat({
   label,
   value,
-  note,
   tone,
   color = "bg-white",
 }: {
@@ -75,7 +71,6 @@ export function Stat({
     >
       <div className="text-xs font-black uppercase tracking-wider text-slate-700">{label}</div>
       <div className={`mt-1.5 text-3xl font-black ${tone ?? "text-black"}`}>{value}</div>
-      {note && <div className="mt-1.5 text-xs font-bold text-slate-600">{note}</div>}
     </div>
   );
 }

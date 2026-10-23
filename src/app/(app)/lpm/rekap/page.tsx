@@ -9,17 +9,13 @@ export default async function LpmRekapPage({ searchParams }: { searchParams: SP 
   await requireUser("LPM");
   const sp = await searchParams;
 
-  const [periodes, allUsers, daftarTemuan] = await Promise.all([
+  const [periodes, daftarTemuan] = await Promise.all([
     prisma.periode.findMany({
       include: {
         unit: true,
         indikator: { include: { isian: true } },
       },
       orderBy: { createdAt: "desc" },
-    }),
-    prisma.user.findMany({
-      where: { role: { in: ["AUDITOR", "AUDITEE"] }, aktif: true },
-      orderBy: { nama: "asc" },
     }),
     prisma.isian.findMany({
       where: { klasifikasi: { in: BUTUH_RTL } },
@@ -58,35 +54,32 @@ export default async function LpmRekapPage({ searchParams }: { searchParams: SP 
 
   return (
     <>
-      <PageHeader
-        title="Rekapitulasi Hasil Audit Mutu Internal & Pengesahan (LPM)"
-        desc="Kompilasi hasil audit seluruh Sesi AMI pada 3 Program Studi ITBMP (Bisnis Digital, Aktuaria, dan Perancangan Wilayah dan Kota)."
-      />
+      <PageHeader title="Rekap & Pengesahan">
+        <a href="/api/rekap-excel" className="btn text-xs">
+          📥 Download Semua Rekap Excel (.xls)
+        </a>
+      </PageHeader>
       <Flash ok={one(sp.ok)} err={one(sp.err)} />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat
           label="Total Sesi AMI"
           value={`${periodes.length} Sesi`}
-          note={`${totalSlot} Total Butir Indikator`}
           color="bg-[#E9D5FF]"
         />
         <Stat
-          label="Keterisian Bukti Google Drive"
+          label="Bukti Drive"
           value={`${totalDrive} / ${totalSlot}`}
-          note="Total bukti tautan Drive terkumpul"
           color="bg-[#FEF08A]"
         />
         <Stat
-          label="Capaian Standar (Melampaui/Mencapai)"
+          label="Capaian Standar"
           value={persenCapaian !== null ? `${persenCapaian}%` : "—"}
-          note={`${totalMelampaui} Melampaui · ${totalMencapai} Mencapai`}
           color="bg-[#D9F99D]"
         />
         <Stat
-          label="Temuan (OB / KTS Minor / Mayor)"
-          value={`${totalOb} OB · ${totalMinor} Minor · ${totalMayor} Mayor`}
-          note="Ringkasan temuan seluruh sesi"
+          label="Temuan (OB / Minor / Mayor)"
+          value={`${totalOb} / ${totalMinor} / ${totalMayor}`}
           color="bg-[#BAE6FD]"
         />
       </div>
@@ -96,71 +89,85 @@ export default async function LpmRekapPage({ searchParams }: { searchParams: SP 
         <table>
           <thead>
             <tr>
-              <th>Sesi AMI &amp; Semester</th>
-              <th>Program Studi</th>
-              <th>Auditee &amp; Auditor Prodi</th>
-              <th>Bukti Link Drive</th>
+              <th>Sesi AMI</th>
+              <th>Prodi</th>
+              <th>Bukti Drive</th>
               <th>Hasil Temuan</th>
-              <th>Pengesahan LPM</th>
+              <th>Pengesahan &amp; Export Excel</th>
             </tr>
           </thead>
           <tbody>
             {periodes.map((p) => {
-              const auditees = allUsers.filter((u) => u.role === "AUDITEE" && (!p.unitId || u.unitId === p.unitId));
-              const auditors = allUsers.filter((u) => u.role === "AUDITOR" && (!p.unitId || u.unitId === p.unitId));
               const jmlInd = p.indikator.length;
-              const isianList = p.indikator
-                .map((ind) => ind.isian.find((i) => !p.unitId || i.unitId === p.unitId) ?? ind.isian[0])
-                .filter(Boolean);
-              const terisi = isianList.filter((i) => i?.linkDrive).length;
-              const tercapai = isianList.filter(
-                (i) => i?.klasifikasi === "MELAMPAUI" || i?.klasifikasi === "MENCAPAI"
-              ).length;
-              const ob = isianList.filter((i) => i?.klasifikasi === "OBSERVASI").length;
-              const minor = isianList.filter((i) => i?.klasifikasi === "KTS_MINOR").length;
-              const mayor = isianList.filter((i) => i?.klasifikasi === "KTS_MAYOR").length;
+              let drive = 0;
+              let melampaui = 0;
+              let mencapai = 0;
+              let ob = 0;
+              let minor = 0;
+              let mayor = 0;
+
+              for (const ind of p.indikator) {
+                const isian = ind.isian.find((i) => !p.unitId || i.unitId === p.unitId) ?? ind.isian[0];
+                if (!isian) continue;
+                if (isian.linkDrive) drive++;
+                if (isian.klasifikasi === "MELAMPAUI") melampaui++;
+                if (isian.klasifikasi === "MENCAPAI") mencapai++;
+                if (isian.klasifikasi === "OBSERVASI") ob++;
+                if (isian.klasifikasi === "KTS_MINOR") minor++;
+                if (isian.klasifikasi === "KTS_MAYOR") mayor++;
+              }
 
               return (
                 <tr key={p.id}>
                   <td>
-                    <div className="font-semibold text-slate-900">{p.nama}</div>
-                    <div className="text-xs text-slate-500">
-                      Tahun {p.tahun} · Semester {p.semester}
+                    <div className="font-bold text-black">{p.nama}</div>
+                    <div className="mt-1 flex gap-1">
+                      <Badge tone="blue">{p.tahun}</Badge>
+                      <Badge tone="purple">{p.semester}</Badge>
                     </div>
                   </td>
-                  <td className="font-semibold text-slate-800">{p.unit?.nama ?? "—"}</td>
-                  <td className="text-xs text-slate-600 space-y-1">
-                    <div>
-                      <strong>Auditee:</strong> {auditees.map((a) => a.nama).join(", ") || "—"}
-                    </div>
-                    <div>
-                      <strong>Auditor:</strong> {auditors.map((a) => a.nama).join(", ") || "—"}
-                    </div>
-                  </td>
+                  <td className="font-bold text-black">{p.unit?.nama ?? "—"}</td>
                   <td>
-                    <Badge tone={terisi === jmlInd && jmlInd > 0 ? "green" : "amber"}>
-                      {terisi} / {jmlInd} Link Drive
+                    <Badge tone={drive === jmlInd && jmlInd > 0 ? "green" : "amber"}>
+                      {drive} / {jmlInd}
                     </Badge>
                   </td>
                   <td>
                     <div className="flex flex-wrap gap-1">
-                      <Badge tone="green">{tercapai} Tercapai</Badge>
-                      <Badge tone="blue">{ob} OB</Badge>
-                      <Badge tone={minor > 0 ? "amber" : "slate"}>{minor} Minor</Badge>
-                      <Badge tone={mayor > 0 ? "red" : "slate"}>{mayor} Mayor</Badge>
+                      <Badge tone="green">🌟 {melampaui}</Badge>
+                      <Badge tone="green">✅ {mencapai}</Badge>
+                      <Badge tone="blue">👀 OB: {ob}</Badge>
+                      <Badge tone="amber">⚠️ Minor: {minor}</Badge>
+                      <Badge tone="red">🚨 Mayor: {mayor}</Badge>
                     </div>
                   </td>
                   <td>
-                    {p.disahkanAt ? (
-                      <Badge tone="green">
-                        ✅ Disahkan ({fmtWaktu(p.disahkanAt)})
-                      </Badge>
-                    ) : (
-                      <form action={sahkanLaporanAkhir}>
-                        <input type="hidden" name="periodeId" value={p.id} />
-                        <button className="btn-success text-xs">✍️ Sahkan</button>
-                      </form>
-                    )}
+                    <div className="flex flex-wrap items-center gap-2">
+                      {p.disahkanAt ? (
+                        <>
+                          <Badge tone="green">✓ Disahkan ({p.disahkanOleh})</Badge>
+                          <a
+                            href={`/api/rekap-excel?periodeId=${p.id}`}
+                            className="btn-success text-xs"
+                          >
+                            📥 Download Excel
+                          </a>
+                        </>
+                      ) : (
+                        <>
+                          <form action={sahkanLaporanAkhir}>
+                            <input type="hidden" name="periodeId" value={p.id} />
+                            <button className="btn text-xs">Sahkan</button>
+                          </form>
+                          <a
+                            href={`/api/rekap-excel?periodeId=${p.id}`}
+                            className="btn-secondary text-xs"
+                          >
+                            📥 Excel
+                          </a>
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );
@@ -169,58 +176,55 @@ export default async function LpmRekapPage({ searchParams }: { searchParams: SP 
         </table>
       </div>
 
-      {/* Monitoring Detail Temuan & RTL */}
-      <div className="card space-y-3 overflow-x-auto">
-        <h2 className="text-base font-bold text-slate-900">Monitoring Detail Temuan (OB / KTS) &amp; Tindak Lanjut (RTL)</h2>
-        {daftarTemuan.length === 0 ? (
-          <Empty>Belum ada temuan Observasi atau KTS.</Empty>
-        ) : (
+      {/* Daftar Temuan & RTL */}
+      {daftarTemuan.length > 0 && (
+        <div className="card space-y-3 overflow-x-auto">
+          <h2 className="text-base font-black text-black">
+            Daftar Temuan &amp; Status RTL ({daftarTemuan.length})
+          </h2>
           <table>
             <thead>
               <tr>
-                <th>Program Studi</th>
+                <th>Prodi</th>
                 <th>Indikator</th>
-                <th>Klasifikasi</th>
-                <th>Uraian Temuan &amp; Rekomendasi Auditor</th>
-                <th>Rencana Tindak Lanjut &amp; Link Bukti Drive</th>
+                <th>Temuan</th>
+                <th>RTL Auditee</th>
                 <th>Status RTL</th>
               </tr>
             </thead>
             <tbody>
               {daftarTemuan.map((t) => (
                 <tr key={t.id}>
-                  <td className="font-semibold text-slate-900">{t.unit.nama}</td>
+                  <td className="font-bold text-black">{t.unit.nama}</td>
                   <td>
-                    <code className="rounded bg-blue-50 px-1.5 py-0.5 text-xs font-bold text-blue-700">{t.indikator.kode}</code>
-                    <div className="mt-0.5 text-xs text-slate-500">{t.indikator.standar}</div>
+                    <code className="rounded border border-black bg-[#BAE6FD] px-1.5 py-0.5 text-xs font-black">
+                      {t.indikator.kode}
+                    </code>
                   </td>
-                  <td>
+                  <td className="text-xs">
                     <Badge
                       tone={
-                        t.klasifikasi === "OBSERVASI" ? "blue" : t.klasifikasi === "KTS_MINOR" ? "amber" : "red"
+                        t.klasifikasi === "OBSERVASI"
+                          ? "blue"
+                          : t.klasifikasi === "KTS_MINOR"
+                            ? "amber"
+                            : "red"
                       }
                     >
                       {KLASIFIKASI_LABEL[t.klasifikasi!]}
                     </Badge>
-                  </td>
-                  <td className="text-xs text-slate-700">
-                    <div>{t.catatanLapangan ?? "—"}</div>
-                    {t.rekomendasi && (
-                      <div className="mt-1 text-slate-500">
-                        <strong>Rekomendasi:</strong> {t.rekomendasi}
-                      </div>
-                    )}
+                    {t.catatanLapangan && <div className="mt-1">{t.catatanLapangan}</div>}
                   </td>
                   <td className="text-xs">
-                    <div>{t.rtlRencana ?? <em className="text-slate-400">Belum diisi Auditee</em>}</div>
+                    <div>{t.rtlRencana ?? "—"}</div>
                     {t.rtlLinkBukti && (
                       <a
                         href={t.rtlLinkBukti}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="mt-1 inline-block font-mono text-blue-600 underline"
+                        className="font-mono font-bold text-blue-700 underline"
                       >
-                        ↗ Buka Bukti Drive RTL
+                        ↗ Bukti RTL
                       </a>
                     )}
                   </td>
@@ -233,8 +237,8 @@ export default async function LpmRekapPage({ searchParams }: { searchParams: SP 
               ))}
             </tbody>
           </table>
-        )}
-      </div>
+        </div>
+      )}
     </>
   );
 }

@@ -14,6 +14,7 @@ import {
   simpanBatchAuditDokumen,
   simpanBatchAuditLapangan,
   simpanBatchVerifikasiRtl,
+  toggleVerifikasiAuditor,
 } from "../actions";
 
 export interface AuditorIndikatorItem {
@@ -26,11 +27,14 @@ export interface AuditorIndikatorItem {
     id: string;
     klaim: string | null;
     linkDrive: string | null;
+    diisiOleh: string | null;
     statusDokumen: StatusDokumen;
     catatanDokumen: string | null;
     klasifikasi: Klasifikasi | null;
     catatanLapangan: string | null;
     rekomendasi: string | null;
+    diperiksaOleh: string | null;
+    terverifikasiAuditor: boolean;
     rtlRencana: string | null;
     rtlLinkBukti: string | null;
     rtlStatus: StatusRtl;
@@ -86,12 +90,18 @@ export default function AuditorClient({
   const [savedValues, setSavedValues] = useState<Record<string, AuditorDraftEntry>>(() =>
     buildInitialMap(indikator)
   );
+  const [verifiedMap, setVerifiedMap] = useState<Record<string, boolean>>(() => {
+    const m: Record<string, boolean> = {};
+    for (const ind of indikator) {
+      m[ind.id] = Boolean(ind.isian?.terverifikasiAuditor);
+    }
+    return m;
+  });
 
   const [notice, setNotice] = useState<{ ok?: string; err?: string } | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  // Pulihkan draft yang belum disimpan dari localStorage saat halaman dibuka
   useEffect(() => {
     try {
       const raw = localStorage.getItem(storageKey);
@@ -129,7 +139,7 @@ export default function AuditorClient({
         return next;
       });
     } catch {
-      // Abaikan jika localStorage tidak tersedia
+      // Abaikan
     }
   }, [storageKey, indikator]);
 
@@ -188,7 +198,8 @@ export default function AuditorClient({
   const isDirtyMode = (indId: string) => {
     if (mode === "dokumen") return isDirtyDokumen(indId);
     if (mode === "lapangan") return isDirtyLapangan(indId);
-    return isDirtyRtl(indId);
+    if (mode === "rtl") return isDirtyRtl(indId);
+    return false;
   };
 
   const dirtyIds = indikator.map((i) => i.id).filter(isDirtyMode);
@@ -235,12 +246,12 @@ export default function AuditorClient({
       setSavingId(null);
 
       if (!res.ok) {
-        setNotice({ err: res.error ?? "Gagal menyimpan Audit Dokumen." });
+        setNotice({ err: res.error ?? "Gagal menyimpan." });
         return;
       }
 
       if (res.savedIds) clearSavedFromStorage(res.savedIds);
-      setNotice({ ok: res.message ?? "Audit Dokumen berhasil disimpan." });
+      setNotice({ ok: res.message ?? "Tersimpan." });
       router.refresh();
     });
   };
@@ -263,12 +274,12 @@ export default function AuditorClient({
       setSavingId(null);
 
       if (!res.ok) {
-        setNotice({ err: res.error ?? "Gagal menyimpan Audit Lapangan." });
+        setNotice({ err: res.error ?? "Gagal menyimpan." });
         return;
       }
 
       if (res.savedIds) clearSavedFromStorage(res.savedIds);
-      setNotice({ ok: res.message ?? "Temuan Audit Lapangan berhasil disimpan." });
+      setNotice({ ok: res.message ?? "Tersimpan." });
       router.refresh();
     });
   };
@@ -279,11 +290,7 @@ export default function AuditorClient({
 
     startTransition(async () => {
       const itemsToSave = indikator
-        .filter(
-          (ind) =>
-            ind.isian &&
-            (ind.id === targetIndikatorId || isDirtyRtl(ind.id))
-        )
+        .filter((ind) => ind.isian && (ind.id === targetIndikatorId || isDirtyRtl(ind.id)))
         .map((ind) => ({
           indikatorId: ind.id,
           isianId: ind.isian!.id,
@@ -295,12 +302,38 @@ export default function AuditorClient({
       setSavingId(null);
 
       if (!res.ok) {
-        setNotice({ err: res.error ?? "Gagal menyimpan verifikasi RTL." });
+        setNotice({ err: res.error ?? "Gagal menyimpan." });
         return;
       }
 
       if (res.savedIds) clearSavedFromStorage(res.savedIds);
-      setNotice({ ok: res.message ?? "Verifikasi RTL berhasil disimpan." });
+      setNotice({ ok: res.message ?? "Tersimpan." });
+      router.refresh();
+    });
+  };
+
+  const handleToggleLock = (targetIds: string[], lock: boolean) => {
+    setNotice(null);
+    setSavingId("LOCK");
+
+    startTransition(async () => {
+      const res = await toggleVerifikasiAuditor(periodeId, unitId, targetIds, lock);
+      setSavingId(null);
+
+      if (!res.ok) {
+        setNotice({ err: res.error ?? "Gagal mengubah status verifikasi." });
+        return;
+      }
+
+      setVerifiedMap((prev) => {
+        const next = { ...prev };
+        for (const id of targetIds) {
+          next[id] = lock;
+        }
+        return next;
+      });
+
+      setNotice({ ok: res.message ?? "Status verifikasi diperbarui." });
       router.refresh();
     });
   };
@@ -309,6 +342,22 @@ export default function AuditorClient({
     const k = savedValues[ind.id]?.klasifikasi ?? ind.isian?.klasifikasi;
     return k && BUTUH_RTL.includes(k);
   }).length;
+
+  // Ringkasan siapa Auditee dan siapa Auditor yang sudah mengerjakan
+  const auditeeKontrib = new Map<string, string[]>();
+  const auditorKontrib = new Map<string, string[]>();
+  for (const ind of indikator) {
+    if (ind.isian?.diisiOleh) {
+      const list = auditeeKontrib.get(ind.isian.diisiOleh) ?? [];
+      list.push(ind.kode);
+      auditeeKontrib.set(ind.isian.diisiOleh, list);
+    }
+    if (ind.isian?.diperiksaOleh) {
+      const list = auditorKontrib.get(ind.isian.diperiksaOleh) ?? [];
+      list.push(ind.kode);
+      auditorKontrib.set(ind.isian.diperiksaOleh, list);
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -323,10 +372,57 @@ export default function AuditorClient({
         </div>
       )}
 
+      {/* Bar Verifikasi & Kunci Semua + Ringkasan Siapa yang Menyimpan */}
+      <div className="card flex flex-wrap items-center justify-between gap-3 py-3">
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          {auditeeKontrib.size > 0 && (
+            <>
+              <span className="font-black uppercase text-black">Auditee:</span>
+              {Array.from(auditeeKontrib.entries()).map(([nama, kodes]) => (
+                <Badge key={nama} tone="blue">
+                  👤 {nama}: {kodes.join(", ")}
+                </Badge>
+              ))}
+            </>
+          )}
+          {auditorKontrib.size > 0 && (
+            <>
+              <span className="ml-2 font-black uppercase text-black">Auditor:</span>
+              {Array.from(auditorKontrib.entries()).map(([nama, kodes]) => (
+                <Badge key={nama} tone="purple">
+                  🕵️ {nama}: {kodes.join(", ")}
+                </Badge>
+              ))}
+            </>
+          )}
+        </div>
+
+        {buka && (
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={() => handleToggleLock(indikator.map((i) => i.id), true)}
+              className="btn text-xs"
+            >
+              🔒 Verifikasi &amp; Kunci Semua Isian Auditee
+            </button>
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={() => handleToggleLock(indikator.map((i) => i.id), false)}
+              className="btn-secondary text-xs"
+            >
+              🔓 Buka Semua Kunci
+            </button>
+          </div>
+        )}
+      </div>
+
       {buka && dirtyIds.length > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-black bg-[#FEF08A] px-4 py-3 text-xs shadow-[4px_4px_0px_#000]">
           <div className="font-black text-black">
-            📝 Ada <strong>{dirtyIds.length} indikator</strong> yang sedang Anda isi / ubah. Ketikan Anda tersimpan otomatis sebagai draft dan tidak akan hilang.
+            📝 {dirtyIds.length} indikator belum disimpan
           </div>
           <button
             type="button"
@@ -339,8 +435,8 @@ export default function AuditorClient({
             className="btn text-xs"
           >
             {isPending && savingId === "ALL"
-              ? "Menyimpan..."
-              : `💾 Simpan Semua Perubahan (${dirtyIds.length})`}
+              ? "..."
+              : `💾 Simpan Semua (${dirtyIds.length})`}
           </button>
         </div>
       )}
@@ -354,6 +450,7 @@ export default function AuditorClient({
         const isFokus = sav.statusDokumen === "PERLU_KLARIFIKASI" || cur.statusDokumen === "PERLU_KLARIFIKASI";
         const butuhRtl = isian?.klasifikasi && BUTUH_RTL.includes(isian.klasifikasi);
         const dirty = isDirtyMode(ind.id);
+        const isVerified = Boolean(verifiedMap[ind.id]);
 
         if (mode === "rtl" && !butuhRtl) {
           return null;
@@ -371,12 +468,24 @@ export default function AuditorClient({
                 <code className="rounded-xl border-2 border-black bg-[#BAE6FD] px-2.5 py-0.5 text-xs font-black text-black shadow-[1.5px_1.5px_0px_#000]">
                   {ind.kode}
                 </code>
-                <span className="text-sm font-bold text-slate-900">{ind.standar}</span>
-                <span className="text-xs text-slate-500">• Target: {ind.target}</span>
-                {dirty && <Badge tone="amber">📝 Draft Belum Disimpan</Badge>}
-                {isFokus && <Badge tone="amber">🎯 Fokus Konfirmasi Audit Lapangan</Badge>}
+                <span className="text-sm font-black text-black">{ind.standar}</span>
+                <Badge tone="slate">Target: {ind.target}</Badge>
+                {isian?.diisiOleh && <Badge tone="blue">👤 {isian.diisiOleh}</Badge>}
+                {isian?.diperiksaOleh && <Badge tone="purple">🕵️ {isian.diperiksaOleh}</Badge>}
+                {dirty && <Badge tone="amber">📝 Belum Disimpan</Badge>}
+                {isFokus && <Badge tone="amber">🎯 Fokus Lapangan</Badge>}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                {buka && (
+                  <button
+                    type="button"
+                    disabled={isPending}
+                    onClick={() => handleToggleLock([ind.id], !isVerified)}
+                    className={isVerified ? "btn-purple text-xs" : "btn-secondary text-xs"}
+                  >
+                    {isVerified ? "🔒 Terverifikasi (Buka Kunci)" : "✅ Verifikasi & Kunci Auditee"}
+                  </button>
+                )}
                 {isian?.linkDrive ? (
                   <a
                     href={isian.linkDrive}
@@ -384,41 +493,39 @@ export default function AuditorClient({
                     rel="noopener noreferrer"
                     className="btn-secondary text-xs"
                   >
-                    📂 Buka Link Google Drive Bukti Auditee ↗
+                    📂 Buka Drive ↗
                   </a>
                 ) : (
-                  <Badge tone="red">⚠️ Auditee Belum Mengisi Link Drive</Badge>
+                  <Badge tone="red">Belum Ada Drive</Badge>
                 )}
               </div>
             </div>
 
-            <p className="text-sm text-slate-800">{ind.pernyataan}</p>
+            <p className="text-sm font-semibold text-slate-900">{ind.pernyataan}</p>
 
             {/* Kotak Klaim & Link Drive Auditee */}
-            <div className="rounded-2xl border-2 border-black bg-[#FAF7EE] p-4 text-xs space-y-1.5 shadow-[2px_2px_0px_#000]">
+            <div className="rounded-2xl border-2 border-black bg-[#FAF7EE] p-3.5 text-xs space-y-1 shadow-[2px_2px_0px_#000]">
               <div>
-                <strong>Klaim Evaluasi Diri Auditee:</strong>{" "}
+                <strong>Evaluasi Diri Auditee{isian?.diisiOleh ? ` (${isian.diisiOleh})` : ""}:</strong>{" "}
                 {isian?.klaim ? (
                   isian.klaim
                 ) : (
-                  <em className="text-slate-400">Belum diisi oleh Auditee</em>
+                  <em className="text-slate-400">Belum diisi</em>
                 )}
               </div>
-              <div className="truncate">
-                <strong>Tautan Google Drive:</strong>{" "}
-                {isian?.linkDrive ? (
+              {isian?.linkDrive && (
+                <div className="truncate">
+                  <strong>Drive:</strong>{" "}
                   <a
                     href={isian.linkDrive}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="font-mono text-blue-600 underline"
+                    className="font-mono text-blue-700 underline"
                   >
                     {isian.linkDrive}
                   </a>
-                ) : (
-                  <em className="text-slate-400">Belum ada link</em>
-                )}
-              </div>
+                </div>
+              )}
             </div>
 
             {/* MODE 1: AUDIT DOKUMEN (DESK AUDIT) */}
@@ -432,7 +539,7 @@ export default function AuditorClient({
               >
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                   <div className="space-y-1">
-                    <label>Status Kecukupan Bukti Drive (Desk Audit)</label>
+                    <label>Status Dokumen</label>
                     <select
                       name="statusDokumen"
                       disabled={!buka}
@@ -443,15 +550,15 @@ export default function AuditorClient({
                       className="w-full"
                     >
                       <option value="BELUM_DICEK">⏳ Belum Diperiksa</option>
-                      <option value="LENGKAP">✅ Bukti Drive Lengkap &amp; Sesuai</option>
+                      <option value="LENGKAP">✅ Lengkap &amp; Sesuai</option>
                       <option value="PERLU_KLARIFIKASI">
-                        🎯 Perlu Klarifikasi di Audit Lapangan
+                        🎯 Perlu Klarifikasi Lapangan
                       </option>
                     </select>
                   </div>
                   <div className="space-y-1 md:col-span-2">
                     <label>
-                      Catatan Audit Dokumen &amp; Daftar Pertanyaan untuk Audit Lapangan
+                      Catatan Audit Dokumen &amp; Daftar Pertanyaan Audit Lapangan
                     </label>
                     <textarea
                       name="catatanDokumen"
@@ -459,7 +566,7 @@ export default function AuditorClient({
                       disabled={!buka}
                       value={cur.catatanDokumen}
                       onChange={(e) => updateField(ind.id, "catatanDokumen", e.target.value)}
-                      placeholder="Tulis hasil pemeriksaan dokumen Google Drive serta daftar pertanyaan yang akan dikonfirmasi saat Audit Lapangan..."
+                      placeholder="Catatan dokumen & daftar pertanyaan lapangan..."
                       className="w-full text-sm leading-relaxed"
                     />
                     {buka && (
@@ -470,8 +577,8 @@ export default function AuditorClient({
                           className="btn shrink-0"
                         >
                           {isPending && (savingId === ind.id || savingId === "ALL")
-                            ? "Menyimpan..."
-                            : "Simpan Desk Audit"}
+                            ? "..."
+                            : "Simpan"}
                         </button>
                       </div>
                     )}
@@ -483,12 +590,11 @@ export default function AuditorClient({
             {/* MODE 2: AUDIT LAPANGAN & KLASIFIKASI TEMUAN */}
             {mode === "lapangan" && (
               <>
-                <div className="rounded-2xl border-2 border-black bg-[#BAE6FD]/40 p-4 text-xs whitespace-pre-wrap shadow-[2px_2px_0px_#000]">
+                <div className="rounded-2xl border-2 border-black bg-[#BAE6FD]/40 p-3.5 text-xs whitespace-pre-wrap shadow-[2px_2px_0px_#000]">
                   <strong className="font-black text-black">
-                    Catatan &amp; Daftar Pertanyaan dari Audit Dokumen (
-                    {STATUS_DOK_LABEL[sav.statusDokumen]}):
+                    Catatan Dokumen ({STATUS_DOK_LABEL[sav.statusDokumen]}):
                   </strong>{" "}
-                  {sav.catatanDokumen || cur.catatanDokumen || "Belum ada catatan audit dokumen."}
+                  {sav.catatanDokumen || cur.catatanDokumen || "—"}
                 </div>
 
                 <form
@@ -500,7 +606,7 @@ export default function AuditorClient({
                 >
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                     <div className="space-y-1">
-                      <label>Klasifikasi Hasil / Temuan Audit</label>
+                      <label>Klasifikasi Temuan</label>
                       <select
                         name="klasifikasi"
                         disabled={!buka}
@@ -510,34 +616,34 @@ export default function AuditorClient({
                         }
                         className="w-full font-semibold"
                       >
-                        <option value="MELAMPAUI">🌟 Melampaui Standar</option>
-                        <option value="MENCAPAI">✅ Mencapai Standar</option>
+                        <option value="MELAMPAUI">🌟 Melampaui</option>
+                        <option value="MENCAPAI">✅ Mencapai</option>
                         <option value="OBSERVASI">👀 Observasi (OB)</option>
                         <option value="KTS_MINOR">⚠️ KTS Minor</option>
                         <option value="KTS_MAYOR">🚨 KTS Mayor</option>
                       </select>
                     </div>
                     <div className="space-y-1">
-                      <label>Fakta Lapangan / Akar Masalah</label>
+                      <label>Temuan Lapangan</label>
                       <textarea
                         name="catatanLapangan"
                         rows={3}
                         disabled={!buka}
                         value={cur.catatanLapangan}
                         onChange={(e) => updateField(ind.id, "catatanLapangan", e.target.value)}
-                        placeholder="Catat hasil konfirmasi wawancara/observasi lapangan..."
+                        placeholder="Temuan lapangan..."
                         className="w-full text-sm"
                       />
                     </div>
                     <div className="space-y-1">
-                      <label>Rekomendasi Perbaikan Auditor</label>
+                      <label>Rekomendasi</label>
                       <textarea
                         name="rekomendasi"
                         rows={3}
                         disabled={!buka}
                         value={cur.rekomendasi}
                         onChange={(e) => updateField(ind.id, "rekomendasi", e.target.value)}
-                        placeholder="Rekomendasi tindak lanjut perbaikan..."
+                        placeholder="Rekomendasi perbaikan..."
                         className="w-full text-sm"
                       />
                       {buka && (
@@ -548,8 +654,8 @@ export default function AuditorClient({
                             className="btn-success shrink-0"
                           >
                             {isPending && (savingId === ind.id || savingId === "ALL")
-                              ? "Menyimpan..."
-                              : "Simpan Temuan"}
+                              ? "..."
+                              : "Simpan"}
                           </button>
                         </div>
                       )}
@@ -562,30 +668,26 @@ export default function AuditorClient({
             {/* MODE 3: VERIFIKASI TINDAK LANJUT (RTL) */}
             {mode === "rtl" && isian && (
               <div className="space-y-3 pt-1">
-                <div className="rounded-2xl border-2 border-black bg-[#FEF08A]/40 p-4 text-xs space-y-1.5 shadow-[2px_2px_0px_#000]">
+                <div className="rounded-2xl border-2 border-black bg-[#FEF08A]/40 p-3.5 text-xs space-y-1 shadow-[2px_2px_0px_#000]">
                   <div>
-                    <strong>Klasifikasi Temuan:</strong>{" "}
-                    {KLASIFIKASI_LABEL[isian.klasifikasi!]} — {isian.catatanLapangan}
+                    <strong>Temuan:</strong> {KLASIFIKASI_LABEL[isian.klasifikasi!]} — {isian.catatanLapangan}
                   </div>
                   <div>
-                    <strong>Rencana Tindak Lanjut Auditee:</strong>{" "}
-                    {isian.rtlRencana ?? "Belum diisi Auditee"}
+                    <strong>RTL Auditee:</strong> {isian.rtlRencana ?? "—"}
                   </div>
-                  <div>
-                    <strong>Link Google Drive Bukti Perbaikan:</strong>{" "}
-                    {isian.rtlLinkBukti ? (
+                  {isian.rtlLinkBukti && (
+                    <div>
+                      <strong>Drive RTL:</strong>{" "}
                       <a
                         href={isian.rtlLinkBukti}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="font-mono text-blue-600 underline"
+                        className="font-mono text-blue-700 underline"
                       >
                         {isian.rtlLinkBukti}
                       </a>
-                    ) : (
-                      "Belum diunggah Auditee"
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
 
                 <form
@@ -596,7 +698,7 @@ export default function AuditorClient({
                   className="grid grid-cols-1 gap-3 md:grid-cols-3"
                 >
                   <div className="space-y-1">
-                    <label>Keputusan Verifikasi RTL ({RTL_LABEL[isian.rtlStatus]})</label>
+                    <label>Status RTL ({RTL_LABEL[isian.rtlStatus]})</label>
                     <select
                       name="rtlStatus"
                       disabled={!buka}
@@ -606,19 +708,19 @@ export default function AuditorClient({
                       }
                       className="w-full"
                     >
-                      <option value="PROSES">⏳ Masih Perlu Perbaikan (Proses)</option>
-                      <option value="TERVERIFIKASI">✅ Closed / Terverifikasi Selesai</option>
+                      <option value="PROSES">⏳ Proses</option>
+                      <option value="TERVERIFIKASI">✅ Terverifikasi</option>
                     </select>
                   </div>
                   <div className="space-y-1 md:col-span-2">
-                    <label>Catatan Verifikasi RTL Auditor</label>
+                    <label>Catatan Verifikasi RTL</label>
                     <textarea
                       name="rtlCatatanAuditor"
                       rows={3}
                       disabled={!buka}
                       value={cur.rtlCatatanAuditor}
                       onChange={(e) => updateField(ind.id, "rtlCatatanAuditor", e.target.value)}
-                      placeholder="Catatan hasil pengecekan bukti perbaikan..."
+                      placeholder="Catatan verifikasi RTL..."
                       className="w-full text-sm"
                     />
                     {buka && (
@@ -629,8 +731,8 @@ export default function AuditorClient({
                           className="btn-success shrink-0"
                         >
                           {isPending && (savingId === ind.id || savingId === "ALL")
-                            ? "Menyimpan..."
-                            : "Simpan Verifikasi"}
+                            ? "..."
+                            : "Simpan"}
                         </button>
                       </div>
                     )}
@@ -643,9 +745,7 @@ export default function AuditorClient({
       })}
 
       {mode === "rtl" && rtlCount === 0 && (
-        <Empty>
-          Tidak ada temuan Observasi / KTS yang memerlukan verifikasi RTL pada sesi ini.
-        </Empty>
+        <Empty>Tidak ada temuan yang memerlukan RTL.</Empty>
       )}
     </div>
   );
