@@ -1,6 +1,4 @@
-import "server-only";
 import type { Klasifikasi, StatusDokumen, StatusRtl, Tahap } from "@prisma/client";
-import { prisma } from "./prisma";
 
 export const TAHAP_URUT: Tahap[] = [
   "PERSIAPAN",
@@ -58,10 +56,6 @@ export const BUTUH_RTL: Klasifikasi[] = ["OBSERVASI", "KTS_MINOR", "KTS_MAYOR"];
 
 export function tahapIndex(t: Tahap) {
   return TAHAP_URUT.indexOf(t);
-}
-
-export async function getActivePeriode() {
-  return prisma.periode.findFirst({ where: { aktif: true }, orderBy: { createdAt: "desc" } });
 }
 
 /** Isian auditee hanya bisa diubah pada tahap PENGISIAN dan sebelum tanggal cut-off. */
