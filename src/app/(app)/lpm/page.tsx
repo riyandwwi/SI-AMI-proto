@@ -6,6 +6,7 @@ import { KLASIFIKASI_LABEL, RTL_LABEL, STATUS_DOK_LABEL } from "@/lib/periode";
 import { Badge, Empty, Flash, PageHeader, one, type SP } from "@/components/ui";
 import {
   buatSesiAmi,
+  editIndikator,
   hapusIndikator,
   hapusSesiAmi,
   hapusUserEmergencyOlehLpm,
@@ -413,13 +414,59 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                           <tr key={ind.id}>
                             <td>
                               <div className="flex items-center gap-1.5">
-                                <code className="rounded-lg border border-black bg-[#BAE6FD] px-2 py-0.5 text-xs font-black text-black">
+                                <code className="rounded-lg border border-black/30 bg-[#BAE6FD] px-2 py-0.5 text-xs font-black text-black">
                                   {ind.kode}
                                 </code>
                                 <Badge tone="slate">{ind.target}</Badge>
                               </div>
                               <div className="mt-1 font-bold text-black">{ind.standar}</div>
                               <div className="mt-0.5 text-xs text-slate-700">{ind.pernyataan}</div>
+
+                              <details className="mt-2">
+                                <summary className="cursor-pointer text-xs font-black text-blue-700 hover:underline">
+                                  ✏️ Edit Indikator
+                                </summary>
+                                <form action={editIndikator} className="mt-2 space-y-1.5 rounded-xl border border-black/20 bg-[#FAF7EE] p-2.5 text-xs">
+                                  <input type="hidden" name="indikatorId" value={ind.id} />
+                                  <input
+                                    type="hidden"
+                                    name="returnTo"
+                                    value={`/lpm?tab=pantau&periodeId=${activePeriodeForPantau.id}`}
+                                  />
+                                  <input
+                                    name="kode"
+                                    required
+                                    defaultValue={ind.kode}
+                                    placeholder="Kode"
+                                    className="w-full font-mono text-xs"
+                                  />
+                                  <input
+                                    name="standar"
+                                    required
+                                    defaultValue={ind.standar}
+                                    placeholder="Standar"
+                                    className="w-full text-xs"
+                                  />
+                                  <input
+                                    name="target"
+                                    required
+                                    defaultValue={ind.target}
+                                    placeholder="Target"
+                                    className="w-full text-xs"
+                                  />
+                                  <textarea
+                                    name="pernyataan"
+                                    rows={2}
+                                    required
+                                    defaultValue={ind.pernyataan}
+                                    placeholder="Pernyataan"
+                                    className="w-full text-xs"
+                                  />
+                                  <button type="submit" className="btn-success w-full py-1 text-xs">
+                                    💾 Simpan Edit
+                                  </button>
+                                </form>
+                              </details>
                             </td>
 
                             <td className="space-y-1.5 text-xs">

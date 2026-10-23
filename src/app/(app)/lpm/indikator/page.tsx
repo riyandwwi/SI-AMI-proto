@@ -1,7 +1,7 @@
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Badge, Empty, Flash, PageHeader, one, type SP } from "@/components/ui";
-import { hapusIndikator, tambahIndikator } from "../actions";
+import { editIndikator, hapusIndikator, tambahIndikator } from "../actions";
 
 export default async function LpmIndikatorPage({ searchParams }: { searchParams: SP }) {
   await requireUser("LPM");
@@ -17,7 +17,9 @@ export default async function LpmIndikatorPage({ searchParams }: { searchParams:
       <Flash ok={one(sp.ok)} err={one(sp.err)} />
 
       <form action={tambahIndikator} className="card space-y-3">
-        <h2 className="border-b-2 border-black pb-2 text-base font-black text-black">+ Tambah Indikator</h2>
+        <h2 className="border-b border-black/15 pb-2 text-base font-black text-black">
+          + Tambah Indikator
+        </h2>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
           <div className="space-y-1">
             <label>Sesi AMI</label>
@@ -59,44 +61,79 @@ export default async function LpmIndikatorPage({ searchParams }: { searchParams:
       ) : (
         periodes.map((p) => (
           <div key={p.id} className="card space-y-3 overflow-x-auto">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 border-b border-black/15 pb-2">
               <h3 className="text-base font-black text-black">{p.nama}</h3>
               <Badge tone="blue">{p.indikator.length} Indikator</Badge>
             </div>
             {p.indikator.length === 0 ? (
               <Empty>Belum ada indikator.</Empty>
             ) : (
-              <table>
-                <thead>
-                  <tr>
-                    <th>Kode</th>
-                    <th>Standar</th>
-                    <th>Pernyataan Indikator</th>
-                    <th>Target</th>
-                    <th>Aksi</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {p.indikator.map((ind) => (
-                    <tr key={ind.id}>
-                      <td>
-                        <code className="rounded-xl border-2 border-black bg-[#BAE6FD] px-2.5 py-0.5 text-xs font-black text-black shadow-[1.5px_1.5px_0px_#000]">
-                          {ind.kode}
-                        </code>
-                      </td>
-                      <td className="font-bold text-black">{ind.standar}</td>
-                      <td className="text-slate-800">{ind.pernyataan}</td>
-                      <td className="font-bold text-black">{ind.target}</td>
-                      <td>
-                        <form action={hapusIndikator}>
-                          <input type="hidden" name="indikatorId" value={ind.id} />
-                          <button className="btn-danger text-xs">Hapus</button>
-                        </form>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="space-y-2.5">
+                {p.indikator.map((ind) => (
+                  <div
+                    key={ind.id}
+                    className="rounded-2xl border border-black/15 bg-[#FAF7EE] p-3.5 space-y-2.5"
+                  >
+                    <form action={editIndikator} className="space-y-2">
+                      <input type="hidden" name="indikatorId" value={ind.id} />
+                      <input type="hidden" name="returnTo" value="/lpm/indikator" />
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
+                        <div className="space-y-1">
+                          <label>Kode</label>
+                          <input
+                            name="kode"
+                            required
+                            defaultValue={ind.kode}
+                            className="w-full font-mono text-xs"
+                          />
+                        </div>
+                        <div className="space-y-1 sm:col-span-2">
+                          <label>Standar</label>
+                          <input
+                            name="standar"
+                            required
+                            defaultValue={ind.standar}
+                            className="w-full text-xs"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label>Target</label>
+                          <input
+                            name="target"
+                            required
+                            defaultValue={ind.target}
+                            className="w-full text-xs"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-end gap-2">
+                        <div className="flex-1 space-y-1">
+                          <label>Pernyataan Indikator</label>
+                          <textarea
+                            name="pernyataan"
+                            rows={2}
+                            required
+                            defaultValue={ind.pernyataan}
+                            className="w-full text-xs"
+                          />
+                        </div>
+                        <button type="submit" className="btn-success shrink-0 text-xs">
+                          💾 Simpan Edit
+                        </button>
+                      </div>
+                    </form>
+
+                    <div className="flex justify-end border-t border-black/10 pt-2">
+                      <form action={hapusIndikator}>
+                        <input type="hidden" name="indikatorId" value={ind.id} />
+                        <input type="hidden" name="returnTo" value="/lpm/indikator" />
+                        <button className="btn-danger px-2.5 py-1 text-xs">Hapus Indikator</button>
+                      </form>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         ))

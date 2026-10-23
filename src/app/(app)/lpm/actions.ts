@@ -438,6 +438,45 @@ export async function tambahIndikator(fd: FormData) {
   ok(returnTo, `Indikator "${kode}" ditambahkan.`);
 }
 
+export async function editIndikator(fd: FormData) {
+  const user = await requireUser("LPM");
+  const returnTo = str(fd, "returnTo", 200) || "/lpm/indikator";
+  const indikatorId = str(fd, "indikatorId", 64);
+  const kode = str(fd, "kode", 32).toUpperCase().replace(/\s+/g, "-");
+  const standar = str(fd, "standar", 120);
+  const pernyataan = str(fd, "pernyataan", 1000);
+  const target = str(fd, "target", 120);
+
+  if (!indikatorId || !kode || !standar || !pernyataan || !target) {
+    fail(returnTo, "Kode, standar, pernyataan, dan target indikator wajib diisi.");
+  }
+
+  const existing = await prisma.indikator.findUnique({ where: { id: indikatorId } });
+  if (!existing) fail(returnTo, "Indikator tidak ditemukan.");
+
+  // Cek duplikat kode dalam sesi yang sama jika kode diubah
+  if (kode !== existing.kode) {
+    const duplicate = await prisma.indikator.findUnique({
+      where: { periodeId_kode: { periodeId: existing.periodeId, kode } },
+    });
+    if (duplicate) {
+      fail(returnTo, `Kode indikator "${kode}" sudah digunakan pada sesi ini.`);
+    }
+  }
+
+  await prisma.indikator.update({
+    where: { id: indikatorId },
+    data: { kode, standar, pernyataan, target },
+  });
+
+  await catat(user.id, "EDIT_INDIKATOR", `[${kode}] ${standar}`);
+  revalidatePath("/lpm/indikator");
+  revalidatePath("/lpm");
+  revalidatePath("/auditee");
+  revalidatePath("/auditor");
+  ok(returnTo, `Indikator "${kode}" berhasil diperbarui.`);
+}
+
 export async function hapusIndikator(fd: FormData) {
   const user = await requireUser("LPM");
   const returnTo = str(fd, "returnTo", 200) || "/lpm/indikator";
