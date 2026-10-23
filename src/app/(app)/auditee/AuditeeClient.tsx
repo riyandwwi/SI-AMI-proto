@@ -220,19 +220,19 @@ export default function AuditeeClient({
   return (
     <div className="space-y-4">
       {notice?.ok && (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-medium text-emerald-800">
+        <div className="rounded-2xl border-2 border-black bg-[#D9F99D] px-4 py-3 text-sm font-black text-black shadow-[4px_4px_0px_#000]">
           ✓ {notice.ok}
         </div>
       )}
       {notice?.err && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-medium text-red-800">
+        <div className="rounded-2xl border-2 border-black bg-[#FECDD3] px-4 py-3 text-sm font-black text-black shadow-[4px_4px_0px_#000]">
           ⚠️ {notice.err}
         </div>
       )}
 
       {buka && dirtyIds.length > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs">
-          <div className="font-medium text-amber-900">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-black bg-[#FEF08A] px-4 py-3 text-xs shadow-[4px_4px_0px_#000]">
+          <div className="font-black text-black">
             📝 Ada <strong>{dirtyIds.length} indikator</strong> yang sedang Anda isi / ubah. Ketikan Anda tersimpan otomatis sebagai draft dan tidak akan hilang.
           </div>
           <button
@@ -259,9 +259,9 @@ export default function AuditeeClient({
             key={ind.id}
             className={`card space-y-3 transition ${dirty ? "ring-2 ring-amber-300" : ""}`}
           >
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-black pb-3">
               <div className="flex flex-wrap items-center gap-2">
-                <code className="rounded bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-700">
+                <code className="rounded-xl border-2 border-black bg-[#BAE6FD] px-2.5 py-0.5 text-xs font-black text-black shadow-[1.5px_1.5px_0px_#000]">
                   {ind.kode}
                 </code>
                 <span className="text-sm font-bold text-slate-900">{ind.standar}</span>
@@ -378,20 +378,20 @@ export default function AuditeeClient({
 
             {/* Catatan Auditor (Jika sudah diperiksa) */}
             {(isian?.catatanDokumen || isian?.catatanLapangan || isian?.rekomendasi) && (
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs space-y-1">
+              <div className="rounded-2xl border-2 border-black bg-[#FAF7EE] p-4 text-xs space-y-1.5 shadow-[2px_2px_0px_#000]">
                 {isian.catatanDokumen && (
                   <div>
-                    <strong>Catatan Audit Dokumen (Auditor):</strong> {isian.catatanDokumen}
+                    <strong className="font-black text-black">Catatan Audit Dokumen (Auditor):</strong> {isian.catatanDokumen}
                   </div>
                 )}
                 {isian.catatanLapangan && (
                   <div>
-                    <strong>Temuan / Catatan Audit Lapangan:</strong> {isian.catatanLapangan}
+                    <strong className="font-black text-black">Temuan / Catatan Audit Lapangan:</strong> {isian.catatanLapangan}
                   </div>
                 )}
                 {isian.rekomendasi && (
                   <div>
-                    <strong>Rekomendasi Perbaikan:</strong> {isian.rekomendasi}
+                    <strong className="font-black text-black">Rekomendasi Perbaikan:</strong> {isian.rekomendasi}
                   </div>
                 )}
               </div>
@@ -404,7 +404,7 @@ export default function AuditeeClient({
                   e.preventDefault();
                   handleSaveRtl(ind.id, isian.id);
                 }}
-                className="rounded-lg border border-amber-200 bg-amber-50/50 p-3 space-y-2.5"
+                className="rounded-2xl border-2 border-black bg-[#FEF08A]/30 p-4 space-y-3 shadow-[2.5px_2.5px_0px_#000]"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="text-xs font-bold text-amber-900">

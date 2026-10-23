@@ -65,24 +65,29 @@ export default async function LpmRekapPage({ searchParams }: { searchParams: SP 
       <Flash ok={one(sp.ok)} err={one(sp.err)} />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Total Sesi AMI" value={`${periodes.length} Sesi`} note={`${totalSlot} Total Butir Indikator`} />
+        <Stat
+          label="Total Sesi AMI"
+          value={`${periodes.length} Sesi`}
+          note={`${totalSlot} Total Butir Indikator`}
+          color="bg-[#E9D5FF]"
+        />
         <Stat
           label="Keterisian Bukti Google Drive"
           value={`${totalDrive} / ${totalSlot}`}
           note="Total bukti tautan Drive terkumpul"
-          tone="text-blue-600"
+          color="bg-[#FEF08A]"
         />
         <Stat
           label="Capaian Standar (Melampaui/Mencapai)"
           value={persenCapaian !== null ? `${persenCapaian}%` : "—"}
           note={`${totalMelampaui} Melampaui · ${totalMencapai} Mencapai`}
-          tone="text-emerald-600"
+          color="bg-[#D9F99D]"
         />
         <Stat
           label="Temuan (OB / KTS Minor / Mayor)"
           value={`${totalOb} OB · ${totalMinor} Minor · ${totalMayor} Mayor`}
           note="Ringkasan temuan seluruh sesi"
-          tone="text-amber-600"
+          color="bg-[#BAE6FD]"
         />
       </div>
 

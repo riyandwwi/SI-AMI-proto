@@ -27,14 +27,14 @@ export default async function AdminPage({ searchParams }: { searchParams: SP }) 
 
       {/* Form Tambah Akun */}
       <form action={tambahUser} className="card space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-black pb-3">
           <div>
-            <h2 className="text-base font-bold text-slate-900">+ Buat Akun Pengguna Baru</h2>
-            <p className="text-xs text-slate-500">
+            <h2 className="text-base font-black text-black">+ Buat Akun Pengguna Baru</h2>
+            <p className="text-xs font-semibold text-slate-600">
               Masukkan Nama, NIDN/NUPTK, Program Studi, Role (LPM / Auditor / Auditee), dan Username.
             </p>
           </div>
-          <Badge tone="amber">🔑 Password Otomatis Saat Dibuat: 123</Badge>
+          <Badge tone="amber">🔑 Password Default Otomatis: 123</Badge>
         </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
@@ -61,7 +61,7 @@ export default async function AdminPage({ searchParams }: { searchParams: SP }) 
 
           <div className="space-y-1">
             <label>Pilih Role Akun</label>
-            <select name="role" required className="w-full" defaultValue="AUDITOR">
+            <select name="role" required className="w-full font-bold" defaultValue="AUDITOR">
               {CREATABLE_ROLES.map((r) => (
                 <option key={r} value={r}>
                   {ROLE_LABEL[r]}
@@ -82,10 +82,10 @@ export default async function AdminPage({ searchParams }: { searchParams: SP }) 
 
       {/* Tabel Daftar Akun */}
       <div className="card space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-black pb-3">
           <div>
-            <h2 className="text-base font-bold text-slate-900">Daftar Akun Terdaftar ({users.length} akun)</h2>
-            <p className="text-xs text-slate-500">
+            <h2 className="text-base font-black text-black">Daftar Akun Terdaftar ({users.length} akun)</h2>
+            <p className="text-xs font-semibold text-slate-600">
               Klik <strong>👁️ Lihat</strong> untuk melihat password saat ini, ubah password, atau klik <strong>Hapus</strong> untuk menghapus akun.
             </p>
           </div>
@@ -122,15 +122,19 @@ export default async function AdminPage({ searchParams }: { searchParams: SP }) 
                 const plain = decryptPassword(u.passwordEnc);
                 const isSuperAdmin = u.role === "SUPER_ADMIN" || u.id === admin.id;
                 return (
-                  <tr key={u.id}>
-                    <td className="font-semibold text-slate-900">{u.nama}</td>
-                    <td className="font-mono text-xs text-slate-700">{u.nimNuptk || "—"}</td>
-                    <td className="text-slate-700">{u.unit ? u.unit.nama : "—"}</td>
+                  <tr key={u.id} className="hover:bg-[#FAF7EE]/60 transition-colors">
+                    <td className="font-bold text-black">{u.nama}</td>
+                    <td className="font-mono text-xs font-semibold text-slate-800">{u.nimNuptk || "—"}</td>
+                    <td className="font-semibold text-slate-800">{u.unit ? u.unit.nama : "—"}</td>
                     <td>
-                      <Badge tone={u.role === "SUPER_ADMIN" ? "purple" : "blue"}>{ROLE_LABEL[u.role]}</Badge>
+                      <Badge tone={u.role === "SUPER_ADMIN" ? "purple" : u.role === "LPM" ? "amber" : u.role === "AUDITOR" ? "green" : "blue"}>
+                        {ROLE_LABEL[u.role]}
+                      </Badge>
                     </td>
                     <td>
-                      <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-bold text-slate-800">{u.username}</code>
+                      <code className="rounded-lg border border-black bg-[#FAF7EE] px-2 py-0.5 text-xs font-mono font-bold text-black shadow-[1px_1px_0px_#000]">
+                        {u.username}
+                      </code>
                     </td>
                     <td>
                       <PasswordCell plainPassword={plain} />
@@ -151,7 +155,9 @@ export default async function AdminPage({ searchParams }: { searchParams: SP }) 
                     </td>
                     <td>
                       {isSuperAdmin ? (
-                        <span className="text-xs text-slate-400">Akun Utama</span>
+                        <span className="rounded-full border border-black bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">
+                          Akun Utama
+                        </span>
                       ) : (
                         <form action={hapusUser}>
                           <input type="hidden" name="userId" value={u.id} />

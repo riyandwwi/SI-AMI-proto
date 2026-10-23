@@ -43,7 +43,7 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
       <Flash ok={one(sp.ok)} err={one(sp.err)} />
 
       {/* Navigasi Tab di Halaman LPM */}
-      <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+      <div className="flex flex-wrap gap-2 border-b-2 border-black pb-3">
         <Link
           href="/lpm?tab=sesi"
           className={tab === "sesi" ? "btn text-xs" : "btn-secondary text-xs"}
@@ -121,7 +121,7 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
 
                 return (
                   <div key={p.id} className="card space-y-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-black pb-3">
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
                           <h3 className="text-base font-bold text-slate-900">{p.nama}</h3>
@@ -159,52 +159,52 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
 
                     {/* Kotak Otomatis Nama Auditee & Nama Auditor dari Prodi yang Dipilih */}
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3.5 space-y-2">
+                      <div className="rounded-2xl border-2 border-black bg-[#FAF7EE] p-4 space-y-2 shadow-[2px_2px_0px_#000]">
                         <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold uppercase tracking-wide text-slate-700">
+                          <span className="text-xs font-black uppercase tracking-wide text-black">
                             👤 Auditee Terdaftar ({p.unit?.nama ?? "Semua Prodi"})
                           </span>
                           <Badge tone="blue">{prodiAuditees.length} Akun</Badge>
                         </div>
                         {prodiAuditees.length === 0 ? (
-                          <p className="text-xs text-slate-400">
+                          <p className="text-xs font-semibold text-slate-500">
                             Belum ada akun Auditee untuk Prodi {p.unit?.nama ?? "ini"}. Tambahkan di menu Super Admin.
                           </p>
                         ) : (
                           <ul className="space-y-1.5 text-xs">
                             {prodiAuditees.map((a) => (
-                              <li key={a.id} className="flex items-center justify-between rounded bg-white px-2.5 py-1.5 border border-slate-200">
+                              <li key={a.id} className="flex items-center justify-between rounded-xl bg-white px-3 py-2 border-2 border-black shadow-[1.5px_1.5px_0px_#000]">
                                 <div>
-                                  <span className="font-semibold text-slate-900">{a.nama}</span>
-                                  {a.nimNuptk && <span className="ml-1.5 text-slate-500">({a.nimNuptk})</span>}
+                                  <span className="font-bold text-black">{a.nama}</span>
+                                  {a.nimNuptk && <span className="ml-1.5 font-mono text-slate-600">({a.nimNuptk})</span>}
                                 </div>
-                                <code className="text-slate-600">{a.username}</code>
+                                <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono font-bold text-slate-800">{a.username}</code>
                               </li>
                             ))}
                           </ul>
                         )}
                       </div>
 
-                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3.5 space-y-2">
+                      <div className="rounded-2xl border-2 border-black bg-[#FAF7EE] p-4 space-y-2 shadow-[2px_2px_0px_#000]">
                         <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold uppercase tracking-wide text-slate-700">
+                          <span className="text-xs font-black uppercase tracking-wide text-black">
                             🕵️ Auditor Terdaftar ({p.unit?.nama ?? "Semua Prodi"})
                           </span>
                           <Badge tone="green">{prodiAuditors.length} Akun</Badge>
                         </div>
                         {prodiAuditors.length === 0 ? (
-                          <p className="text-xs text-slate-400">
+                          <p className="text-xs font-semibold text-slate-500">
                             Belum ada akun Auditor untuk Prodi {p.unit?.nama ?? "ini"}. Tambahkan di menu Super Admin.
                           </p>
                         ) : (
                           <ul className="space-y-1.5 text-xs">
                             {prodiAuditors.map((a) => (
-                              <li key={a.id} className="flex items-center justify-between rounded bg-white px-2.5 py-1.5 border border-slate-200">
+                              <li key={a.id} className="flex items-center justify-between rounded-xl bg-white px-3 py-2 border-2 border-black shadow-[1.5px_1.5px_0px_#000]">
                                 <div>
-                                  <span className="font-semibold text-slate-900">{a.nama}</span>
-                                  {a.nimNuptk && <span className="ml-1.5 text-slate-500">({a.nimNuptk})</span>}
+                                  <span className="font-bold text-black">{a.nama}</span>
+                                  {a.nimNuptk && <span className="ml-1.5 font-mono text-slate-600">({a.nimNuptk})</span>}
                                 </div>
-                                <code className="text-slate-600">{a.username}</code>
+                                <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono font-bold text-slate-800">{a.username}</code>
                               </li>
                             ))}
                           </ul>
@@ -272,7 +272,7 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
               {/* Form Cepat Tambah Indikator oleh LPM */}
               <form action={tambahIndikator} className="card space-y-3">
                 <input type="hidden" name="returnTo" value={`/lpm?tab=pantau&periodeId=${activePeriodeForPantau.id}`} />
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-black pb-2">
                   <h3 className="text-sm font-bold text-slate-900">+ Tambah Indikator Baru (Oleh LPM)</h3>
                   <span className="text-xs text-slate-500">Pilih apakah indikator ditambahkan ke sesi ini saja atau semua sesi</span>
                 </div>

@@ -79,7 +79,7 @@ export default async function AuditorListPage({ searchParams }: { searchParams: 
                   </div>
                 </div>
 
-                <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-3">
+                <div className="flex flex-wrap gap-2 border-t-2 border-black pt-3">
                   <Link href={`/auditor/${p.id}?mode=dokumen`} className="btn text-xs">
                     📄 1. Audit Dokumen (Cek Link Drive)
                   </Link>

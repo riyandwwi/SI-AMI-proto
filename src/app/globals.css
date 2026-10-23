@@ -1,42 +1,74 @@
 @import "tailwindcss";
 
+@theme {
+  --font-sans: var(--font-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
 @layer base {
   body {
-    @apply bg-slate-50 text-slate-800 antialiased;
+    background-color: #FAF7EE;
+    color: #121212;
+    @apply antialiased selection:bg-[#FEF08A] selection:text-black;
   }
   input,
   select,
   textarea {
-    @apply rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100 disabled:text-slate-500;
+    @apply rounded-xl border-2 border-black bg-white px-3 py-2 text-sm font-semibold text-black shadow-[2.5px_2.5px_0px_#000000] outline-none transition-all focus:shadow-[4.5px_4.5px_0px_#000000] focus:bg-[#FFFDF8] disabled:bg-slate-100 disabled:opacity-60;
   }
   label {
-    @apply text-xs font-semibold text-slate-600;
+    @apply text-xs font-black uppercase tracking-wider text-black;
   }
   table {
     @apply w-full text-left text-sm;
   }
   th {
-    @apply border-b border-slate-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500;
+    @apply border-b-2 border-black bg-[#FAF7EE] px-3.5 py-2.5 text-xs font-black uppercase tracking-wider text-black;
   }
   td {
-    @apply border-b border-slate-100 px-3 py-2 align-top;
+    @apply border-b-2 border-black/10 px-3.5 py-3 align-top font-medium;
   }
 }
 
 @layer components {
+  /* Neo-Brutalist Buttons */
   .btn {
-    @apply inline-flex items-center justify-center gap-1 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-1.5 rounded-xl border-2 border-black bg-[#FF5C38] px-4 py-2 text-sm font-black text-white shadow-[3px_3px_0px_#000000] transition-all hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[5px_5px_0px_#000000] active:translate-x-0.5 active:translate-y-0.5 active:shadow-[1px_1px_0px_#000000] disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer;
   }
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-1.5 rounded-xl border-2 border-black bg-white px-4 py-2 text-sm font-black text-black shadow-[3px_3px_0px_#000000] transition-all hover:bg-[#FEF08A] hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[5px_5px_0px_#000000] active:translate-x-0.5 active:translate-y-0.5 active:shadow-[1px_1px_0px_#000000] disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer;
   }
   .btn-success {
-    @apply inline-flex items-center justify-center gap-1 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-1.5 rounded-xl border-2 border-black bg-[#D9F99D] px-4 py-2 text-sm font-black text-black shadow-[3px_3px_0px_#000000] transition-all hover:bg-[#bef264] hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[5px_5px_0px_#000000] active:translate-x-0.5 active:translate-y-0.5 active:shadow-[1px_1px_0px_#000000] disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer;
   }
   .btn-danger {
-    @apply inline-flex items-center justify-center gap-1 rounded-md border border-red-300 bg-white px-3 py-1.5 text-sm font-semibold text-red-700 hover:bg-red-50;
+    @apply inline-flex items-center justify-center gap-1.5 rounded-xl border-2 border-black bg-[#FECDD3] px-4 py-2 text-sm font-black text-black shadow-[3px_3px_0px_#000000] transition-all hover:bg-[#fda4af] hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[5px_5px_0px_#000000] active:translate-x-0.5 active:translate-y-0.5 active:shadow-[1px_1px_0px_#000000] disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer;
   }
+  .btn-purple {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-xl border-2 border-black bg-[#E9D5FF] px-4 py-2 text-sm font-black text-black shadow-[3px_3px_0px_#000000] transition-all hover:bg-[#d8b4fe] hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[5px_5px_0px_#000000] active:translate-x-0.5 active:translate-y-0.5 active:shadow-[1px_1px_0px_#000000] disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer;
+  }
+
+  /* Neo-Brutalist Cards */
   .card {
-    @apply rounded-xl border border-slate-200 bg-white p-5 shadow-sm;
+    @apply rounded-2xl border-2 border-black bg-white p-5 shadow-[4px_4px_0px_#000000];
+  }
+  .card-coral {
+    @apply rounded-2xl border-2 border-black bg-[#FF5C38] p-5 text-white shadow-[4px_4px_0px_#000000];
+  }
+  .card-yellow {
+    @apply rounded-2xl border-2 border-black bg-[#FEF08A] p-5 text-black shadow-[4px_4px_0px_#000000];
+  }
+  .card-lime {
+    @apply rounded-2xl border-2 border-black bg-[#D9F99D] p-5 text-black shadow-[4px_4px_0px_#000000];
+  }
+  .card-lavender {
+    @apply rounded-2xl border-2 border-black bg-[#E9D5FF] p-5 text-black shadow-[4px_4px_0px_#000000];
+  }
+  .card-sky {
+    @apply rounded-2xl border-2 border-black bg-[#BAE6FD] p-5 text-black shadow-[4px_4px_0px_#000000];
+  }
+
+  /* Circular category button like in screenshot */
+  .neo-circle {
+    @apply flex h-14 w-14 items-center justify-center rounded-full border-2 border-black shadow-[3px_3px_0px_#000000] transition-all hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[4.5px_4.5px_0px_#000000] active:translate-x-0.5 active:translate-y-0.5 active:shadow-[1px_1px_0px_#000000];
   }
 }

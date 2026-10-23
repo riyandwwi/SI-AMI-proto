@@ -93,7 +93,7 @@ export default async function AuditorUnitWorkspacePage({
       <Flash ok={one(sp.ok)} err={one(sp.err)} />
 
       {/* Sub-Navigasi 3 Mode Pemeriksaan Auditor */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-black pb-3">
         <div className="flex flex-wrap gap-2">
           <Link
             href={`/auditor/${periode.id}?mode=dokumen`}

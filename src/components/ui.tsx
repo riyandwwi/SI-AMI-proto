@@ -10,21 +10,26 @@ export function Flash({ ok, err }: { ok?: string; err?: string }) {
   if (!ok && !err) return null;
   return (
     <div
-      className={`rounded-lg border px-4 py-2.5 text-sm ${
-        err ? "border-red-200 bg-red-50 text-red-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"
+      className={`rounded-2xl border-2 border-black p-4 text-sm font-black shadow-[4px_4px_0px_#000000] ${
+        err ? "bg-[#FECDD3] text-black" : "bg-[#D9F99D] text-black"
       }`}
     >
-      {err ?? ok}
+      <div className="flex items-center gap-2.5">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-black bg-white text-xs shadow-[1.5px_1.5px_0px_#000000]">
+          {err ? "⚠️" : "✓"}
+        </span>
+        <span className="leading-snug">{err ?? ok}</span>
+      </div>
     </div>
   );
 }
 
 export function PageHeader({ title, desc, children }: { title: string; desc?: ReactNode; children?: ReactNode }) {
   return (
-    <div className="flex flex-wrap items-end justify-between gap-3">
+    <div className="flex flex-wrap items-end justify-between gap-3 pt-1">
       <div>
-        <h1 className="text-xl font-bold text-slate-900">{title}</h1>
-        {desc && <p className="mt-0.5 text-sm text-slate-500">{desc}</p>}
+        <h1 className="text-2xl font-black tracking-tight text-black sm:text-3xl">{title}</h1>
+        {desc && <div className="mt-1 text-sm font-semibold text-slate-700">{desc}</div>}
       </div>
       {children}
     </div>
@@ -32,33 +37,56 @@ export function PageHeader({ title, desc, children }: { title: string; desc?: Re
 }
 
 const TONES = {
-  slate: "bg-slate-100 text-slate-700 border-slate-200",
-  blue: "bg-blue-50 text-blue-700 border-blue-200",
-  green: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  amber: "bg-amber-50 text-amber-800 border-amber-200",
-  red: "bg-red-50 text-red-700 border-red-200",
-  purple: "bg-purple-50 text-purple-700 border-purple-200",
+  slate: "bg-white text-black border-2 border-black shadow-[2px_2px_0px_#000000]",
+  blue: "bg-[#BAE6FD] text-black border-2 border-black shadow-[2px_2px_0px_#000000]",
+  green: "bg-[#D9F99D] text-black border-2 border-black shadow-[2px_2px_0px_#000000]",
+  amber: "bg-[#FEF08A] text-black border-2 border-black shadow-[2px_2px_0px_#000000]",
+  red: "bg-[#FECDD3] text-black border-2 border-black shadow-[2px_2px_0px_#000000]",
+  purple: "bg-[#E9D5FF] text-black border-2 border-black shadow-[2px_2px_0px_#000000]",
 } as const;
 export type Tone = keyof typeof TONES;
 
 export function Badge({ tone = "slate", children }: { tone?: Tone; children: ReactNode }) {
   return (
-    <span className={`inline-flex items-center whitespace-nowrap rounded border px-1.5 py-0.5 text-xs font-semibold ${TONES[tone]}`}>
+    <span
+      className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-3 py-0.5 text-xs font-black uppercase tracking-wide ${TONES[tone]}`}
+    >
       {children}
     </span>
   );
 }
 
-export function Stat({ label, value, note, tone }: { label: string; value: ReactNode; note?: ReactNode; tone?: string }) {
+export function Stat({
+  label,
+  value,
+  note,
+  tone,
+  color = "bg-white",
+}: {
+  label: string;
+  value: ReactNode;
+  note?: ReactNode;
+  tone?: string;
+  color?: string;
+}) {
   return (
-    <div className="card">
-      <div className="text-xs text-slate-500">{label}</div>
-      <div className={`mt-1 text-2xl font-bold ${tone ?? "text-slate-900"}`}>{value}</div>
-      {note && <div className="mt-1 text-xs text-slate-500">{note}</div>}
+    <div
+      className={`rounded-2xl border-2 border-black p-5 shadow-[4px_4px_0px_#000000] transition-all hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[6px_6px_0px_#000000] ${color}`}
+    >
+      <div className="text-xs font-black uppercase tracking-wider text-slate-700">{label}</div>
+      <div className={`mt-1.5 text-3xl font-black ${tone ?? "text-black"}`}>{value}</div>
+      {note && <div className="mt-1.5 text-xs font-bold text-slate-600">{note}</div>}
     </div>
   );
 }
 
 export function Empty({ children }: { children: ReactNode }) {
-  return <div className="rounded-lg border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">{children}</div>;
+  return (
+    <div className="rounded-2xl border-2 border-dashed border-black bg-white/80 p-8 text-center text-sm font-bold text-slate-800 shadow-[4px_4px_0px_#000000]">
+      <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full border-2 border-black bg-[#FEF08A] text-sm shadow-[2px_2px_0px_#000000]">
+        📂
+      </div>
+      {children}
+    </div>
+  );
 }

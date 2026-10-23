@@ -100,7 +100,7 @@ export default async function LpmIndikatorPage({ searchParams }: { searchParams:
                   {p.indikator.map((ind) => (
                     <tr key={ind.id}>
                       <td>
-                        <code className="rounded bg-blue-50 px-1.5 py-0.5 text-xs font-bold text-blue-700">{ind.kode}</code>
+                        <code className="rounded-xl border-2 border-black bg-[#BAE6FD] px-2.5 py-0.5 text-xs font-black text-black shadow-[1.5px_1.5px_0px_#000]">{ind.kode}</code>
                       </td>
                       <td className="font-semibold text-slate-900">{ind.standar}</td>
                       <td>
