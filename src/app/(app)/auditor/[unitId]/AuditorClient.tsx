@@ -15,6 +15,8 @@ import {
   simpanBatchAuditLapangan,
   simpanBatchVerifikasiRtl,
   toggleVerifikasiAuditor,
+  toggleVerifikasiLapangan,
+  toggleVerifikasiRtl,
 } from "../actions";
 
 export interface AuditorIndikatorItem {
@@ -35,6 +37,7 @@ export interface AuditorIndikatorItem {
     rekomendasi: string | null;
     diperiksaOleh: string | null;
     terverifikasiAuditor: boolean;
+    terverifikasiLapangan: boolean;
     rtlRencana: string | null;
     rtlLinkBukti: string | null;
     rtlStatus: StatusRtl;
@@ -94,6 +97,20 @@ export default function AuditorClient({
     const m: Record<string, boolean> = {};
     for (const ind of indikator) {
       m[ind.id] = Boolean(ind.isian?.terverifikasiAuditor);
+    }
+    return m;
+  });
+  const [verifiedLapanganMap, setVerifiedLapanganMap] = useState<Record<string, boolean>>(() => {
+    const m: Record<string, boolean> = {};
+    for (const ind of indikator) {
+      m[ind.id] = Boolean(ind.isian?.terverifikasiLapangan);
+    }
+    return m;
+  });
+  const [verifiedRtlMap, setVerifiedRtlMap] = useState<Record<string, boolean>>(() => {
+    const m: Record<string, boolean> = {};
+    for (const ind of indikator) {
+      m[ind.id] = ind.isian?.rtlStatus === "TERVERIFIKASI";
     }
     return m;
   });
@@ -229,7 +246,7 @@ export default function AuditorClient({
     }
   };
 
-  const handleSaveDokumen = (targetIndikatorId?: string) => {
+  const handleSaveDokumen = (targetIndikatorId?: string, lockDokumen?: boolean) => {
     setNotice(null);
     setSavingId(targetIndikatorId ?? "ALL");
 
@@ -242,7 +259,7 @@ export default function AuditorClient({
           catatanDokumen: values[ind.id]?.catatanDokumen ?? "",
         }));
 
-      const res = await simpanBatchAuditDokumen(periodeId, unitId, itemsToSave);
+      const res = await simpanBatchAuditDokumen(periodeId, unitId, itemsToSave, lockDokumen);
       setSavingId(null);
 
       if (!res.ok) {
@@ -250,13 +267,22 @@ export default function AuditorClient({
         return;
       }
 
-      if (res.savedIds) clearSavedFromStorage(res.savedIds);
+      if (res.savedIds) {
+        clearSavedFromStorage(res.savedIds);
+        if (lockDokumen !== undefined) {
+          setVerifiedMap((prev) => {
+            const next = { ...prev };
+            for (const id of res.savedIds!) next[id] = lockDokumen;
+            return next;
+          });
+        }
+      }
       setNotice({ ok: res.message ?? "Tersimpan." });
       router.refresh();
     });
   };
 
-  const handleSaveLapangan = (targetIndikatorId?: string) => {
+  const handleSaveLapangan = (targetIndikatorId?: string, lockLapangan?: boolean) => {
     setNotice(null);
     setSavingId(targetIndikatorId ?? "ALL");
 
@@ -270,7 +296,7 @@ export default function AuditorClient({
           rekomendasi: values[ind.id]?.rekomendasi ?? "",
         }));
 
-      const res = await simpanBatchAuditLapangan(periodeId, unitId, itemsToSave);
+      const res = await simpanBatchAuditLapangan(periodeId, unitId, itemsToSave, lockLapangan);
       setSavingId(null);
 
       if (!res.ok) {
@@ -278,13 +304,29 @@ export default function AuditorClient({
         return;
       }
 
-      if (res.savedIds) clearSavedFromStorage(res.savedIds);
+      if (res.savedIds) {
+        clearSavedFromStorage(res.savedIds);
+        if (lockLapangan !== undefined) {
+          setVerifiedLapanganMap((prev) => {
+            const next = { ...prev };
+            for (const id of res.savedIds!) next[id] = lockLapangan;
+            return next;
+          });
+          if (lockLapangan) {
+            setVerifiedMap((prev) => {
+              const next = { ...prev };
+              for (const id of res.savedIds!) next[id] = true;
+              return next;
+            });
+          }
+        }
+      }
       setNotice({ ok: res.message ?? "Tersimpan." });
       router.refresh();
     });
   };
 
-  const handleSaveRtl = (targetIndikatorId?: string) => {
+  const handleSaveRtl = (targetIndikatorId?: string, forceVerifyLock?: boolean) => {
     setNotice(null);
     setSavingId(targetIndikatorId ?? "ALL");
 
@@ -294,7 +336,9 @@ export default function AuditorClient({
         .map((ind) => ({
           indikatorId: ind.id,
           isianId: ind.isian!.id,
-          rtlStatus: values[ind.id]?.rtlStatus ?? "PROSES",
+          rtlStatus: forceVerifyLock
+            ? ("TERVERIFIKASI" as StatusRtl)
+            : (values[ind.id]?.rtlStatus ?? "PROSES"),
           rtlCatatanAuditor: values[ind.id]?.rtlCatatanAuditor ?? "",
         }));
 
@@ -306,7 +350,19 @@ export default function AuditorClient({
         return;
       }
 
-      if (res.savedIds) clearSavedFromStorage(res.savedIds);
+      if (res.savedIds) {
+        clearSavedFromStorage(res.savedIds);
+        if (forceVerifyLock) {
+          setVerifiedRtlMap((prev) => {
+            const next = { ...prev };
+            for (const id of res.savedIds!) next[id] = true;
+            return next;
+          });
+          for (const id of res.savedIds) {
+            updateField(id, "rtlStatus", "TERVERIFIKASI");
+          }
+        }
+      }
       setNotice({ ok: res.message ?? "Tersimpan." });
       router.refresh();
     });
@@ -321,7 +377,7 @@ export default function AuditorClient({
       setSavingId(null);
 
       if (!res.ok) {
-        setNotice({ err: res.error ?? "Gagal mengubah status verifikasi." });
+        setNotice({ err: res.error ?? "Gagal mengubah status kunci dokumen." });
         return;
       }
 
@@ -333,7 +389,65 @@ export default function AuditorClient({
         return next;
       });
 
-      setNotice({ ok: res.message ?? "Status verifikasi diperbarui." });
+      setNotice({ ok: res.message ?? "Status kunci dokumen diperbarui." });
+      router.refresh();
+    });
+  };
+
+  const handleToggleLockLapangan = (targetIds: string[], lock: boolean) => {
+    setNotice(null);
+    setSavingId("LOCK_LAPANGAN");
+
+    startTransition(async () => {
+      const res = await toggleVerifikasiLapangan(periodeId, unitId, targetIds, lock);
+      setSavingId(null);
+
+      if (!res.ok) {
+        setNotice({ err: res.error ?? "Gagal mengubah status verifikasi lapangan." });
+        return;
+      }
+
+      setVerifiedLapanganMap((prev) => {
+        const next = { ...prev };
+        for (const id of targetIds) next[id] = lock;
+        return next;
+      });
+      if (lock) {
+        setVerifiedMap((prev) => {
+          const next = { ...prev };
+          for (const id of targetIds) next[id] = true;
+          return next;
+        });
+      }
+
+      setNotice({ ok: res.message ?? "Status verifikasi lapangan diperbarui." });
+      router.refresh();
+    });
+  };
+
+  const handleToggleLockRtl = (targetIds: string[], lock: boolean) => {
+    setNotice(null);
+    setSavingId("LOCK_RTL");
+
+    startTransition(async () => {
+      const res = await toggleVerifikasiRtl(periodeId, unitId, targetIds, lock);
+      setSavingId(null);
+
+      if (!res.ok) {
+        setNotice({ err: res.error ?? "Gagal mengubah status verifikasi RTL." });
+        return;
+      }
+
+      setVerifiedRtlMap((prev) => {
+        const next = { ...prev };
+        for (const id of targetIds) next[id] = lock;
+        return next;
+      });
+      for (const id of targetIds) {
+        updateField(id, "rtlStatus", lock ? "TERVERIFIKASI" : "PROSES");
+      }
+
+      setNotice({ ok: res.message ?? "Status verifikasi RTL diperbarui." });
       router.refresh();
     });
   };
@@ -397,7 +511,7 @@ export default function AuditorClient({
           )}
         </div>
 
-        {buka && (
+        {buka && mode === "dokumen" && (
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
@@ -405,7 +519,7 @@ export default function AuditorClient({
               onClick={() => handleToggleLock(indikator.map((i) => i.id), true)}
               className="btn text-xs"
             >
-              🔒 Verifikasi &amp; Kunci Semua Isian Auditee
+              🔒 Kunci Semua Dokumen (Tutup Upload Dosen)
             </button>
             <button
               type="button"
@@ -413,7 +527,63 @@ export default function AuditorClient({
               onClick={() => handleToggleLock(indikator.map((i) => i.id), false)}
               className="btn-secondary text-xs"
             >
-              🔓 Buka Semua Kunci
+              🔓 Buka Kunci Dokumen
+            </button>
+          </div>
+        )}
+
+        {buka && mode === "lapangan" && (
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={() => handleToggleLockLapangan(indikator.map((i) => i.id), true)}
+              className="btn text-xs"
+            >
+              🔒 Verifikasi &amp; Kunci Semua Lapangan
+            </button>
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={() => handleToggleLockLapangan(indikator.map((i) => i.id), false)}
+              className="btn-secondary text-xs"
+            >
+              🔓 Buka Kunci Lapangan
+            </button>
+          </div>
+        )}
+
+        {buka && mode === "rtl" && rtlCount > 0 && (
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={() =>
+                handleToggleLockRtl(
+                  indikator
+                    .filter((ind) => ind.isian?.klasifikasi && BUTUH_RTL.includes(ind.isian.klasifikasi))
+                    .map((i) => i.id),
+                  true
+                )
+              }
+              className="btn text-xs"
+            >
+              🔒 Verifikasi &amp; Kunci Semua RTL
+            </button>
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={() =>
+                handleToggleLockRtl(
+                  indikator
+                    .filter((ind) => ind.isian?.klasifikasi && BUTUH_RTL.includes(ind.isian.klasifikasi))
+                    .map((i) => i.id),
+                  false
+                )
+              }
+              className="btn-secondary text-xs"
+            >
+              🔓 Buka Kunci RTL
             </button>
           </div>
         )}
@@ -450,7 +620,9 @@ export default function AuditorClient({
         const isFokus = sav.statusDokumen === "PERLU_KLARIFIKASI" || cur.statusDokumen === "PERLU_KLARIFIKASI";
         const butuhRtl = isian?.klasifikasi && BUTUH_RTL.includes(isian.klasifikasi);
         const dirty = isDirtyMode(ind.id);
-        const isVerified = Boolean(verifiedMap[ind.id]);
+        const isVerifiedDokumen = Boolean(verifiedMap[ind.id]);
+        const isVerifiedLapangan = Boolean(verifiedLapanganMap[ind.id]);
+        const isVerifiedRtl = Boolean(verifiedRtlMap[ind.id]) || cur.rtlStatus === "TERVERIFIKASI";
 
         if (mode === "rtl" && !butuhRtl) {
           return null;
@@ -476,14 +648,38 @@ export default function AuditorClient({
                 {isFokus && <Badge tone="amber">🎯 Fokus Lapangan</Badge>}
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                {buka && (
+                {buka && mode === "dokumen" && (
                   <button
                     type="button"
                     disabled={isPending}
-                    onClick={() => handleToggleLock([ind.id], !isVerified)}
-                    className={isVerified ? "btn-purple text-xs" : "btn-secondary text-xs"}
+                    onClick={() => handleToggleLock([ind.id], !isVerifiedDokumen)}
+                    className={isVerifiedDokumen ? "btn-purple text-xs" : "btn-secondary text-xs"}
                   >
-                    {isVerified ? "🔒 Terverifikasi (Buka Kunci)" : "✅ Verifikasi & Kunci Auditee"}
+                    {isVerifiedDokumen
+                      ? "🔒 Dokumen Terkunci (Buka Kunci)"
+                      : "🔒 Kunci Upload Dosen"}
+                  </button>
+                )}
+                {buka && mode === "lapangan" && (
+                  <button
+                    type="button"
+                    disabled={isPending}
+                    onClick={() => handleToggleLockLapangan([ind.id], !isVerifiedLapangan)}
+                    className={isVerifiedLapangan ? "btn-purple text-xs" : "btn-secondary text-xs"}
+                  >
+                    {isVerifiedLapangan
+                      ? "🔒 Lapangan Terkunci (Buka Kunci)"
+                      : "🔒 Kunci Lapangan"}
+                  </button>
+                )}
+                {buka && mode === "rtl" && (
+                  <button
+                    type="button"
+                    disabled={isPending}
+                    onClick={() => handleToggleLockRtl([ind.id], !isVerifiedRtl)}
+                    className={isVerifiedRtl ? "btn-purple text-xs" : "btn-secondary text-xs"}
+                  >
+                    {isVerifiedRtl ? "🔒 RTL Terkunci (Buka Kunci)" : "🔒 Kunci RTL"}
                   </button>
                 )}
                 {isian?.linkDrive ? (
@@ -570,15 +766,23 @@ export default function AuditorClient({
                       className="w-full text-sm leading-relaxed"
                     />
                     {buka && (
-                      <div className="flex justify-end pt-1">
+                      <div className="flex flex-wrap justify-end gap-2 pt-1">
                         <button
                           type="submit"
                           disabled={isPending}
-                          className="btn shrink-0"
+                          className="btn-secondary shrink-0 text-xs"
                         >
                           {isPending && (savingId === ind.id || savingId === "ALL")
                             ? "..."
                             : "Simpan"}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isPending}
+                          onClick={() => handleSaveDokumen(ind.id, true)}
+                          className="btn shrink-0 text-xs"
+                        >
+                          🔒 Simpan &amp; Kunci Dokumen
                         </button>
                       </div>
                     )}
@@ -609,7 +813,7 @@ export default function AuditorClient({
                       <label>Klasifikasi Temuan</label>
                       <select
                         name="klasifikasi"
-                        disabled={!buka}
+                        disabled={!buka || isVerifiedLapangan}
                         value={cur.klasifikasi}
                         onChange={(e) =>
                           updateField(ind.id, "klasifikasi", e.target.value as Klasifikasi)
@@ -628,7 +832,7 @@ export default function AuditorClient({
                       <textarea
                         name="catatanLapangan"
                         rows={3}
-                        disabled={!buka}
+                        disabled={!buka || isVerifiedLapangan}
                         value={cur.catatanLapangan}
                         onChange={(e) => updateField(ind.id, "catatanLapangan", e.target.value)}
                         placeholder="Temuan lapangan..."
@@ -640,22 +844,30 @@ export default function AuditorClient({
                       <textarea
                         name="rekomendasi"
                         rows={3}
-                        disabled={!buka}
+                        disabled={!buka || isVerifiedLapangan}
                         value={cur.rekomendasi}
                         onChange={(e) => updateField(ind.id, "rekomendasi", e.target.value)}
                         placeholder="Rekomendasi perbaikan..."
                         className="w-full text-sm"
                       />
-                      {buka && (
-                        <div className="flex justify-end pt-1">
+                      {buka && !isVerifiedLapangan && (
+                        <div className="flex flex-wrap justify-end gap-2 pt-1">
                           <button
                             type="submit"
                             disabled={isPending}
-                            className="btn-success shrink-0"
+                            className="btn-secondary shrink-0 text-xs"
                           >
                             {isPending && (savingId === ind.id || savingId === "ALL")
                               ? "..."
                               : "Simpan"}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isPending}
+                            onClick={() => handleSaveLapangan(ind.id, true)}
+                            className="btn-success shrink-0 text-xs"
+                          >
+                            🔒 Simpan &amp; Kunci Lapangan
                           </button>
                         </div>
                       )}
@@ -709,7 +921,7 @@ export default function AuditorClient({
                       className="w-full"
                     >
                       <option value="PROSES">⏳ Proses</option>
-                      <option value="TERVERIFIKASI">✅ Terverifikasi</option>
+                      <option value="TERVERIFIKASI">✅ Terverifikasi (Kunci RTL)</option>
                     </select>
                   </div>
                   <div className="space-y-1 md:col-span-2">
@@ -724,15 +936,23 @@ export default function AuditorClient({
                       className="w-full text-sm"
                     />
                     {buka && (
-                      <div className="flex justify-end pt-1">
+                      <div className="flex flex-wrap justify-end gap-2 pt-1">
                         <button
                           type="submit"
                           disabled={isPending}
-                          className="btn-success shrink-0"
+                          className="btn-secondary shrink-0 text-xs"
                         >
                           {isPending && (savingId === ind.id || savingId === "ALL")
                             ? "..."
                             : "Simpan"}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isPending}
+                          onClick={() => handleSaveRtl(ind.id, true)}
+                          className="btn-success shrink-0 text-xs"
+                        >
+                          🔒 Simpan &amp; Kunci RTL
                         </button>
                       </div>
                     )}

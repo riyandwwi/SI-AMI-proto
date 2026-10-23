@@ -25,6 +25,7 @@ export interface AuditeeIndikatorItem {
     rekomendasi: string | null;
     diperiksaOleh: string | null;
     terverifikasiAuditor: boolean;
+    terverifikasiLapangan: boolean;
     rtlRencana: string | null;
     rtlLinkBukti: string | null;
     rtlStatus: StatusRtl;
@@ -274,7 +275,8 @@ export default function AuditeeClient({
         const sav = savedValues[ind.id] ?? { klaim: "", linkDrive: "", diisiOleh: null };
         const dirty = isDirty(ind.id);
         const hasSavedDrive = Boolean(sav.linkDrive.trim());
-        const lockedByAuditor = Boolean(isian?.terverifikasiAuditor);
+        const lockedByAuditor = Boolean(isian?.terverifikasiAuditor || isian?.terverifikasiLapangan);
+        const lockedLapangan = Boolean(isian?.terverifikasiLapangan);
         const canEdit = buka && !lockedByAuditor;
         const perluRtl = isian?.klasifikasi && BUTUH_RTL.includes(isian.klasifikasi);
         const namaPengisi = sav.diisiOleh ?? isian?.diisiOleh;
@@ -297,12 +299,15 @@ export default function AuditeeClient({
                 {namaPengisi && <Badge tone="blue">👤 {namaPengisi}</Badge>}
                 {lockedByAuditor ? (
                   <Badge tone="purple">
-                    🔒 Diverifikasi Auditor{isian?.diperiksaOleh ? ` (${isian.diperiksaOleh})` : ""}
+                    🔒 Dokumen Dikunci Auditor{isian?.diperiksaOleh ? ` (${isian.diperiksaOleh})` : ""}
                   </Badge>
                 ) : (
                   <Badge tone={hasSavedDrive ? "green" : "amber"}>
                     {hasSavedDrive ? "✓ Tersimpan" : "Belum Diisi"}
                   </Badge>
+                )}
+                {lockedLapangan && (
+                  <Badge tone="purple">🔒 Lapangan Terverifikasi</Badge>
                 )}
                 {isian?.klasifikasi && (
                   <Badge

@@ -25,7 +25,8 @@ export async function simpanBatchAuditDokumen(
     indikatorId: string;
     statusDokumen: StatusDokumen;
     catatanDokumen: string;
-  }>
+  }>,
+  lockDokumen?: boolean
 ): Promise<AuditorActionResult> {
   const user = await requireUser("AUDITOR");
   if (!periodeId || !unitId || !items.length) {
@@ -61,11 +62,13 @@ export async function simpanBatchAuditDokumen(
         statusDokumen,
         catatanDokumen,
         diperiksaOleh: user.nama,
+        ...(lockDokumen !== undefined ? { terverifikasiAuditor: lockDokumen } : {}),
       },
       update: {
         statusDokumen,
         catatanDokumen,
         diperiksaOleh: user.nama,
+        ...(lockDokumen !== undefined ? { terverifikasiAuditor: lockDokumen } : {}),
       },
     });
 
@@ -73,7 +76,11 @@ export async function simpanBatchAuditDokumen(
     savedCodes.push(ind.kode);
   }
 
-  await catat(user.id, "AUDIT_DOKUMEN", `${user.nama}: ${savedCodes.join(", ")}`);
+  await catat(
+    user.id,
+    lockDokumen ? "AUDIT_DOKUMEN_KUNCI" : "AUDIT_DOKUMEN",
+    `${user.nama}: ${savedCodes.join(", ")}`
+  );
   revalidatePath(`/auditor/${periodeId}`);
   revalidatePath("/auditee");
   revalidatePath("/lpm");
@@ -82,7 +89,9 @@ export async function simpanBatchAuditDokumen(
     ok: true,
     savedIds,
     diperiksaOleh: user.nama,
-    message: `Tersimpan (${savedCodes.join(", ")}) oleh ${user.nama}.`,
+    message: lockDokumen
+      ? `Audit Dokumen disimpan & Upload Dosen dikunci (${savedCodes.join(", ")}) oleh ${user.nama}.`
+      : `Audit Dokumen disimpan (${savedCodes.join(", ")}) oleh ${user.nama}.`,
   };
 }
 
@@ -94,7 +103,8 @@ export async function simpanBatchAuditLapangan(
     klasifikasi: Klasifikasi;
     catatanLapangan: string;
     rekomendasi: string;
-  }>
+  }>,
+  lockLapangan?: boolean
 ): Promise<AuditorActionResult> {
   const user = await requireUser("AUDITOR");
   if (!periodeId || !unitId || !items.length) {
@@ -132,12 +142,18 @@ export async function simpanBatchAuditLapangan(
         catatanLapangan,
         rekomendasi,
         diperiksaOleh: user.nama,
+        ...(lockLapangan !== undefined
+          ? { terverifikasiLapangan: lockLapangan, ...(lockLapangan ? { terverifikasiAuditor: true } : {}) }
+          : {}),
       },
       update: {
         klasifikasi,
         catatanLapangan,
         rekomendasi,
         diperiksaOleh: user.nama,
+        ...(lockLapangan !== undefined
+          ? { terverifikasiLapangan: lockLapangan, ...(lockLapangan ? { terverifikasiAuditor: true } : {}) }
+          : {}),
       },
     });
 
@@ -145,7 +161,11 @@ export async function simpanBatchAuditLapangan(
     savedCodes.push(ind.kode);
   }
 
-  await catat(user.id, "AUDIT_LAPANGAN", `${user.nama}: ${savedCodes.join(", ")}`);
+  await catat(
+    user.id,
+    lockLapangan ? "AUDIT_LAPANGAN_KUNCI" : "AUDIT_LAPANGAN",
+    `${user.nama}: ${savedCodes.join(", ")}`
+  );
   revalidatePath(`/auditor/${periodeId}`);
   revalidatePath("/auditee");
   revalidatePath("/lpm");
@@ -154,7 +174,9 @@ export async function simpanBatchAuditLapangan(
     ok: true,
     savedIds,
     diperiksaOleh: user.nama,
-    message: `Temuan disimpan (${savedCodes.join(", ")}) oleh ${user.nama}.`,
+    message: lockLapangan
+      ? `Temuan Lapangan disimpan & dikunci (${savedCodes.join(", ")}) oleh ${user.nama}.`
+      : `Temuan Lapangan disimpan (${savedCodes.join(", ")}) oleh ${user.nama}.`,
   };
 }
 
@@ -271,8 +293,135 @@ export async function toggleVerifikasiAuditor(
     savedIds,
     diperiksaOleh: user.nama,
     message: lock
-      ? `Isian Auditee pada (${savedCodes.join(", ")}) telah diverifikasi & dikunci oleh ${user.nama}.`
-      : `Kunci isian Auditee pada (${savedCodes.join(", ")}) dibuka oleh ${user.nama}.`,
+      ? `Dokumen Dosen pada (${savedCodes.join(", ")}) dikunci oleh ${user.nama} (Dosen tidak bisa upload lagi).`
+      : `Kunci Dokumen Dosen pada (${savedCodes.join(", ")}) dibuka oleh ${user.nama}.`,
+  };
+}
+
+/**
+ * Verifikasi & Kunci Audit Lapangan oleh Auditor per bagian
+ */
+export async function toggleVerifikasiLapangan(
+  periodeId: string,
+  unitId: string,
+  indikatorIds: string[],
+  lock: boolean
+): Promise<AuditorActionResult> {
+  const user = await requireUser("AUDITOR");
+  if (!periodeId || !unitId || !indikatorIds.length) {
+    return { ok: false, error: "Pilih indikator terlebih dahulu." };
+  }
+
+  const indikatorList = await prisma.indikator.findMany({
+    where: { id: { in: indikatorIds } },
+    include: { periode: true },
+  });
+  if (indikatorList.length === 0) {
+    return { ok: false, error: "Indikator tidak ditemukan." };
+  }
+
+  const savedIds: string[] = [];
+  const savedCodes: string[] = [];
+
+  for (const ind of indikatorList) {
+    await prisma.isian.upsert({
+      where: { indikatorId_unitId: { indikatorId: ind.id, unitId } },
+      create: {
+        indikatorId: ind.id,
+        unitId,
+        terverifikasiLapangan: lock,
+        ...(lock ? { terverifikasiAuditor: true } : {}),
+        diperiksaOleh: user.nama,
+      },
+      update: {
+        terverifikasiLapangan: lock,
+        ...(lock ? { terverifikasiAuditor: true } : {}),
+        diperiksaOleh: user.nama,
+      },
+    });
+    savedIds.push(ind.id);
+    savedCodes.push(ind.kode);
+  }
+
+  await catat(
+    user.id,
+    lock ? "VERIFIKASI_KUNCI_LAPANGAN" : "BUKA_KUNCI_LAPANGAN",
+    `${user.nama}: ${savedCodes.join(", ")}`
+  );
+  revalidatePath(`/auditor/${periodeId}`);
+  revalidatePath("/auditee");
+  revalidatePath("/lpm");
+
+  return {
+    ok: true,
+    savedIds,
+    diperiksaOleh: user.nama,
+    message: lock
+      ? `Audit Lapangan (${savedCodes.join(", ")}) telah diverifikasi & dikunci oleh ${user.nama}.`
+      : `Kunci Audit Lapangan (${savedCodes.join(", ")}) dibuka oleh ${user.nama}.`,
+  };
+}
+
+/**
+ * Verifikasi & Kunci RTL oleh Auditor per bagian
+ */
+export async function toggleVerifikasiRtl(
+  periodeId: string,
+  unitId: string,
+  indikatorIds: string[],
+  lock: boolean
+): Promise<AuditorActionResult> {
+  const user = await requireUser("AUDITOR");
+  if (!periodeId || !unitId || !indikatorIds.length) {
+    return { ok: false, error: "Pilih indikator terlebih dahulu." };
+  }
+
+  const indikatorList = await prisma.indikator.findMany({
+    where: { id: { in: indikatorIds } },
+    include: { periode: true },
+  });
+  if (indikatorList.length === 0) {
+    return { ok: false, error: "Indikator tidak ditemukan." };
+  }
+
+  const savedIds: string[] = [];
+  const savedCodes: string[] = [];
+  const nextStatus: StatusRtl = lock ? "TERVERIFIKASI" : "PROSES";
+
+  for (const ind of indikatorList) {
+    await prisma.isian.upsert({
+      where: { indikatorId_unitId: { indikatorId: ind.id, unitId } },
+      create: {
+        indikatorId: ind.id,
+        unitId,
+        rtlStatus: nextStatus,
+        diperiksaOleh: user.nama,
+      },
+      update: {
+        rtlStatus: nextStatus,
+        diperiksaOleh: user.nama,
+      },
+    });
+    savedIds.push(ind.id);
+    savedCodes.push(ind.kode);
+  }
+
+  await catat(
+    user.id,
+    lock ? "VERIFIKASI_KUNCI_RTL" : "BUKA_KUNCI_RTL",
+    `${user.nama}: ${savedCodes.join(", ")}`
+  );
+  revalidatePath(`/auditor/${periodeId}`);
+  revalidatePath("/auditee");
+  revalidatePath("/lpm");
+
+  return {
+    ok: true,
+    savedIds,
+    diperiksaOleh: user.nama,
+    message: lock
+      ? `RTL (${savedCodes.join(", ")}) telah diverifikasi & dikunci oleh ${user.nama}.`
+      : `Kunci RTL (${savedCodes.join(", ")}) dibuka oleh ${user.nama}.`,
   };
 }
 

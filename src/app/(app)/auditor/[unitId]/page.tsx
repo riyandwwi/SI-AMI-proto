@@ -76,6 +76,7 @@ export default async function AuditorUnitWorkspacePage({
             rekomendasi: isian.rekomendasi,
             diperiksaOleh: isian.diperiksaOleh,
             terverifikasiAuditor: isian.terverifikasiAuditor,
+            terverifikasiLapangan: isian.terverifikasiLapangan,
             rtlRencana: isian.rtlRencana,
             rtlLinkBukti: isian.rtlLinkBukti,
             rtlStatus: isian.rtlStatus,

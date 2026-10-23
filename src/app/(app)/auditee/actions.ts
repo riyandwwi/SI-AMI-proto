@@ -84,10 +84,10 @@ export async function simpanBatchIsianAuditee(
   // Cek apakah indikator yang diklik sudah diverifikasi Auditor
   if (targetIndikatorId) {
     const targetInd = indikatorList.find((ind) => ind.id === targetIndikatorId);
-    if (targetInd?.isian[0]?.terverifikasiAuditor) {
+    if (targetInd?.isian[0]?.terverifikasiAuditor || targetInd?.isian[0]?.terverifikasiLapangan) {
       return {
         ok: false,
-        error: `Indikator "${targetInd.kode}" sudah diverifikasi oleh Auditor dan tidak dapat diubah lagi.`,
+        error: `Indikator "${targetInd.kode}" sudah dikunci oleh Auditor sehingga Dosen tidak dapat upload/mengubah lagi.`,
       };
     }
   }
@@ -100,7 +100,7 @@ export async function simpanBatchIsianAuditee(
     const ind = validIndMap.get(item.indikatorId);
     if (!ind) continue;
     // Lewati indikator yang sudah diverifikasi/dikunci oleh Auditor
-    if (ind.isian[0]?.terverifikasiAuditor) continue;
+    if (ind.isian[0]?.terverifikasiAuditor || ind.isian[0]?.terverifikasiLapangan) continue;
 
     await prisma.isian.upsert({
       where: { indikatorId_unitId: { indikatorId: item.indikatorId, unitId: user.unitId } },
@@ -183,6 +183,9 @@ export async function simpanRtlAuditeeClient(payload: {
   }
   if (!isian.klasifikasi || !BUTUH_RTL.includes(isian.klasifikasi)) {
     return { ok: false, error: "Indikator ini tidak memerlukan RTL." };
+  }
+  if (isian.rtlStatus === "TERVERIFIKASI") {
+    return { ok: false, error: "RTL sudah diverifikasi & dikunci oleh Auditor sehingga tidak dapat diubah lagi." };
   }
 
   const nextStatus = rtlLinkBukti ? "SELESAI_AUDITEE" : "PROSES";
