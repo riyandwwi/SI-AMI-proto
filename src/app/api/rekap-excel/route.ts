@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { KLASIFIKASI_LABEL, RTL_LABEL, STATUS_DOK_LABEL } from "@/lib/periode";
 import { fmtWaktu } from "@/lib/format";
@@ -14,10 +14,7 @@ function esc(val: unknown): string {
 }
 
 export async function GET(req: NextRequest) {
-  const user = await getCurrentUser();
-  if (!user || (user.role !== "LPM" && user.role !== "SUPER_ADMIN")) {
-    return new NextResponse("Unauthorized", { status: 401 });
-  }
+  await requireUser("LPM", "SUPER_ADMIN");
 
   const periodeId = req.nextUrl.searchParams.get("periodeId");
 
