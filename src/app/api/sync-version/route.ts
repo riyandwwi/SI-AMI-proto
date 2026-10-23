@@ -12,7 +12,13 @@ export async function GET() {
       }),
       prisma.indikator.count(),
       prisma.periode.aggregate({
-        _max: { createdAt: true, disahkanAt: true },
+        _max: {
+          createdAt: true,
+          disahkanAt: true,
+          ttdAuditeeAt: true,
+          ttdAuditorAt: true,
+          ttdLpmAt: true,
+        },
         _count: { _all: true },
       }),
     ]);
@@ -24,6 +30,9 @@ export async function GET() {
       periodeAgg._count._all,
       periodeAgg._max.createdAt?.getTime() ?? 0,
       periodeAgg._max.disahkanAt?.getTime() ?? 0,
+      periodeAgg._max.ttdAuditeeAt?.getTime() ?? 0,
+      periodeAgg._max.ttdAuditorAt?.getTime() ?? 0,
+      periodeAgg._max.ttdLpmAt?.getTime() ?? 0,
     ].join(":");
 
     return NextResponse.json(

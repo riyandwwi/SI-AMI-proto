@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Badge, Empty, Flash, PageHeader, one, type SP } from "@/components/ui";
+import { SignaturePadCard } from "@/components/SignaturePadCard";
 import AuditorClient, { type AuditorIndikatorItem } from "./AuditorClient";
 
 export default async function AuditorUnitWorkspacePage({
@@ -147,6 +148,30 @@ export default async function AuditorUnitWorkspacePage({
           indikator={clientItems}
         />
       )}
+
+      {/* Panel Tanda Tangan Ketua Auditor */}
+      <SignaturePadCard
+        session={{
+          periodeId: periode.id,
+          periodeNama: periode.nama,
+          ketuaAuditeeId: periode.ketuaAuditeeId,
+          ketuaAuditeeNama: periode.ketuaAuditeeNama,
+          ketuaAuditeeNip: periode.ketuaAuditeeNip,
+          hasTtdAuditee: Boolean(periode.ttdAuditee),
+          ttdAuditeePreview: periode.ttdAuditee,
+          ketuaAuditorId: periode.ketuaAuditorId,
+          ketuaAuditorNama: periode.ketuaAuditorNama,
+          ketuaAuditorNip: periode.ketuaAuditorNip,
+          hasTtdAuditor: Boolean(periode.ttdAuditor),
+          ttdAuditorPreview: periode.ttdAuditor,
+          kepalaLpmNama: periode.kepalaLpmNama ?? periode.disahkanOleh,
+          kepalaLpmNip: periode.kepalaLpmNip,
+          hasTtdLpm: Boolean(periode.ttdLpm),
+          ttdLpmPreview: periode.ttdLpm,
+        }}
+        currentUserId={user.id}
+        currentRole="AUDITOR"
+      />
     </>
   );
 }

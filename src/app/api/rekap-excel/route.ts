@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { KLASIFIKASI_LABEL, RTL_LABEL, STATUS_DOK_LABEL } from "@/lib/periode";
+import {
+  KLASIFIKASI_LABEL,
+  RTL_LABEL,
+  STATUS_DOK_LABEL,
+  sortPeriodesChronological,
+} from "@/lib/periode";
 import { fmtWaktu } from "@/lib/format";
 
 function esc(val: unknown): string {
@@ -14,12 +19,12 @@ function esc(val: unknown): string {
 }
 
 export async function GET(req: NextRequest) {
-  await requireUser("LPM", "SUPER_ADMIN", "AUDITOR");
+  await requireUser("LPM", "SUPER_ADMIN", "AUDITOR", "AUDITEE");
 
   const periodeId = req.nextUrl.searchParams.get("periodeId");
   const isPrint = req.nextUrl.searchParams.get("print") === "1";
 
-  const periodes = await prisma.periode.findMany({
+  const rawPeriodes = await prisma.periode.findMany({
     where: periodeId ? { id: periodeId } : undefined,
     include: {
       unit: true,
@@ -28,8 +33,10 @@ export async function GET(req: NextRequest) {
         include: { isian: true },
       },
     },
-    orderBy: { createdAt: "desc" },
   });
+
+  // Urutkan kronologis: 2025/2026 Ganjil -> 2025/2026 Genap -> 2026/2027 Ganjil -> 2026/2027 Genap
+  const periodes = sortPeriodesChronological(rawPeriodes);
 
   let rowsHtml = "";
   let no = 1;
@@ -72,6 +79,64 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Ambil data tanda tangan dari sesi yang dicetak (atau sesi terakhir jika semua)
+  const targetSignPeriode = periodes[periodes.length - 1] ?? null;
+  const signatureHtml =
+    isPrint && targetSignPeriode
+      ? `
+      <div class="sig-wrapper">
+        <div class="sig-top-row">
+          <!-- KIRI: KETUA AUDITEE -->
+          <div class="sig-box">
+            <div class="sig-role">Pihak Terperiksa (Auditee),</div>
+            <div class="sig-title">Ketua Auditee ${esc(targetSignPeriode.unit?.nama ?? "")}</div>
+            <div class="sig-img-area">
+              ${
+                targetSignPeriode.ttdAuditee
+                  ? `<img src="${targetSignPeriode.ttdAuditee}" alt="TTD Auditee" class="sig-img" />`
+                  : `<div class="sig-empty">( Belum TTD )</div>`
+              }
+            </div>
+            <div class="sig-name">${esc(targetSignPeriode.ketuaAuditeeNama || "........................................")}</div>
+            <div class="sig-nip">NIDN/NUPTK: ${esc(targetSignPeriode.ketuaAuditeeNip || "........................")}</div>
+          </div>
+
+          <!-- KANAN: KETUA AUDITOR -->
+          <div class="sig-box">
+            <div class="sig-role">Diperiksa &amp; Diverifikasi Oleh,</div>
+            <div class="sig-title">Ketua Tim Auditor AMI</div>
+            <div class="sig-img-area">
+              ${
+                targetSignPeriode.ttdAuditor
+                  ? `<img src="${targetSignPeriode.ttdAuditor}" alt="TTD Auditor" class="sig-img" />`
+                  : `<div class="sig-empty">( Belum TTD )</div>`
+              }
+            </div>
+            <div class="sig-name">${esc(targetSignPeriode.ketuaAuditorNama || "........................................")}</div>
+            <div class="sig-nip">NIDN/NUPTK: ${esc(targetSignPeriode.ketuaAuditorNip || "........................")}</div>
+          </div>
+        </div>
+
+        <!-- TENGAH AGAK BAWAH: KEPALA LPM -->
+        <div class="sig-bottom-center">
+          <div class="sig-box">
+            <div class="sig-role">Mengetahui &amp; Mengesahkan,</div>
+            <div class="sig-title">Kepala Lembaga Penjaminan Mutu (LPM) ITBMP</div>
+            <div class="sig-img-area">
+              ${
+                targetSignPeriode.ttdLpm
+                  ? `<img src="${targetSignPeriode.ttdLpm}" alt="TTD Kepala LPM" class="sig-img" />`
+                  : `<div class="sig-empty">( Belum TTD )</div>`
+              }
+            </div>
+            <div class="sig-name">${esc(targetSignPeriode.kepalaLpmNama || targetSignPeriode.disahkanOleh || "........................................")}</div>
+            <div class="sig-nip">NIDN/NUPTK: ${esc(targetSignPeriode.kepalaLpmNip || "........................")}</div>
+          </div>
+        </div>
+      </div>
+      `
+      : "";
+
   const excelHref = `/api/rekap-excel${periodeId ? `?periodeId=${encodeURIComponent(periodeId)}` : ""}`;
 
   const html = `
@@ -90,6 +155,17 @@ export async function GET(req: NextRequest) {
           table { width: 100%; border-collapse: collapse; font-size: 9pt; }
           th { background-color: #FEF08A; color: #000000; font-weight: bold; border: 1px solid #000000; padding: 6px; text-align: left; }
           td { border: 1px solid #000000; padding: 5px; vertical-align: top; word-break: break-word; }
+          .sig-wrapper { margin-top: 28px; page-break-inside: avoid; width: 100%; }
+          .sig-top-row { display: flex; justify-content: space-between; align-items: flex-start; padding: 0 40px; }
+          .sig-bottom-center { display: flex; justify-content: center; margin-top: 18px; }
+          .sig-box { width: 280px; text-align: center; font-size: 10pt; }
+          .sig-role { font-size: 9.5pt; color: #222; }
+          .sig-title { font-weight: bold; margin-top: 2px; }
+          .sig-img-area { height: 78px; display: flex; align-items: center; justify-content: center; margin: 6px 0; }
+          .sig-img { max-height: 74px; max-width: 220px; object-fit: contain; }
+          .sig-empty { font-size: 8.5pt; color: #888; font-style: italic; }
+          .sig-name { font-weight: bold; text-decoration: underline; }
+          .sig-nip { font-size: 9pt; margin-top: 2px; }
           @media print {
             .no-print { display: none !important; }
             body { margin: 0; }
@@ -103,7 +179,7 @@ export async function GET(req: NextRequest) {
                 <button type="button" class="btn-print" onclick="window.print()">🖨️ Print / Simpan PDF</button>
                 <a class="btn-excel" href="${excelHref}">📥 Download Excel (.xls)</a>
               </div>
-              <script>window.onload = function() { setTimeout(function() { window.print(); }, 300); };</script>`
+              <script>window.onload = function() { setTimeout(function() { window.print(); }, 350); };</script>`
             : ""
         }
         <h2>REKAPITULASI HASIL AUDIT MUTU INTERNAL (SI-AMI ITBMP)</h2>
@@ -140,6 +216,7 @@ export async function GET(req: NextRequest) {
             ${rowsHtml}
           </tbody>
         </table>
+        ${signatureHtml}
       </body>
     </html>
   `;

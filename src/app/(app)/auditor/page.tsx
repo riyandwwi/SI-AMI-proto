@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { PRODI_LIST } from "@/lib/roles";
+import { sortPeriodesChronological } from "@/lib/periode";
 import { Badge, Empty, Flash, PageHeader, one, type SP } from "@/components/ui";
 
 export default async function AuditorListPage({ searchParams }: { searchParams: SP }) {
   const user = await requireUser("AUDITOR");
   const sp = await searchParams;
+  const prodiFilter = one(sp.prodi) ?? "ALL";
 
   // Ambil semua Sesi AMI yang BUKAN dari prodi asal Auditor (Independensi AMI: tidak boleh satu prodi)
   const [allPeriodes, auditees] = await Promise.all([
@@ -16,7 +19,6 @@ export default async function AuditorListPage({ searchParams }: { searchParams: 
         penugasan: { include: { tim: true } },
         indikator: { include: { isian: true } },
       },
-      orderBy: [{ aktif: "desc" }, { createdAt: "desc" }],
     }),
     prisma.user.findMany({
       where: { role: "AUDITEE", aktif: true },
@@ -31,14 +33,41 @@ export default async function AuditorListPage({ searchParams }: { searchParams: 
     return allTim.some((t) => t.auditorId === user.id);
   });
 
-  const displayPeriodes = periodes.length > 0 ? periodes : allPeriodes;
+  const basePeriodes = periodes.length > 0 ? periodes : allPeriodes;
+  const filteredPeriodes =
+    prodiFilter === "ALL"
+      ? basePeriodes
+      : basePeriodes.filter((p) => p.unit?.kode === prodiFilter);
+
+  // Urutkan per Tahun Akademik & Semester (2025/2026 Ganjil -> 2025/2026 Genap -> 2026/2027 Ganjil -> dst)
+  const displayPeriodes = sortPeriodesChronological(filteredPeriodes);
 
   return (
     <>
       <PageHeader title="Sesi Audit Lintas Prodi">
-        {user.unit && <Badge tone="purple">Asal Auditor: {user.unit.nama}</Badge>}
+        {user.unit && <Badge tone="purple">Homebase Auditor: {user.unit.nama}</Badge>}
       </PageHeader>
       <Flash ok={one(sp.ok)} err={one(sp.err)} />
+
+      {/* Filter Sesi per Program Studi */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-black uppercase text-black">Filter Prodi:</span>
+        <Link
+          href="/auditor?prodi=ALL"
+          className={prodiFilter === "ALL" ? "btn text-xs" : "btn-secondary text-xs"}
+        >
+          Semua Prodi ({basePeriodes.length})
+        </Link>
+        {PRODI_LIST.map((pr) => (
+          <Link
+            key={pr.kode}
+            href={`/auditor?prodi=${pr.kode}`}
+            className={prodiFilter === pr.kode ? "btn text-xs" : "btn-secondary text-xs"}
+          >
+            {pr.nama}
+          </Link>
+        ))}
+      </div>
 
       {displayPeriodes.length === 0 ? (
         <Empty>Belum ada Sesi AMI lintas prodi yang ditugaskan kepada Anda.</Empty>
@@ -68,6 +97,21 @@ export default async function AuditorListPage({ searchParams }: { searchParams: 
                     {prodiAuditees.length > 0
                       ? prodiAuditees.map((a) => a.nama).join(", ")
                       : "—"}
+                  </div>
+
+                  <div className="flex flex-wrap gap-1 pt-1">
+                    {p.ketuaAuditorNama && (
+                      <Badge tone="purple">⭐ Ketua Auditor: {p.ketuaAuditorNama}</Badge>
+                    )}
+                    <Badge tone={p.ttdAuditee ? "green" : "slate"}>
+                      {p.ttdAuditee ? "✅ TTD Auditee" : "⏳ TTD Auditee"}
+                    </Badge>
+                    <Badge tone={p.ttdAuditor ? "green" : "slate"}>
+                      {p.ttdAuditor ? "✅ TTD Auditor" : "⏳ TTD Auditor"}
+                    </Badge>
+                    <Badge tone={p.ttdLpm ? "green" : "slate"}>
+                      {p.ttdLpm ? "✅ TTD LPM" : "⏳ TTD LPM"}
+                    </Badge>
                   </div>
                 </div>
 

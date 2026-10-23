@@ -102,6 +102,20 @@ model Periode {
   tglClosing        DateTime?
   disahkanAt        DateTime?
   disahkanOleh      String?
+  ketuaAuditeeId    String?
+  ketuaAuditeeNama  String?
+  ketuaAuditeeNip   String?
+  ttdAuditee        String?
+  ttdAuditeeAt      DateTime?
+  ketuaAuditorId    String?
+  ketuaAuditorNama  String?
+  ketuaAuditorNip   String?
+  ttdAuditor        String?
+  ttdAuditorAt      DateTime?
+  kepalaLpmNama     String?
+  kepalaLpmNip      String?
+  ttdLpm            String?
+  ttdLpmAt          DateTime?
   createdAt         DateTime    @default(now())
   indikator         Indikator[]
   penugasan         Penugasan[]

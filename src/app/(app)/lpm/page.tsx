@@ -2,7 +2,12 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { HOMEBASE_LIST, PRODI_LIST } from "@/lib/roles";
-import { KLASIFIKASI_LABEL, RTL_LABEL, STATUS_DOK_LABEL } from "@/lib/periode";
+import {
+  KLASIFIKASI_LABEL,
+  RTL_LABEL,
+  STATUS_DOK_LABEL,
+  sortPeriodesChronological,
+} from "@/lib/periode";
 import { Badge, Empty, Flash, PageHeader, one, type SP } from "@/components/ui";
 import { ImportIndikatorExcel } from "./ImportIndikatorExcel";
 import {
@@ -12,6 +17,7 @@ import {
   hapusSesiAmi,
   hapusUserEmergencyOlehLpm,
   lepasAuditorDariSesi,
+  pilihKetuaSesiAmi,
   tambahIndikator,
   tambahUserEmergencyOlehLpm,
   toggleStatusSesi,
@@ -22,9 +28,10 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
   await requireUser("LPM");
   const sp = await searchParams;
   const tab = one(sp.tab) ?? "sesi";
+  const prodiFilter = one(sp.prodi) ?? "ALL";
   const selectedPeriodeId = one(sp.periodeId);
 
-  const [periodes, allUsers] = await Promise.all([
+  const [rawPeriodes, allUsers] = await Promise.all([
     prisma.periode.findMany({
       include: {
         unit: true,
@@ -42,7 +49,6 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
           include: { isian: true },
         },
       },
-      orderBy: { createdAt: "desc" },
     }),
     prisma.user.findMany({
       where: { role: { in: ["AUDITOR", "AUDITEE"] }, aktif: true },
@@ -50,6 +56,13 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
       orderBy: { nama: "asc" },
     }),
   ]);
+
+  // Urutkan sesi berdasarkan Tahun Akademik & Semester (2025/2026 Ganjil -> 2025/2026 Genap -> 2026/2027 Ganjil -> dst)
+  const periodes = sortPeriodesChronological(rawPeriodes);
+  const filteredPeriodes =
+    prodiFilter === "ALL"
+      ? periodes
+      : periodes.filter((p) => p.unit?.kode === prodiFilter);
 
   const activePeriodeForPantau =
     periodes.find((p) => p.id === selectedPeriodeId) ?? periodes[0] ?? null;
@@ -153,12 +166,35 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
             </div>
           </form>
 
+          {/* Filter Sesi per Program Studi (Urut Kronologis TA & Semester) */}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-black uppercase text-black">Filter Prodi:</span>
+              <Link
+                href="/lpm?tab=sesi&prodi=ALL"
+                className={prodiFilter === "ALL" ? "btn text-xs" : "btn-secondary text-xs"}
+              >
+                Semua Prodi ({periodes.length})
+              </Link>
+              {PRODI_LIST.map((pr) => (
+                <Link
+                  key={pr.kode}
+                  href={`/lpm?tab=sesi&prodi=${pr.kode}`}
+                  className={prodiFilter === pr.kode ? "btn text-xs" : "btn-secondary text-xs"}
+                >
+                  {pr.nama} ({periodes.filter((p) => p.unit?.kode === pr.kode).length})
+                </Link>
+              ))}
+            </div>
+            <Badge tone="slate">📅 Urutan: Tahun Akademik &amp; Semester (Ganjil ➔ Genap)</Badge>
+          </div>
+
           {/* Daftar Sesi AMI */}
-          {periodes.length === 0 ? (
+          {filteredPeriodes.length === 0 ? (
             <Empty>Belum ada Sesi AMI.</Empty>
           ) : (
             <div className="space-y-4">
-              {periodes.map((p) => {
+              {filteredPeriodes.map((p) => {
                 // 1. Auditee WAJIB satu prodi dengan Sesi AMI ini
                 const prodiAuditees = allUsers.filter(
                   (u) => u.role === "AUDITEE" && u.unitId === p.unitId
@@ -192,6 +228,15 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                         <Badge tone="purple">{p.semester}</Badge>
                         <Badge tone={p.aktif ? "green" : "amber"}>
                           {p.aktif ? "🟢 Terbuka" : "🔒 Terkunci"}
+                        </Badge>
+                        <Badge tone={p.ttdAuditee ? "green" : "slate"}>
+                          {p.ttdAuditee ? "✅ TTD Auditee" : "⏳ TTD Auditee"}
+                        </Badge>
+                        <Badge tone={p.ttdAuditor ? "green" : "slate"}>
+                          {p.ttdAuditor ? "✅ TTD Auditor" : "⏳ TTD Auditor"}
+                        </Badge>
+                        <Badge tone={p.ttdLpm ? "green" : "slate"}>
+                          {p.ttdLpm ? "✅ TTD LPM" : "⏳ TTD LPM"}
                         </Badge>
                       </div>
 
@@ -229,22 +274,56 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                           <p className="text-xs font-semibold text-slate-400">Belum ada Auditee</p>
                         ) : (
                           <ul className="space-y-1.5 text-xs">
-                            {prodiAuditees.map((a) => (
-                              <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white px-3 py-2 border border-black/15">
-                                <div>
-                                  <span className="font-bold text-black">{a.nama}</span>
-                                  {a.nimNuptk && <span className="ml-1 font-mono text-slate-500">({a.nimNuptk})</span>}
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                  <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono font-bold text-slate-800">{a.username}</code>
-                                  <form action={hapusUserEmergencyOlehLpm}>
-                                    <input type="hidden" name="userId" value={a.id} />
-                                    <input type="hidden" name="returnTo" value="/lpm?tab=sesi" />
-                                    <button className="btn-danger px-2 py-0.5 text-[11px]">Hapus</button>
-                                  </form>
-                                </div>
-                              </li>
-                            ))}
+                            {prodiAuditees.map((a) => {
+                              const isKetuaAuditee = p.ketuaAuditeeId === a.id;
+                              return (
+                                <li
+                                  key={a.id}
+                                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white px-3 py-2 border border-black/15"
+                                >
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    <span className="font-bold text-black">{a.nama}</span>
+                                    {a.nimNuptk && (
+                                      <span className="font-mono text-slate-500">({a.nimNuptk})</span>
+                                    )}
+                                    {isKetuaAuditee && (
+                                      <Badge tone="amber">⭐ Ketua Auditee</Badge>
+                                    )}
+                                  </div>
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono font-bold text-slate-800">
+                                      {a.username}
+                                    </code>
+                                    {!isKetuaAuditee && (
+                                      <form action={pilihKetuaSesiAmi}>
+                                        <input type="hidden" name="periodeId" value={p.id} />
+                                        <input type="hidden" name="tipe" value="AUDITEE" />
+                                        <input type="hidden" name="userId" value={a.id} />
+                                        <input
+                                          type="hidden"
+                                          name="returnTo"
+                                          value={`/lpm?tab=sesi&prodi=${prodiFilter}`}
+                                        />
+                                        <button className="btn-secondary px-2 py-0.5 text-[11px]">
+                                          ⭐ Jadikan Ketua
+                                        </button>
+                                      </form>
+                                    )}
+                                    <form action={hapusUserEmergencyOlehLpm}>
+                                      <input type="hidden" name="userId" value={a.id} />
+                                      <input
+                                        type="hidden"
+                                        name="returnTo"
+                                        value={`/lpm?tab=sesi&prodi=${prodiFilter}`}
+                                      />
+                                      <button className="btn-danger px-2 py-0.5 text-[11px]">
+                                        Hapus
+                                      </button>
+                                    </form>
+                                  </div>
+                                </li>
+                              );
+                            })}
                           </ul>
                         )}
 
@@ -277,30 +356,68 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                           <p className="text-xs font-semibold text-slate-400">Belum ada Auditor lintas prodi</p>
                         ) : (
                           <ul className="space-y-1.5 text-xs">
-                            {assignedAuditors.map((a) => (
-                              <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white px-3 py-2 border border-black/15">
-                                <div className="flex flex-wrap items-center gap-1.5">
-                                  <span className="font-bold text-black">{a.nama}</span>
-                                  {a.unit && <Badge tone="purple">Asal: {a.unit.nama}</Badge>}
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                  <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono font-bold text-slate-800">{a.username}</code>
-                                  {assignedFromPenugasan.length > 0 && (
-                                    <form action={lepasAuditorDariSesi}>
-                                      <input type="hidden" name="periodeId" value={p.id} />
-                                      <input type="hidden" name="auditorId" value={a.id} />
-                                      <input type="hidden" name="returnTo" value="/lpm?tab=sesi" />
-                                      <button className="btn-secondary px-2 py-0.5 text-[11px]">Lepas</button>
+                            {assignedAuditors.map((a) => {
+                              const isKetuaAuditor = p.ketuaAuditorId === a.id;
+                              return (
+                                <li
+                                  key={a.id}
+                                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white px-3 py-2 border border-black/15"
+                                >
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    <span className="font-bold text-black">{a.nama}</span>
+                                    {a.unit && <Badge tone="purple">Asal: {a.unit.nama}</Badge>}
+                                    {isKetuaAuditor && (
+                                      <Badge tone="amber">⭐ Ketua Auditor</Badge>
+                                    )}
+                                  </div>
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono font-bold text-slate-800">
+                                      {a.username}
+                                    </code>
+                                    {!isKetuaAuditor && (
+                                      <form action={pilihKetuaSesiAmi}>
+                                        <input type="hidden" name="periodeId" value={p.id} />
+                                        <input type="hidden" name="tipe" value="AUDITOR" />
+                                        <input type="hidden" name="userId" value={a.id} />
+                                        <input
+                                          type="hidden"
+                                          name="returnTo"
+                                          value={`/lpm?tab=sesi&prodi=${prodiFilter}`}
+                                        />
+                                        <button className="btn-secondary px-2 py-0.5 text-[11px]">
+                                          ⭐ Jadikan Ketua
+                                        </button>
+                                      </form>
+                                    )}
+                                    {assignedFromPenugasan.length > 0 && (
+                                      <form action={lepasAuditorDariSesi}>
+                                        <input type="hidden" name="periodeId" value={p.id} />
+                                        <input type="hidden" name="auditorId" value={a.id} />
+                                        <input
+                                          type="hidden"
+                                          name="returnTo"
+                                          value={`/lpm?tab=sesi&prodi=${prodiFilter}`}
+                                        />
+                                        <button className="btn-secondary px-2 py-0.5 text-[11px]">
+                                          Lepas
+                                        </button>
+                                      </form>
+                                    )}
+                                    <form action={hapusUserEmergencyOlehLpm}>
+                                      <input type="hidden" name="userId" value={a.id} />
+                                      <input
+                                        type="hidden"
+                                        name="returnTo"
+                                        value={`/lpm?tab=sesi&prodi=${prodiFilter}`}
+                                      />
+                                      <button className="btn-danger px-2 py-0.5 text-[11px]">
+                                        Hapus
+                                      </button>
                                     </form>
-                                  )}
-                                  <form action={hapusUserEmergencyOlehLpm}>
-                                    <input type="hidden" name="userId" value={a.id} />
-                                    <input type="hidden" name="returnTo" value="/lpm?tab=sesi" />
-                                    <button className="btn-danger px-2 py-0.5 text-[11px]">Hapus</button>
-                                  </form>
-                                </div>
-                              </li>
-                            ))}
+                                  </div>
+                                </li>
+                              );
+                            })}
                           </ul>
                         )}
 

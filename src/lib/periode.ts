@@ -63,3 +63,30 @@ export function pengisianTerbuka(p: { tahap: Tahap; tglCutOff: Date | null }) {
   if (p.tahap !== "PENGISIAN") return false;
   return !p.tglCutOff || Date.now() <= p.tglCutOff.getTime();
 }
+
+/**
+ * Mengubah string Tahun Akademik (misal "2025/2026") + Semester ("Ganjil" / "Genap")
+ * menjadi angka urut kronologis (misal 20251 untuk 2025/2026 Ganjil, 20252 untuk 2025/2026 Genap).
+ */
+export function periodeChronologicalScore(p: { tahun: string; semester: string }): number {
+  const match = (p.tahun || "").match(/(\d{4})/);
+  const startYear = match ? parseInt(match[1], 10) : 0;
+  const semOrder = (p.semester || "").toLowerCase().includes("genap") ? 2 : 1;
+  return startYear * 10 + semOrder;
+}
+
+/**
+ * Urutkan sesi secara kronologis: 2025/2026 Ganjil -> 2025/2026 Genap -> 2026/2027 Ganjil -> 2026/2027 Genap
+ */
+export function sortPeriodesChronological<
+  T extends { tahun: string; semester: string; unit?: { nama: string } | null }
+>(list: T[]): T[] {
+  return [...list].sort((a, b) => {
+    const scoreA = periodeChronologicalScore(a);
+    const scoreB = periodeChronologicalScore(b);
+    if (scoreA !== scoreB) return scoreA - scoreB;
+    const unitA = a.unit?.nama ?? "";
+    const unitB = b.unit?.nama ?? "";
+    return unitA.localeCompare(unitB, "id");
+  });
+}
