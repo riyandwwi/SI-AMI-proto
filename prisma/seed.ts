@@ -25,6 +25,14 @@ async function main() {
     units[u.kode] = saved.id;
   }
 
+  // Jika di database SUDAH ADA akun (misal sudah disiapkan untuk testing/produksi),
+  // JANGAN pernah membuat ulang akun dummy atau sesi AMI dummy saat deploy update!
+  const totalUsers = await prisma.user.count();
+  if (totalUsers > 0) {
+    console.log("⏭️ Database sudah memiliki akun, melewati pembuatan akun & sesi dummy.");
+    return;
+  }
+
   // 2. Buat Akun untuk 4 Role (SUPER_ADMIN, LPM, AUDITOR, AUDITEE) jika belum ada
   const akunAwal: {
     username: string;
