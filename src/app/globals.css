@@ -22,10 +22,10 @@
     @apply w-full text-left text-sm;
   }
   th {
-    @apply border-b border-black/20 bg-[#E5DEC9] px-3.5 py-2.5 text-xs font-black uppercase tracking-wider text-black;
+    @apply border-b border-black/25 bg-[#CFC2A8] px-3.5 py-2.5 text-xs font-black uppercase tracking-wider text-black;
   }
   td {
-    @apply border-b border-black/10 px-3.5 py-3 align-top font-medium;
+    @apply border-b border-black/15 px-3.5 py-3 align-top font-medium;
   }
 }
 
@@ -47,9 +47,9 @@
     @apply inline-flex items-center justify-center gap-1.5 rounded-xl border-2 border-black bg-[#E9D5FF] px-4 py-2 text-sm font-black text-black shadow-[3px_3px_0px_#000000] transition-all hover:bg-[#d8b4fe] hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[5px_5px_0px_#000000] active:translate-x-0.5 active:translate-y-0.5 active:shadow-[1px_1px_0px_#000000] disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer;
   }
 
-  /* Neo-Brutalist Cards — Warm Sand (#EFE9DB) agar teduh & kontras dengan background (#FAF7EE) dan input putih (#FFFFFF) */
+  /* Neo-Brutalist Cards — Warm Taupe/Sand (#DED2BA) yang jauh lebih gelap dari background (#FAF7EE) dan kontras dengan input putih (#FFFFFF) */
   .card {
-    @apply rounded-2xl border-2 border-black bg-[#EFE9DB] p-5 shadow-[4px_4px_0px_#000000];
+    @apply rounded-2xl border-2 border-black bg-[#DED2BA] p-5 shadow-[4px_4px_0px_#000000];
   }
   .card-coral {
     @apply rounded-2xl border-2 border-black bg-[#FF5C38] p-5 text-white shadow-[4px_4px_0px_#000000];
