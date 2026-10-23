@@ -114,7 +114,7 @@ model Indikator {
   kode         String
   standar      String
   pernyataan   String
-  target       String
+  target       String  @default("-")
   buktiDiminta String?
   urutan       Int     @default(0)
   isian        Isian[]

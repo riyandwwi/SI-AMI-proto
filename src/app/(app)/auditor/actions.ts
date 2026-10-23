@@ -25,6 +25,7 @@ export async function simpanBatchAuditDokumen(
     indikatorId: string;
     statusDokumen: StatusDokumen;
     catatanDokumen: string;
+    buktiDiminta?: string;
   }>,
   lockDokumen?: boolean
 ): Promise<AuditorActionResult> {
@@ -53,6 +54,14 @@ export async function simpanBatchAuditDokumen(
     if (!ind) continue;
     const statusDokumen = VALID_DOK.includes(item.statusDokumen) ? item.statusDokumen : "BELUM_DICEK";
     const catatanDokumen = item.catatanDokumen.trim().slice(0, 4000) || null;
+
+    if (item.buktiDiminta !== undefined) {
+      const buktiDiminta = item.buktiDiminta.trim().slice(0, 500) || null;
+      await prisma.indikator.update({
+        where: { id: ind.id },
+        data: { buktiDiminta },
+      });
+    }
 
     await prisma.isian.upsert({
       where: { indikatorId_unitId: { indikatorId: ind.id, unitId } },

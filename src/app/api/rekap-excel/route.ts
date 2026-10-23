@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
           <td><b>${esc(ind.kode)}</b></td>
           <td>${esc(ind.standar)}</td>
           <td>${esc(ind.pernyataan)}</td>
-          <td>${esc(ind.target)}</td>
+          <td>${esc(ind.buktiDiminta ?? "-")}</td>
           <td>${esc(isian?.klaim ?? "-")}</td>
           <td>${esc(isian?.linkDrive ?? "-")}</td>
           <td><b>${esc(isian?.diisiOleh ?? "-")}</b></td>
@@ -118,7 +118,7 @@ export async function GET(req: NextRequest) {
               <th>Kode Indikator</th>
               <th>Standar SPMI</th>
               <th>Pernyataan Indikator</th>
-              <th>Target</th>
+              <th>Dokumen Bukti</th>
               <th>Evaluasi Diri Auditee</th>
               <th>Link Google Drive Bukti</th>
               <th>Disimpan Oleh (Auditee)</th>

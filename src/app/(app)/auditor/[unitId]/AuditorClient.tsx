@@ -25,6 +25,7 @@ export interface AuditorIndikatorItem {
   standar: string;
   pernyataan: string;
   target: string;
+  buktiDiminta: string | null;
   isian: {
     id: string;
     klaim: string | null;
@@ -46,6 +47,7 @@ export interface AuditorIndikatorItem {
 }
 
 interface AuditorDraftEntry {
+  buktiDiminta: string;
   statusDokumen: StatusDokumen;
   catatanDokumen: string;
   klasifikasi: Klasifikasi;
@@ -75,6 +77,7 @@ export default function AuditorClient({
     const map: Record<string, AuditorDraftEntry> = {};
     for (const ind of items) {
       map[ind.id] = {
+        buktiDiminta: ind.buktiDiminta ?? "",
         statusDokumen: ind.isian?.statusDokumen ?? "BELUM_DICEK",
         catatanDokumen: ind.isian?.catatanDokumen ?? "",
         klasifikasi: ind.isian?.klasifikasi ?? "MENCAPAI",
@@ -132,6 +135,10 @@ export default function AuditorClient({
           const cur = next[ind.id];
           if (!cur) continue;
           next[ind.id] = {
+            buktiDiminta:
+              d.buktiDiminta !== undefined && d.buktiDiminta !== ""
+                ? d.buktiDiminta
+                : cur.buktiDiminta,
             statusDokumen: d.statusDokumen ?? cur.statusDokumen,
             catatanDokumen:
               d.catatanDokumen !== undefined && d.catatanDokumen !== ""
@@ -186,6 +193,7 @@ export default function AuditorClient({
     const sav = savedValues[indId];
     if (!cur || !sav) return false;
     return (
+      cur.buktiDiminta.trim() !== sav.buktiDiminta.trim() ||
       cur.statusDokumen !== sav.statusDokumen ||
       cur.catatanDokumen.trim() !== sav.catatanDokumen.trim()
     );
@@ -255,6 +263,7 @@ export default function AuditorClient({
         .filter((ind) => ind.id === targetIndikatorId || isDirtyDokumen(ind.id))
         .map((ind) => ({
           indikatorId: ind.id,
+          buktiDiminta: values[ind.id]?.buktiDiminta ?? "",
           statusDokumen: values[ind.id]?.statusDokumen ?? "BELUM_DICEK",
           catatanDokumen: values[ind.id]?.catatanDokumen ?? "",
         }));
@@ -641,7 +650,9 @@ export default function AuditorClient({
                   {ind.kode}
                 </code>
                 <span className="text-sm font-black text-black">{ind.standar}</span>
-                <Badge tone="slate">Target: {ind.target}</Badge>
+                {(sav.buktiDiminta || ind.buktiDiminta) && (
+                  <Badge tone="slate">📋 Bukti: {sav.buktiDiminta || ind.buktiDiminta}</Badge>
+                )}
                 {isian?.diisiOleh && <Badge tone="blue">👤 {isian.diisiOleh}</Badge>}
                 {isian?.diperiksaOleh && <Badge tone="purple">🕵️ {isian.diperiksaOleh}</Badge>}
                 {dirty && <Badge tone="amber">📝 Belum Disimpan</Badge>}
@@ -734,23 +745,36 @@ export default function AuditorClient({
                 className="space-y-3 pt-1"
               >
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                  <div className="space-y-1">
-                    <label>Status Dokumen</label>
-                    <select
-                      name="statusDokumen"
-                      disabled={!buka}
-                      value={cur.statusDokumen}
-                      onChange={(e) =>
-                        updateField(ind.id, "statusDokumen", e.target.value as StatusDokumen)
-                      }
-                      className="w-full"
-                    >
-                      <option value="BELUM_DICEK">⏳ Belum Diperiksa</option>
-                      <option value="LENGKAP">✅ Lengkap &amp; Sesuai</option>
-                      <option value="PERLU_KLARIFIKASI">
-                        🎯 Perlu Klarifikasi Lapangan
-                      </option>
-                    </select>
+                  <div className="space-y-2">
+                    <div className="space-y-1">
+                      <label>Dokumen Bukti yang Diminta</label>
+                      <input
+                        name="buktiDiminta"
+                        disabled={!buka}
+                        value={cur.buktiDiminta}
+                        onChange={(e) => updateField(ind.id, "buktiDiminta", e.target.value)}
+                        placeholder="SK, RPS, Laporan..."
+                        className="w-full text-xs"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label>Status Dokumen</label>
+                      <select
+                        name="statusDokumen"
+                        disabled={!buka}
+                        value={cur.statusDokumen}
+                        onChange={(e) =>
+                          updateField(ind.id, "statusDokumen", e.target.value as StatusDokumen)
+                        }
+                        className="w-full"
+                      >
+                        <option value="BELUM_DICEK">⏳ Belum Diperiksa</option>
+                        <option value="LENGKAP">✅ Lengkap &amp; Sesuai</option>
+                        <option value="PERLU_KLARIFIKASI">
+                          🎯 Perlu Klarifikasi Lapangan
+                        </option>
+                      </select>
+                    </div>
                   </div>
                   <div className="space-y-1 md:col-span-2">
                     <label>

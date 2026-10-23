@@ -16,8 +16,8 @@ const DEFAULT_INDIKATOR = [
     standar: "Standar Isi Pembelajaran",
     pernyataan:
       "Ketersediaan dokumen Kurikulum Berbasis OBE dan RPS lengkap untuk seluruh mata kuliah aktif semester berjalan.",
-    target: "100% Mata Kuliah",
-    buktiDiminta: null,
+    target: "-",
+    buktiDiminta: "SK Kurikulum OBE, Matriks CPL, dan RPS",
     urutan: 1,
   },
   {
@@ -25,8 +25,8 @@ const DEFAULT_INDIKATOR = [
     standar: "Standar Proses Pembelajaran",
     pernyataan:
       "Pelaksanaan monitoring kehadiran dosen dan kesesuaian materi perkuliahan minimal 14-16 pertemuan per semester beserta berita acara.",
-    target: ">= 95% Kehadiran",
-    buktiDiminta: null,
+    target: "-",
+    buktiDiminta: "Rekap Presensi, Jurnal Perkuliahan, Laporan Monev",
     urutan: 2,
   },
   {
@@ -34,8 +34,8 @@ const DEFAULT_INDIKATOR = [
     standar: "Standar Penelitian & PKM",
     pernyataan:
       "Keterlibatan mahasiswa dalam peta jalan penelitian dosen tetap program studi yang dibuktikan dengan SK/Kontrak atau publikasi bersama.",
-    target: ">= 30% Penelitian Dosen",
-    buktiDiminta: null,
+    target: "-",
+    buktiDiminta: "SK/Kontrak Penelitian, Artikel Publikasi",
     urutan: 3,
   },
 ];
@@ -397,11 +397,10 @@ export async function tambahIndikator(fd: FormData) {
   const kode = str(fd, "kode", 32).toUpperCase().replace(/\s+/g, "-");
   const standar = str(fd, "standar", 120);
   const pernyataan = str(fd, "pernyataan", 1000);
-  const target = str(fd, "target", 120);
-  const buktiDiminta = str(fd, "buktiDiminta", 400) || null;
+  const buktiDiminta = str(fd, "buktiDiminta", 500) || null;
 
-  if (!kode || !standar || !pernyataan || !target) {
-    fail(returnTo, "Kode, standar, pernyataan, dan target indikator wajib diisi.");
+  if (!kode || !standar || !pernyataan) {
+    fail(returnTo, "Kode, standar, dan pernyataan indikator wajib diisi.");
   }
 
   const periodes =
@@ -417,13 +416,13 @@ export async function tambahIndikator(fd: FormData) {
     const jml = await prisma.indikator.count({ where: { periodeId: p.id } });
     await prisma.indikator.upsert({
       where: { periodeId_kode: { periodeId: p.id, kode } },
-      update: { standar, pernyataan, target, buktiDiminta },
+      update: { standar, pernyataan, buktiDiminta },
       create: {
         periodeId: p.id,
         kode,
         standar,
         pernyataan,
-        target,
+        target: "-",
         buktiDiminta,
         urutan: jml + 1,
       },
@@ -445,10 +444,10 @@ export async function editIndikator(fd: FormData) {
   const kode = str(fd, "kode", 32).toUpperCase().replace(/\s+/g, "-");
   const standar = str(fd, "standar", 120);
   const pernyataan = str(fd, "pernyataan", 1000);
-  const target = str(fd, "target", 120);
+  const buktiDiminta = str(fd, "buktiDiminta", 500) || null;
 
-  if (!indikatorId || !kode || !standar || !pernyataan || !target) {
-    fail(returnTo, "Kode, standar, pernyataan, dan target indikator wajib diisi.");
+  if (!indikatorId || !kode || !standar || !pernyataan) {
+    fail(returnTo, "Kode, standar, dan pernyataan indikator wajib diisi.");
   }
 
   const existing = await prisma.indikator.findUnique({ where: { id: indikatorId } });
@@ -466,7 +465,7 @@ export async function editIndikator(fd: FormData) {
 
   await prisma.indikator.update({
     where: { id: indikatorId },
-    data: { kode, standar, pernyataan, target },
+    data: { kode, standar, pernyataan, buktiDiminta },
   });
 
   await catat(user.id, "EDIT_INDIKATOR", `[${kode}] ${standar}`);

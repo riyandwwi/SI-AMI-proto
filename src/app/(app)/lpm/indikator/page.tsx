@@ -41,8 +41,12 @@ export default async function LpmIndikatorPage({ searchParams }: { searchParams:
             <input name="standar" required placeholder="Standar Isi..." className="w-full" />
           </div>
           <div className="space-y-1">
-            <label>Target</label>
-            <input name="target" required placeholder="100%" className="w-full" />
+            <label>Dokumen Bukti</label>
+            <input
+              name="buktiDiminta"
+              placeholder="Contoh: SK Kurikulum, RPS..."
+              className="w-full"
+            />
           </div>
         </div>
         <div className="flex gap-2">
@@ -87,7 +91,7 @@ export default async function LpmIndikatorPage({ searchParams }: { searchParams:
                             className="w-full font-mono text-xs"
                           />
                         </div>
-                        <div className="space-y-1 sm:col-span-2">
+                        <div className="space-y-1">
                           <label>Standar</label>
                           <input
                             name="standar"
@@ -96,12 +100,12 @@ export default async function LpmIndikatorPage({ searchParams }: { searchParams:
                             className="w-full text-xs"
                           />
                         </div>
-                        <div className="space-y-1">
-                          <label>Target</label>
+                        <div className="space-y-1 sm:col-span-2">
+                          <label>Dokumen Bukti</label>
                           <input
-                            name="target"
-                            required
-                            defaultValue={ind.target}
+                            name="buktiDiminta"
+                            defaultValue={ind.buktiDiminta ?? ""}
+                            placeholder="Contoh: SK Kurikulum, RPS..."
                             className="w-full text-xs"
                           />
                         </div>

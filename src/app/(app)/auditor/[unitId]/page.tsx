@@ -63,6 +63,7 @@ export default async function AuditorUnitWorkspacePage({
       standar: ind.standar,
       pernyataan: ind.pernyataan,
       target: ind.target,
+      buktiDiminta: ind.buktiDiminta,
       isian: isian
         ? {
             id: isian.id,

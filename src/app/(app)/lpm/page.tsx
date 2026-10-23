@@ -371,8 +371,12 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                     <input name="standar" required placeholder="Standar Isi..." className="w-full" />
                   </div>
                   <div className="space-y-1">
-                    <label>Target</label>
-                    <input name="target" required placeholder="100%" className="w-full" />
+                    <label>Dokumen Bukti</label>
+                    <input
+                      name="buktiDiminta"
+                      placeholder="SK, RPS, Laporan..."
+                      className="w-full"
+                    />
                   </div>
                 </div>
                 <div className="flex gap-2">
@@ -413,11 +417,13 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                         return (
                           <tr key={ind.id}>
                             <td>
-                              <div className="flex items-center gap-1.5">
+                              <div className="flex flex-wrap items-center gap-1.5">
                                 <code className="rounded-lg border border-black/30 bg-[#BAE6FD] px-2 py-0.5 text-xs font-black text-black">
                                   {ind.kode}
                                 </code>
-                                <Badge tone="slate">{ind.target}</Badge>
+                                {ind.buktiDiminta && (
+                                  <Badge tone="slate">📋 {ind.buktiDiminta}</Badge>
+                                )}
                               </div>
                               <div className="mt-1 font-bold text-black">{ind.standar}</div>
                               <div className="mt-0.5 text-xs text-slate-700">{ind.pernyataan}</div>
@@ -448,10 +454,9 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                                     className="w-full text-xs"
                                   />
                                   <input
-                                    name="target"
-                                    required
-                                    defaultValue={ind.target}
-                                    placeholder="Target"
+                                    name="buktiDiminta"
+                                    defaultValue={ind.buktiDiminta ?? ""}
+                                    placeholder="Dokumen bukti yang diminta..."
                                     className="w-full text-xs"
                                   />
                                   <textarea

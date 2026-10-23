@@ -13,6 +13,7 @@ export interface AuditeeIndikatorItem {
   standar: string;
   pernyataan: string;
   target: string;
+  buktiDiminta: string | null;
   isian: {
     id: string;
     klaim: string | null;
@@ -292,7 +293,7 @@ export default function AuditeeClient({
                   {ind.kode}
                 </code>
                 <span className="text-sm font-black text-black">{ind.standar}</span>
-                <Badge tone="slate">Target: {ind.target}</Badge>
+                {ind.buktiDiminta && <Badge tone="slate">📋 Bukti: {ind.buktiDiminta}</Badge>}
               </div>
               <div className="flex flex-wrap items-center gap-1.5">
                 {dirty && <Badge tone="amber">📝 Belum Disimpan</Badge>}
