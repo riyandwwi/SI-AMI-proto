@@ -12,8 +12,10 @@ import { FormStandarBertahap, type ExistingStandarInfo } from "../FormStandarBer
 import {
   editIndikator,
   hapusIndikator,
+  hapusSemuaIndikator,
   hapusStandarEmergency,
   tambahIndikator,
+  toggleKunciIndikator,
   ubahNamaStandar,
 } from "../actions";
 
@@ -67,7 +69,35 @@ export default async function LpmIndikatorPage({ searchParams }: { searchParams:
 
   return (
     <>
-      <PageHeader title="Master Standar, Pernyataan Standar & Indikator SPMI" />
+      <PageHeader title="Master Standar, Pernyataan Standar & Indikator SPMI">
+        {periodes.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            <form action={toggleKunciIndikator}>
+              <input type="hidden" name="periodeId" value="ALL" />
+              <input type="hidden" name="lockAction" value="LOCK" />
+              <input type="hidden" name="returnTo" value="/lpm/indikator" />
+              <button className="btn-success text-xs">
+                🔒 Kunci &amp; Terbitkan Semua Sesi ke Auditor/Auditee
+              </button>
+            </form>
+            <form action={toggleKunciIndikator}>
+              <input type="hidden" name="periodeId" value="ALL" />
+              <input type="hidden" name="lockAction" value="UNLOCK" />
+              <input type="hidden" name="returnTo" value="/lpm/indikator" />
+              <button className="btn-secondary text-xs">
+                🔓 Buka Kunci Semua Sesi (Edit)
+              </button>
+            </form>
+            <form action={hapusSemuaIndikator}>
+              <input type="hidden" name="periodeId" value="ALL" />
+              <input type="hidden" name="returnTo" value="/lpm/indikator" />
+              <button className="btn-danger text-xs">
+                🗑️ Hapus Semua Indikator (Semua Sesi)
+              </button>
+            </form>
+          </div>
+        )}
+      </PageHeader>
       <Flash ok={one(sp.ok)} err={one(sp.err)} />
 
       {periodes.length > 0 && (
@@ -142,8 +172,52 @@ export default async function LpmIndikatorPage({ searchParams }: { searchParams:
                     </h3>
                     <Badge tone="blue">{p.indikator.length} Indikator</Badge>
                     <Badge tone="purple">{allGroups.length} Standar</Badge>
+                    {p.sourceLocked ? (
+                      <Badge tone="green">
+                        🔒 Terkunci &amp; Diterbitkan ke Auditor/Auditee
+                      </Badge>
+                    ) : (
+                      <Badge tone="amber">
+                        🔓 Belum Dikunci (Belum Masuk ke Auditor/Auditee)
+                      </Badge>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <form action={toggleKunciIndikator}>
+                      <input type="hidden" name="periodeId" value={p.id} />
+                      <input
+                        type="hidden"
+                        name="lockAction"
+                        value={p.sourceLocked ? "UNLOCK" : "LOCK"}
+                      />
+                      <input type="hidden" name="returnTo" value="/lpm/indikator" />
+                      <button
+                        className={p.sourceLocked ? "btn-secondary text-xs" : "btn-success text-xs"}
+                      >
+                        {p.sourceLocked
+                          ? "🔓 Buka Kunci Indikator (Untuk Edit)"
+                          : "🔒 Kunci & Terbitkan ke Auditor/Auditee"}
+                      </button>
+                    </form>
+
+                    {!p.sourceLocked && p.indikator.length > 0 && (
+                      <form action={hapusSemuaIndikator}>
+                        <input type="hidden" name="periodeId" value={p.id} />
+                        <input type="hidden" name="returnTo" value="/lpm/indikator" />
+                        <button className="btn-danger text-xs">
+                          🗑️ Hapus Semua Indikator Sesi Ini ({p.indikator.length})
+                        </button>
+                      </form>
+                    )}
                   </div>
                 </div>
+
+                {p.sourceLocked && (
+                  <div className="rounded-xl border-2 border-black bg-[#D9F99D] px-4 py-2.5 text-xs font-bold text-black">
+                    🔒 Indikator pada sesi ini sudah <strong>DIKUNCI &amp; DITERBITKAN</strong> ke halaman Auditor dan Auditee. Jika ingin menambah, mengedit, atau menghapus indikator, klik tombol <strong>&ldquo;🔓 Buka Kunci Indikator (Untuk Edit)&rdquo;</strong> di kanan atas, lalu kunci kembali setelah selesai.
+                  </div>
+                )}
 
                 {visibleGroups.length === 0 ? (
                   <Empty>Belum ada indikator untuk standar ini.</Empty>
@@ -169,37 +243,39 @@ export default async function LpmIndikatorPage({ searchParams }: { searchParams:
                               </Badge>
                             </div>
 
-                            <div className="flex flex-wrap items-center gap-2">
-                              <details className="relative">
-                                <summary className="btn-secondary text-xs list-none">
-                                  ✏️ Ubah Nama Standar
-                                </summary>
-                                <form
-                                  action={ubahNamaStandar}
-                                  className="mt-2 flex items-center gap-1.5 rounded-xl border border-black bg-white p-2"
-                                >
-                                  <input type="hidden" name="periodeId" value={p.id} />
-                                  <input type="hidden" name="standarLama" value={group.standar} />
-                                  <input type="hidden" name="returnTo" value="/lpm/indikator" />
-                                  <input
-                                    name="standarBaru"
-                                    required
-                                    defaultValue={group.standar}
-                                    className="w-48 text-xs"
-                                  />
-                                  <button className="btn-success text-xs">Simpan</button>
-                                </form>
-                              </details>
+                            {!p.sourceLocked && (
+                              <div className="flex flex-wrap items-center gap-2">
+                                <details className="relative">
+                                  <summary className="btn-secondary text-xs list-none">
+                                    ✏️ Ubah Nama Standar
+                                  </summary>
+                                  <form
+                                    action={ubahNamaStandar}
+                                    className="mt-2 flex items-center gap-1.5 rounded-xl border border-black bg-white p-2"
+                                  >
+                                    <input type="hidden" name="periodeId" value={p.id} />
+                                    <input type="hidden" name="standarLama" value={group.standar} />
+                                    <input type="hidden" name="returnTo" value="/lpm/indikator" />
+                                    <input
+                                      name="standarBaru"
+                                      required
+                                      defaultValue={group.standar}
+                                      className="w-48 text-xs"
+                                    />
+                                    <button className="btn-success text-xs">Simpan</button>
+                                  </form>
+                                </details>
 
-                              <form action={hapusStandarEmergency}>
-                                <input type="hidden" name="periodeId" value={p.id} />
-                                <input type="hidden" name="standar" value={group.standar} />
-                                <input type="hidden" name="returnTo" value="/lpm/indikator" />
-                                <button className="btn-danger text-xs">
-                                  🗑️ Hapus Standar Ini
-                                </button>
-                              </form>
-                            </div>
+                                <form action={hapusStandarEmergency}>
+                                  <input type="hidden" name="periodeId" value={p.id} />
+                                  <input type="hidden" name="standar" value={group.standar} />
+                                  <input type="hidden" name="returnTo" value="/lpm/indikator" />
+                                  <button className="btn-danger text-xs">
+                                    🗑️ Hapus Standar Ini
+                                  </button>
+                                </form>
+                              </div>
+                            )}
                           </div>
 
                           {/* Daftar Indikator di dalam Standar Ini */}
@@ -218,6 +294,7 @@ export default async function LpmIndikatorPage({ searchParams }: { searchParams:
                                       <input
                                         name="kode"
                                         required
+                                        disabled={p.sourceLocked}
                                         defaultValue={ind.kode}
                                         className="w-full font-mono text-xs"
                                       />
@@ -227,6 +304,7 @@ export default async function LpmIndikatorPage({ searchParams }: { searchParams:
                                       <input
                                         name="standar"
                                         required
+                                        disabled={p.sourceLocked}
                                         defaultValue={ind.standar}
                                         className="w-full text-xs"
                                       />
@@ -235,6 +313,7 @@ export default async function LpmIndikatorPage({ searchParams }: { searchParams:
                                       <label>Dokumen Bukti</label>
                                       <input
                                         name="buktiDiminta"
+                                        disabled={p.sourceLocked}
                                         defaultValue={ind.buktiDiminta ?? ""}
                                         placeholder="Contoh: Dokumen Kurikulum Program Studi yang memuat CPL"
                                         className="w-full text-xs"
@@ -247,6 +326,7 @@ export default async function LpmIndikatorPage({ searchParams }: { searchParams:
                                     <textarea
                                       name="pernyataanStandar"
                                       rows={2}
+                                      disabled={p.sourceLocked}
                                       defaultValue={ind.pernyataanStandar ?? ""}
                                       placeholder="Isi pernyataan standar..."
                                       className="w-full text-xs"
@@ -260,76 +340,83 @@ export default async function LpmIndikatorPage({ searchParams }: { searchParams:
                                         name="pernyataan"
                                         rows={2}
                                         required
+                                        disabled={p.sourceLocked}
                                         defaultValue={ind.pernyataan}
                                         className="w-full text-xs"
                                       />
                                     </div>
-                                    <button type="submit" className="btn-success shrink-0 text-xs">
-                                      💾 Simpan Edit
-                                    </button>
+                                    {!p.sourceLocked && (
+                                      <button type="submit" className="btn-success shrink-0 text-xs">
+                                        💾 Simpan Edit
+                                      </button>
+                                    )}
                                   </div>
                                 </form>
 
-                                <div className="flex justify-end border-t border-black/10 pt-1.5">
-                                  <form action={hapusIndikator}>
-                                    <input type="hidden" name="indikatorId" value={ind.id} />
-                                    <input type="hidden" name="returnTo" value="/lpm/indikator" />
-                                    <button className="btn-danger px-2.5 py-1 text-xs">
-                                      Hapus Indikator #{noUrut} ({ind.kode})
-                                    </button>
-                                  </form>
-                                </div>
+                                {!p.sourceLocked && (
+                                  <div className="flex justify-end border-t border-black/10 pt-1.5">
+                                    <form action={hapusIndikator}>
+                                      <input type="hidden" name="indikatorId" value={ind.id} />
+                                      <input type="hidden" name="returnTo" value="/lpm/indikator" />
+                                      <button className="btn-danger px-2.5 py-1 text-xs">
+                                        🗑️ Hapus Indikator #{noUrut} ({ind.kode})
+                                      </button>
+                                    </form>
+                                  </div>
+                                )}
                               </div>
                             ))}
                           </div>
 
                           {/* Form Cepat: + Tambah Indikator (IK) Lanjutan ke Standar Ini */}
-                          <form
-                            action={tambahIndikator}
-                            className="space-y-2 rounded-xl border border-dashed border-black/30 bg-[#EFE9DB]/60 p-3"
-                          >
-                            <div className="text-xs font-black text-black">
-                              ➕ Tambah Indikator Lanjutan ke &ldquo;{group.standar}&rdquo;
-                            </div>
-                            <input type="hidden" name="periodeId" value={p.id} />
-                            <input type="hidden" name="standar" value={group.standar} />
-                            <input type="hidden" name="returnTo" value="/lpm/indikator" />
+                          {!p.sourceLocked && (
+                            <form
+                              action={tambahIndikator}
+                              className="space-y-2 rounded-xl border border-dashed border-black/30 bg-[#EFE9DB]/60 p-3"
+                            >
+                              <div className="text-xs font-black text-black">
+                                ➕ Tambah Indikator Lanjutan ke &ldquo;{group.standar}&rdquo;
+                              </div>
+                              <input type="hidden" name="periodeId" value={p.id} />
+                              <input type="hidden" name="standar" value={group.standar} />
+                              <input type="hidden" name="returnTo" value="/lpm/indikator" />
 
-                            <div className="space-y-1">
-                              <label>Isi Pernyataan Standar</label>
-                              <textarea
-                                name="pernyataanStandar"
-                                rows={2}
-                                defaultValue={lastPs}
-                                placeholder="Isi pernyataan standar..."
-                                className="w-full text-xs"
-                              />
-                            </div>
-
-                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
-                              <input
-                                name="kode"
-                                required
-                                defaultValue={`IK${group.items.length + 1}`}
-                                placeholder="IK..."
-                                className="font-mono text-xs"
-                              />
-                              <input
-                                name="pernyataan"
-                                required
-                                placeholder="Indikator kinerja..."
-                                className="text-xs sm:col-span-2"
-                              />
-                              <div className="flex gap-1.5">
-                                <input
-                                  name="buktiDiminta"
-                                  placeholder="Dokumen bukti..."
+                              <div className="space-y-1">
+                                <label>Isi Pernyataan Standar</label>
+                                <textarea
+                                  name="pernyataanStandar"
+                                  rows={2}
+                                  defaultValue={lastPs}
+                                  placeholder="Isi pernyataan standar..."
                                   className="w-full text-xs"
                                 />
-                                <button className="btn shrink-0 text-xs">+ Tambah</button>
                               </div>
-                            </div>
-                          </form>
+
+                              <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
+                                <input
+                                  name="kode"
+                                  required
+                                  defaultValue={`IK${group.items.length + 1}`}
+                                  placeholder="IK..."
+                                  className="font-mono text-xs"
+                                />
+                                <input
+                                  name="pernyataan"
+                                  required
+                                  placeholder="Indikator kinerja..."
+                                  className="text-xs sm:col-span-2"
+                                />
+                                <div className="flex gap-1.5">
+                                  <input
+                                    name="buktiDiminta"
+                                    placeholder="Dokumen bukti..."
+                                    className="w-full text-xs"
+                                  />
+                                  <button className="btn shrink-0 text-xs">+ Tambah</button>
+                                </div>
+                              </div>
+                            </form>
+                          )}
                         </div>
                       );
                     })}

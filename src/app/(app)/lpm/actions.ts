@@ -423,6 +423,15 @@ export async function tambahIndikator(fd: FormData) {
   }
 
   for (const p of periodes) {
+    if (p.sourceLocked) {
+      fail(
+        returnTo,
+        `Indikator pada sesi "${p.nama}" sedang TERKUNCI. Klik "🔓 Buka Kunci Indikator" terlebih dahulu jika ingin menambah atau mengedit indikator.`
+      );
+    }
+  }
+
+  for (const p of periodes) {
     const jml = await prisma.indikator.count({ where: { periodeId: p.id } });
     await prisma.indikator.upsert({
       where: { periodeId_standar_kode: { periodeId: p.id, standar, kode } },
@@ -463,8 +472,17 @@ export async function editIndikator(fd: FormData) {
     fail(returnTo, "Kode, standar, dan pernyataan indikator wajib diisi.");
   }
 
-  const existing = await prisma.indikator.findUnique({ where: { id: indikatorId } });
+  const existing = await prisma.indikator.findUnique({
+    where: { id: indikatorId },
+    include: { periode: true },
+  });
   if (!existing) fail(returnTo, "Indikator tidak ditemukan.");
+  if (existing.periode.sourceLocked) {
+    fail(
+      returnTo,
+      `Indikator pada sesi "${existing.periode.nama}" sedang TERKUNCI. Klik "🔓 Buka Kunci Indikator" terlebih dahulu jika ingin mengedit.`
+    );
+  }
 
   // Cek duplikat kode dalam sesi & standar yang sama jika kode/standar diubah
   if (kode !== existing.kode || standar !== existing.standar) {
@@ -500,16 +518,108 @@ export async function hapusIndikator(fd: FormData) {
   const user = await requireUser("LPM");
   const returnTo = str(fd, "returnTo", 200) || "/lpm/indikator";
   const indikatorId = str(fd, "indikatorId", 64);
-  const ind = await prisma.indikator.findUnique({ where: { id: indikatorId } });
+  const ind = await prisma.indikator.findUnique({
+    where: { id: indikatorId },
+    include: { periode: true },
+  });
   if (!ind) fail(returnTo, "Indikator tidak ditemukan.");
+  if (ind.periode.sourceLocked) {
+    fail(
+      returnTo,
+      `Indikator pada sesi "${ind.periode.nama}" sedang TERKUNCI. Klik "🔓 Buka Kunci Indikator" terlebih dahulu jika ingin menghapus.`
+    );
+  }
 
   await prisma.indikator.delete({ where: { id: indikatorId } });
   await catat(user.id, "HAPUS_INDIKATOR", ind.kode);
   revalidatePath("/lpm/indikator");
   revalidatePath("/lpm");
+  revalidatePath("/lpm/rekap");
   revalidatePath("/auditee");
   revalidatePath("/auditor");
   ok(returnTo, `Indikator "${ind.kode}" dihapus.`);
+}
+
+/**
+ * Hapus SEMUA Indikator pada 1 Sesi AMI atau Semua Sesi AMI (selama belum terkunci)
+ */
+export async function hapusSemuaIndikator(fd: FormData) {
+  const user = await requireUser("LPM");
+  const returnTo = str(fd, "returnTo", 200) || "/lpm/indikator";
+  const periodeId = str(fd, "periodeId", 64) || "ALL";
+
+  const targetPeriodes =
+    periodeId === "ALL"
+      ? await prisma.periode.findMany()
+      : await prisma.periode.findMany({ where: { id: periodeId } });
+
+  for (const p of targetPeriodes) {
+    if (p.sourceLocked) {
+      fail(
+        returnTo,
+        `Gagal menghapus: Indikator pada sesi "${p.nama}" sedang TERKUNCI. Buka kunci terlebih dahulu.`
+      );
+    }
+  }
+
+  const deleted = await prisma.indikator.deleteMany({
+    where: periodeId === "ALL" ? {} : { periodeId },
+  });
+
+  await catat(
+    user.id,
+    "HAPUS_SEMUA_INDIKATOR",
+    `Hapus semua indikator (${deleted.count} indikator, target: ${periodeId})`
+  );
+  revalidatePath("/lpm/indikator");
+  revalidatePath("/lpm");
+  revalidatePath("/lpm/rekap");
+  revalidatePath("/auditee");
+  revalidatePath("/auditor");
+  ok(returnTo, `Berhasil menghapus ${deleted.count} indikator.`);
+}
+
+/**
+ * Kunci / Buka Kunci Indikator (Source Lock):
+ * - Saat DIKUNCI (sourceLocked = true): Indikator terkunci dari edit/hapus tidak sengaja di LPM,
+ *   dan OTOMATIS DITERBITKAN / MUNCUL di halaman Auditor & Auditee.
+ * - Saat DIBUKA (sourceLocked = false): LPM bisa menambah, mengedit, atau menghapus indikator.
+ */
+export async function toggleKunciIndikator(fd: FormData) {
+  const user = await requireUser("LPM");
+  const returnTo = str(fd, "returnTo", 200) || "/lpm/indikator";
+  const periodeId = str(fd, "periodeId", 64) || "ALL";
+  const lockAction = str(fd, "lockAction", 16); // "LOCK" | "UNLOCK"
+
+  const nextLocked = lockAction === "LOCK";
+
+  if (periodeId === "ALL") {
+    await prisma.periode.updateMany({
+      data: { sourceLocked: nextLocked },
+    });
+  } else {
+    await prisma.periode.update({
+      where: { id: periodeId },
+      data: { sourceLocked: nextLocked },
+    });
+  }
+
+  await catat(
+    user.id,
+    nextLocked ? "KUNCI_TERBITKAN_INDIKATOR" : "BUKA_KUNCI_INDIKATOR",
+    `Target: ${periodeId}`
+  );
+  revalidatePath("/lpm/indikator");
+  revalidatePath("/lpm");
+  revalidatePath("/lpm/rekap");
+  revalidatePath("/auditee");
+  revalidatePath("/auditor");
+  ok(
+    returnTo,
+    nextLocked
+      ? "🔒 Indikator berhasil DIKUNCI & DITERBITKAN ke halaman Auditor dan Auditee!"
+      : "🔓 Kunci Indikator DIBUKA. Silakan tambah/edit/hapus indikator, lalu klik Kunci kembali setelah selesai."
+  );
 }
 
 /**
@@ -524,6 +634,19 @@ export async function ubahNamaStandar(fd: FormData) {
 
   if (!standarLama || !standarBaru) {
     fail(returnTo, "Nama standar lama dan baru wajib diisi.");
+  }
+
+  const checkPeriodes =
+    periodeId === "ALL"
+      ? await prisma.periode.findMany()
+      : await prisma.periode.findMany({ where: { id: periodeId } });
+  for (const p of checkPeriodes) {
+    if (p.sourceLocked) {
+      fail(
+        returnTo,
+        `Indikator pada sesi "${p.nama}" sedang TERKUNCI. Buka kunci terlebih dahulu untuk mengubah nama standar.`
+      );
+    }
   }
 
   await prisma.indikator.updateMany({
@@ -553,6 +676,19 @@ export async function hapusStandarEmergency(fd: FormData) {
 
   if (!standar) {
     fail(returnTo, "Nama standar tidak valid.");
+  }
+
+  const checkPeriodes =
+    !periodeId || periodeId === "ALL"
+      ? await prisma.periode.findMany()
+      : await prisma.periode.findMany({ where: { id: periodeId } });
+  for (const p of checkPeriodes) {
+    if (p.sourceLocked) {
+      fail(
+        returnTo,
+        `Indikator pada sesi "${p.nama}" sedang TERKUNCI. Buka kunci terlebih dahulu untuk menghapus standar.`
+      );
+    }
   }
 
   const deleted = await prisma.indikator.deleteMany({
@@ -612,6 +748,15 @@ export async function importBatchIndikatorExcel(
 
   if (periodes.length === 0) {
     return { ok: false, error: "Sesi AMI belum ditemukan. Buat Sesi AMI terlebih dahulu." };
+  }
+
+  for (const p of periodes) {
+    if (p.sourceLocked) {
+      return {
+        ok: false,
+        error: `Indikator pada sesi "${p.nama}" sedang TERKUNCI. Klik "🔓 Buka Kunci Indikator" terlebih dahulu sebelum mengimport Excel.`,
+      };
+    }
   }
 
   let addedCount = 0;

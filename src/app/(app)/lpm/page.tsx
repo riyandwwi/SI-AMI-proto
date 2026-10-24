@@ -18,6 +18,7 @@ import {
   buatSesiAmi,
   editIndikator,
   hapusIndikator,
+  hapusSemuaIndikator,
   hapusSesiAmi,
   hapusStandarEmergency,
   hapusUserEmergencyOlehLpm,
@@ -25,6 +26,7 @@ import {
   pilihKetuaSesiAmi,
   tambahIndikator,
   tambahUserEmergencyOlehLpm,
+  toggleKunciIndikator,
   toggleStatusSesi,
   tugaskanAuditorKeSesi,
 } from "./actions";
@@ -457,59 +459,130 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
             <Empty>Belum ada Sesi AMI.</Empty>
           ) : (
             <>
-              <div className="card flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-base font-black text-black">
-                  {activePeriodeForPantau.nama}
-                </h2>
-                <div className="flex flex-wrap gap-1.5">
-                  {periodes.map((p) => (
-                    <Link
-                      key={p.id}
-                      href={`/lpm?tab=pantau&periodeId=${p.id}`}
-                      className={p.id === activePeriodeForPantau.id ? "btn text-xs" : "btn-secondary text-xs"}
-                    >
-                      {p.unit?.nama ?? p.nama} ({p.semester})
-                    </Link>
-                  ))}
+              <div className="card space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-base font-black text-black">
+                      {activePeriodeForPantau.nama}
+                    </h2>
+                    {activePeriodeForPantau.sourceLocked ? (
+                      <Badge tone="green">
+                        🔒 Terkunci &amp; Diterbitkan ke Auditor/Auditee
+                      </Badge>
+                    ) : (
+                      <Badge tone="amber">
+                        🔓 Belum Dikunci (Belum Masuk ke Auditor/Auditee)
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {periodes.map((p) => (
+                      <Link
+                        key={p.id}
+                        href={`/lpm?tab=pantau&periodeId=${p.id}`}
+                        className={p.id === activePeriodeForPantau.id ? "btn text-xs" : "btn-secondary text-xs"}
+                      >
+                        {p.unit?.nama ?? p.nama} ({p.semester})
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Bar Kontrol Kunci Indikator & Hapus Semua Indikator */}
+                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-black/15 pt-2.5">
+                  <div className="text-xs font-semibold text-slate-700">
+                    {activePeriodeForPantau.sourceLocked
+                      ? "🔒 Indikator terkunci permanen & sudah tampil di halaman Auditor dan Auditee."
+                      : "🔓 Setelah selesai mengisi/mengimport indikator, klik Kunci agar indikator tampil di halaman Auditor & Auditee."}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <form action={toggleKunciIndikator}>
+                      <input type="hidden" name="periodeId" value={activePeriodeForPantau.id} />
+                      <input
+                        type="hidden"
+                        name="lockAction"
+                        value={activePeriodeForPantau.sourceLocked ? "UNLOCK" : "LOCK"}
+                      />
+                      <input
+                        type="hidden"
+                        name="returnTo"
+                        value={`/lpm?tab=pantau&periodeId=${activePeriodeForPantau.id}`}
+                      />
+                      <button
+                        className={
+                          activePeriodeForPantau.sourceLocked
+                            ? "btn-secondary text-xs"
+                            : "btn-success text-xs"
+                        }
+                      >
+                        {activePeriodeForPantau.sourceLocked
+                          ? "🔓 Buka Kunci Indikator (Untuk Edit)"
+                          : "🔒 Kunci & Terbitkan ke Auditor/Auditee"}
+                      </button>
+                    </form>
+
+                    {!activePeriodeForPantau.sourceLocked &&
+                      activePeriodeForPantau.indikator.length > 0 && (
+                        <form action={hapusSemuaIndikator}>
+                          <input
+                            type="hidden"
+                            name="periodeId"
+                            value={activePeriodeForPantau.id}
+                          />
+                          <input
+                            type="hidden"
+                            name="returnTo"
+                            value={`/lpm?tab=pantau&periodeId=${activePeriodeForPantau.id}`}
+                          />
+                          <button className="btn-danger text-xs">
+                            🗑️ Hapus Semua Indikator ({activePeriodeForPantau.indikator.length})
+                          </button>
+                        </form>
+                      )}
+                  </div>
                 </div>
               </div>
 
-              {/* Import Indikator via Excel (Aman & Anti Tumpang Tindih) */}
-              <ImportIndikatorExcel
-                periodes={periodes.map((p) => ({
-                  id: p.id,
-                  nama: p.nama,
-                  existingCodes: p.indikator.map(
-                    (i) => `${i.standar.toUpperCase()}|||${i.kode.toUpperCase()}`
-                  ),
-                }))}
-                defaultPeriodeId={activePeriodeForPantau.id}
-              />
+              {!activePeriodeForPantau.sourceLocked && (
+                <>
+                  {/* Import Indikator via Excel (Aman & Anti Tumpang Tindih) */}
+                  <ImportIndikatorExcel
+                    periodes={periodes.map((p) => ({
+                      id: p.id,
+                      nama: p.nama,
+                      existingCodes: p.indikator.map(
+                        (i) => `${i.standar.toUpperCase()}|||${i.kode.toUpperCase()}`
+                      ),
+                    }))}
+                    defaultPeriodeId={activePeriodeForPantau.id}
+                  />
 
-              {/* Form Bertahap Manual: 1. Standar -> 2. Pernyataan Standar -> 3. Indikator */}
-              <FormStandarBertahap
-                returnTo={`/lpm?tab=pantau&periodeId=${activePeriodeForPantau.id}`}
-                periodes={periodes.map((p) => ({ id: p.id, nama: p.nama }))}
-                defaultPeriodeId={activePeriodeForPantau.id}
-                existingStandarList={(() => {
-                  const stdMap = new Map<string, Set<string>>();
-                  const cntMap = new Map<string, number>();
-                  for (const ind of activePeriodeForPantau.indikator) {
-                    if (!ind.standar) continue;
-                    if (!stdMap.has(ind.standar)) stdMap.set(ind.standar, new Set<string>());
-                    if (ind.pernyataanStandar) stdMap.get(ind.standar)!.add(ind.pernyataanStandar);
-                    cntMap.set(ind.standar, (cntMap.get(ind.standar) ?? 0) + 1);
-                  }
-                  const list: ExistingStandarInfo[] = Array.from(stdMap.entries()).map(
-                    ([standar, psSet]) => ({
-                      standar,
-                      pernyataanStandarList: Array.from(psSet),
-                      nextIkNumber: (cntMap.get(standar) ?? 0) + 1,
-                    })
-                  );
-                  return list;
-                })()}
-              />
+                  {/* Form Bertahap Manual: 1. Standar -> 2. Pernyataan Standar -> 3. Indikator */}
+                  <FormStandarBertahap
+                    returnTo={`/lpm?tab=pantau&periodeId=${activePeriodeForPantau.id}`}
+                    periodes={periodes.map((p) => ({ id: p.id, nama: p.nama }))}
+                    defaultPeriodeId={activePeriodeForPantau.id}
+                    existingStandarList={(() => {
+                      const stdMap = new Map<string, Set<string>>();
+                      const cntMap = new Map<string, number>();
+                      for (const ind of activePeriodeForPantau.indikator) {
+                        if (!ind.standar) continue;
+                        if (!stdMap.has(ind.standar)) stdMap.set(ind.standar, new Set<string>());
+                        if (ind.pernyataanStandar) stdMap.get(ind.standar)!.add(ind.pernyataanStandar);
+                        cntMap.set(ind.standar, (cntMap.get(ind.standar) ?? 0) + 1);
+                      }
+                      const list: ExistingStandarInfo[] = Array.from(stdMap.entries()).map(
+                        ([standar, psSet]) => ({
+                          standar,
+                          pernyataanStandarList: Array.from(psSet),
+                          nextIkNumber: (cntMap.get(standar) ?? 0) + 1,
+                        })
+                      );
+                      return list;
+                    })()}
+                  />
+                </>
+              )}
 
               {/* 2 Tab Tabel (1. Tabel Standar, Pernyataan Standar & Indikator | 2. Tabel Rekap Audit Sesi Sebelum Print) */}
               <TabelInstrumenDanRekap
@@ -574,18 +647,20 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                           </Badge>
                         </div>
 
-                        <form action={hapusStandarEmergency}>
-                          <input type="hidden" name="periodeId" value={activePeriodeForPantau.id} />
-                          <input type="hidden" name="standar" value={group.standar} />
-                          <input
-                            type="hidden"
-                            name="returnTo"
-                            value={`/lpm?tab=pantau&periodeId=${activePeriodeForPantau.id}`}
-                          />
-                          <button className="btn-danger text-xs">
-                            🗑️ Hapus Standar Ini
-                          </button>
-                        </form>
+                        {!activePeriodeForPantau.sourceLocked && (
+                          <form action={hapusStandarEmergency}>
+                            <input type="hidden" name="periodeId" value={activePeriodeForPantau.id} />
+                            <input type="hidden" name="standar" value={group.standar} />
+                            <input
+                              type="hidden"
+                              name="returnTo"
+                              value={`/lpm?tab=pantau&periodeId=${activePeriodeForPantau.id}`}
+                            />
+                            <button className="btn-danger text-xs">
+                              🗑️ Hapus Standar Ini
+                            </button>
+                          </form>
+                        )}
                       </div>
 
                       <table>
@@ -625,60 +700,62 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                                   )}
                                   <div className="mt-1 text-xs text-slate-800">{ind.pernyataan}</div>
 
-                                  <details className="mt-2">
-                                    <summary className="cursor-pointer text-xs font-black text-blue-700 hover:underline">
-                                      ✏️ Edit Indikator
-                                    </summary>
-                                    <form
-                                      action={editIndikator}
-                                      className="mt-2 space-y-1.5 rounded-xl border border-black/20 bg-[#FAF7EE] p-2.5 text-xs"
-                                    >
-                                      <input type="hidden" name="indikatorId" value={ind.id} />
-                                      <input
-                                        type="hidden"
-                                        name="returnTo"
-                                        value={`/lpm?tab=pantau&periodeId=${activePeriodeForPantau.id}`}
-                                      />
-                                      <input
-                                        name="kode"
-                                        required
-                                        defaultValue={ind.kode}
-                                        placeholder="Kode (IK)"
-                                        className="w-full font-mono text-xs"
-                                      />
-                                      <input
-                                        name="standar"
-                                        required
-                                        defaultValue={ind.standar}
-                                        placeholder="Standar"
-                                        className="w-full text-xs"
-                                      />
-                                      <textarea
-                                        name="pernyataanStandar"
-                                        rows={2}
-                                        defaultValue={ind.pernyataanStandar ?? ""}
-                                        placeholder="Isi pernyataan standar..."
-                                        className="w-full text-xs"
-                                      />
-                                      <input
-                                        name="buktiDiminta"
-                                        defaultValue={ind.buktiDiminta ?? ""}
-                                        placeholder="Dokumen bukti yang diminta..."
-                                        className="w-full text-xs"
-                                      />
-                                      <textarea
-                                        name="pernyataan"
-                                        rows={2}
-                                        required
-                                        defaultValue={ind.pernyataan}
-                                        placeholder="Indikator kinerja..."
-                                        className="w-full text-xs"
-                                      />
-                                      <button type="submit" className="btn-success w-full py-1 text-xs">
-                                        💾 Simpan Edit
-                                      </button>
-                                    </form>
-                                  </details>
+                                  {!activePeriodeForPantau.sourceLocked && (
+                                    <details className="mt-2">
+                                      <summary className="cursor-pointer text-xs font-black text-blue-700 hover:underline">
+                                        ✏️ Edit Indikator
+                                      </summary>
+                                      <form
+                                        action={editIndikator}
+                                        className="mt-2 space-y-1.5 rounded-xl border border-black/20 bg-[#FAF7EE] p-2.5 text-xs"
+                                      >
+                                        <input type="hidden" name="indikatorId" value={ind.id} />
+                                        <input
+                                          type="hidden"
+                                          name="returnTo"
+                                          value={`/lpm?tab=pantau&periodeId=${activePeriodeForPantau.id}`}
+                                        />
+                                        <input
+                                          name="kode"
+                                          required
+                                          defaultValue={ind.kode}
+                                          placeholder="Kode (IK)"
+                                          className="w-full font-mono text-xs"
+                                        />
+                                        <input
+                                          name="standar"
+                                          required
+                                          defaultValue={ind.standar}
+                                          placeholder="Standar"
+                                          className="w-full text-xs"
+                                        />
+                                        <textarea
+                                          name="pernyataanStandar"
+                                          rows={2}
+                                          defaultValue={ind.pernyataanStandar ?? ""}
+                                          placeholder="Isi pernyataan standar..."
+                                          className="w-full text-xs"
+                                        />
+                                        <input
+                                          name="buktiDiminta"
+                                          defaultValue={ind.buktiDiminta ?? ""}
+                                          placeholder="Dokumen bukti yang diminta..."
+                                          className="w-full text-xs"
+                                        />
+                                        <textarea
+                                          name="pernyataan"
+                                          rows={2}
+                                          required
+                                          defaultValue={ind.pernyataan}
+                                          placeholder="Indikator kinerja..."
+                                          className="w-full text-xs"
+                                        />
+                                        <button type="submit" className="btn-success w-full py-1 text-xs">
+                                          💾 Simpan Edit
+                                        </button>
+                                      </form>
+                                    </details>
+                                  )}
                                 </td>
 
                                 <td className="space-y-1.5 text-xs">
@@ -798,15 +875,19 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                                 </td>
 
                                 <td className="text-right">
-                                  <form action={hapusIndikator}>
-                                    <input type="hidden" name="indikatorId" value={ind.id} />
-                                    <input
-                                      type="hidden"
-                                      name="returnTo"
-                                      value={`/lpm?tab=pantau&periodeId=${activePeriodeForPantau.id}`}
-                                    />
-                                    <button className="btn-danger text-xs">Hapus</button>
-                                  </form>
+                                  {!activePeriodeForPantau.sourceLocked ? (
+                                    <form action={hapusIndikator}>
+                                      <input type="hidden" name="indikatorId" value={ind.id} />
+                                      <input
+                                        type="hidden"
+                                        name="returnTo"
+                                        value={`/lpm?tab=pantau&periodeId=${activePeriodeForPantau.id}`}
+                                      />
+                                      <button className="btn-danger text-xs">🗑️ Hapus</button>
+                                    </form>
+                                  ) : (
+                                    <Badge tone="slate">🔒 Terkunci</Badge>
+                                  )}
                                 </td>
                               </tr>
                             );

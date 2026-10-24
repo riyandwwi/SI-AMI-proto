@@ -57,48 +57,48 @@ export function ImportIndikatorExcel({
 
     const templateData = [
       {
-        NO: 1,
-        STANDAR: "Standar Kompetensi Lulusan",
-        PERNYATAAN_STANDAR: contohPernyataanStandar1,
-        KODE: "IK1",
-        PERNYATAAN:
+        "No.": "1.1",
+        Standar: "Standar Kompetensi Lulusan",
+        "Isi Pernyataan Standar": contohPernyataanStandar1,
+        IK: "IK1",
+        "Indikator Kinerja":
           "Tersedia CPL PS yang mencakup kompetensi penguasaan ilmu pengetahuan, teknologi, serta kecakapan/keterampilan spesifik dan aplikasinya sesuai bidang ilmu yang dipelajarinya",
-        DOKUMEN_BUKTI: "Dokumen Kurikulum Program Studi yang memuat CPL",
+        "Dokumen Bukti": "Dokumen Kurikulum Program Studi yang memuat CPL",
       },
       {
-        NO: 2,
-        STANDAR: "Standar Kompetensi Lulusan",
-        PERNYATAAN_STANDAR: contohPernyataanStandar1,
-        KODE: "IK2",
-        PERNYATAAN:
+        "No.": "",
+        Standar: "Standar Kompetensi Lulusan",
+        "Isi Pernyataan Standar": "",
+        IK: "IK2",
+        "Indikator Kinerja":
           "Tersedia CPL PS yang mencakup kompetensi kecakapan umum sebagai dasar penguasaan IPTEK dan kesiapan kerja yang mencakup komunikasi, kolaborasi, literasi digital, serta etika profesional",
-        DOKUMEN_BUKTI: "Dokumen Kurikulum Program Studi yang memuat CPL",
+        "Dokumen Bukti": "Dokumen Kurikulum Program Studi yang memuat CPL",
       },
       {
-        NO: 3,
-        STANDAR: "Standar Isi Pembelajaran",
-        PERNYATAAN_STANDAR:
+        "No.": "2.1",
+        Standar: "Standar Isi Pembelajaran",
+        "Isi Pernyataan Standar":
           "UPPS memastikan materi pembelajaran setiap program studi wajib memperhatikan perkembangan ilmu pengetahuan dan teknologi yang menjadi dasar keilmuan program studi.",
-        KODE: "IK1",
-        PERNYATAAN:
+        IK: "IK1",
+        "Indikator Kinerja":
           "Tersedia dokumen kurikulum yang memuat materi pembelajaran sesuai perkembangan dasar keilmuan",
-        DOKUMEN_BUKTI:
+        "Dokumen Bukti":
           "Dokumen Kurikulum PS yang memuat materi pembelajaran sesuai perkembangan keilmuan",
       },
     ];
 
     const ws = XLSX.utils.json_to_sheet(templateData);
     ws["!cols"] = [
-      { wch: 6 },
+      { wch: 8 },
       { wch: 28 },
       { wch: 55 },
-      { wch: 12 },
+      { wch: 10 },
       { wch: 55 },
-      { wch: 40 },
+      { wch: 42 },
     ];
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Template_Indikator_AMI");
-    XLSX.writeFile(wb, "Template_Indikator_AMI_ITBMP.xlsx");
+    XLSX.utils.book_append_sheet(wb, ws, "Standar Kompetensi Lulusan");
+    XLSX.writeFile(wb, "Template_Instrumen_AMI_ITBMP.xlsx");
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -319,6 +319,13 @@ export function ImportIndikatorExcel({
           ✓ {successMsg}
         </div>
       )}
+
+      <div className="rounded-xl border border-black/15 bg-[#FAF7EE] px-3 py-2 text-xs text-slate-700">
+        <strong>Format Kolom Excel yang Didukung:</strong>{" "}
+        <code className="rounded bg-[#FEF08A] px-1.5 py-0.5 font-black text-black">
+          No. | Standar (atau otomatis dari Nama Sheet) | Isi Pernyataan Standar | IK | Indikator Kinerja | Dokumen Bukti
+        </code>
+      </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="space-y-1">

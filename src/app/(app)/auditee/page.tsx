@@ -190,7 +190,11 @@ export default async function AuditeePage({ searchParams }: { searchParams: SP }
         </div>
       )}
 
-      {clientItems.length === 0 ? (
+      {!periode.sourceLocked ? (
+        <Empty>
+          ⏳ Instrumen &amp; Indikator sedang disusun atau diedit oleh LPM. Indikator akan otomatis muncul di halaman Auditee setelah dikunci oleh LPM.
+        </Empty>
+      ) : clientItems.length === 0 ? (
         <Empty>Belum ada indikator.</Empty>
       ) : (
         <>
