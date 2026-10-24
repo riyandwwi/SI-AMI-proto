@@ -186,24 +186,24 @@ export function TabelInstrumenDanRekap({
 
                     return (
                       <tr key={ind.id}>
-                        <td className="text-center font-mono text-xs font-black">#{noUrut}</td>
-                        <td className="text-xs font-bold">{ind.standar}</td>
-                        <td className="text-xs leading-relaxed text-slate-800">
+                        <td className="text-center font-mono text-sm font-black text-black">#{noUrut}</td>
+                        <td className="text-sm font-black text-black">{ind.standar}</td>
+                        <td className="text-sm font-semibold leading-relaxed text-black">
                           {samePernyataanStandar ? (
-                            <span className="italic text-slate-500">
-                              ↳ (Sama dengan pernyataan standar di atas)
+                            <span className="font-semibold text-black">
+                              {ind.pernyataanStandar}
                             </span>
                           ) : (
-                            ind.pernyataanStandar || <span className="text-slate-400">—</span>
+                            ind.pernyataanStandar || <span>—</span>
                           )}
                         </td>
                         <td>
-                          <code className="rounded bg-[#BAE6FD] px-2 py-0.5 text-xs font-black">
+                          <code className="rounded bg-[#BAE6FD] px-2.5 py-0.5 text-xs font-black text-black">
                             {ind.kode}
                           </code>
                         </td>
-                        <td className="text-xs leading-relaxed">{ind.pernyataan}</td>
-                        <td className="text-xs text-slate-700">{ind.buktiDiminta || "—"}</td>
+                        <td className="text-sm font-semibold leading-relaxed text-black">{ind.pernyataan}</td>
+                        <td className="text-sm font-semibold text-black">{ind.buktiDiminta || "—"}</td>
                       </tr>
                     );
                   })}
@@ -243,16 +243,16 @@ export function TabelInstrumenDanRekap({
                     const isian = ind.isian;
                     return (
                       <tr key={ind.id}>
-                        <td className="text-center font-mono text-xs font-black">#{noUrut}</td>
-                        <td className="text-xs font-bold">{ind.standar}</td>
-                        <td className="text-xs text-slate-800">{ind.pernyataanStandar || "—"}</td>
+                        <td className="text-center font-mono text-sm font-black text-black">#{noUrut}</td>
+                        <td className="text-sm font-black text-black">{ind.standar}</td>
+                        <td className="text-sm font-semibold leading-relaxed text-black">{ind.pernyataanStandar || "—"}</td>
                         <td>
-                          <code className="rounded bg-[#BAE6FD] px-2 py-0.5 text-xs font-black">
+                          <code className="rounded bg-[#BAE6FD] px-2.5 py-0.5 text-xs font-black text-black">
                             {ind.kode}
                           </code>
                         </td>
-                        <td className="text-xs">{ind.pernyataan}</td>
-                        <td className="text-xs text-slate-700">{ind.buktiDiminta || "—"}</td>
+                        <td className="text-sm font-semibold leading-relaxed text-black">{ind.pernyataan}</td>
+                        <td className="text-sm font-semibold text-black">{ind.buktiDiminta || "—"}</td>
                         <td className="text-xs space-y-1">
                           <div>{isian?.klaim || <span className="text-slate-400">Belum diisi</span>}</div>
                           {isian?.linkDrive && (

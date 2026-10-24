@@ -676,11 +676,13 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                                     )}
                                   </div>
                                   {ind.pernyataanStandar && (
-                                    <div className="mt-1 rounded-lg border border-black/15 bg-[#FAF7EE] p-1.5 text-[11px] text-slate-700">
-                                      <strong>Pernyataan Standar:</strong> {ind.pernyataanStandar}
+                                    <div className="mt-1.5 text-sm font-semibold leading-relaxed text-black">
+                                      <strong className="font-black">Pernyataan Standar:</strong> {ind.pernyataanStandar}
                                     </div>
                                   )}
-                                  <div className="mt-1 text-xs text-slate-800">{ind.pernyataan}</div>
+                                  <div className="mt-1.5 text-sm font-semibold leading-relaxed text-black">
+                                    <strong className="font-black">Indikator ({ind.kode}):</strong> {ind.pernyataan}
+                                  </div>
                                 </td>
 
                                 <td className="space-y-1.5 text-xs">

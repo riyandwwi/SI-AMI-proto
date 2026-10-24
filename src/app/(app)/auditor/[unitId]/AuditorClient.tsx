@@ -827,14 +827,14 @@ export default function AuditorClient({
             </div>
 
             {ind.pernyataanStandar && (
-              <div className="rounded-xl border border-black/15 bg-[#FAF7EE] px-3 py-2 text-xs text-slate-800">
+              <p className="text-sm font-semibold leading-relaxed text-black">
                 <strong className="font-black text-black">📜 Isi Pernyataan Standar:</strong>{" "}
                 {ind.pernyataanStandar}
-              </div>
+              </p>
             )}
 
-            <p className="text-sm font-semibold text-slate-900">
-              <strong className="text-black">🎯 Indikator Kinerja ({ind.kode}):</strong>{" "}
+            <p className="text-sm font-semibold leading-relaxed text-black">
+              <strong className="font-black text-black">🎯 Indikator Kinerja ({ind.kode}):</strong>{" "}
               {ind.pernyataan}
             </p>
 

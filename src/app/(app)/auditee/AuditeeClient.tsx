@@ -520,7 +520,7 @@ export default function AuditeeClient({
                         {ind.kode}
                       </code>
                       {!isExpanded ? (
-                        <span className="line-clamp-1 max-w-xl text-xs font-semibold text-[#FAF7EE]/90">
+                        <span className="line-clamp-1 max-w-xl text-sm font-semibold text-[#FAF7EE]">
                           {ind.pernyataan}
                         </span>
                       ) : (
@@ -592,14 +592,14 @@ export default function AuditeeClient({
                   {isExpanded && (
                     <div className="space-y-3 pt-1">
                       {ind.pernyataanStandar && (
-                        <div className="rounded-xl border border-white/15 bg-[#1E2229] px-3.5 py-2.5 text-xs text-[#EAE3D2]">
+                        <div className="rounded-xl border border-white/15 bg-[#1E2229] px-4 py-3 text-sm font-semibold leading-relaxed text-[#FAF7EE]">
                           <strong className="font-black text-[#FEF08A]">📜 Isi Pernyataan Standar:</strong>{" "}
                           {ind.pernyataanStandar}
                         </div>
                       )}
 
-                      <p className="text-sm font-semibold text-[#FAF7EE]">
-                        <strong className="text-[#FEF08A]">🎯 Indikator Kinerja ({ind.kode}):</strong>{" "}
+                      <p className="text-sm font-semibold leading-relaxed text-[#FAF7EE]">
+                        <strong className="font-black text-[#FEF08A]">🎯 Indikator Kinerja ({ind.kode}):</strong>{" "}
                         {ind.pernyataan}
                       </p>
 
