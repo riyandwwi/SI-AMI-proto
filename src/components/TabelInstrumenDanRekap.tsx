@@ -40,11 +40,15 @@ export function TabelInstrumenDanRekap({
   periodeNama,
   indikator,
   defaultTab = "instrumen",
+  hideHeaderButtons = false,
+  headerRight,
 }: {
   periodeId?: string;
   periodeNama?: string;
   indikator: RekapTableRowItem[];
   defaultTab?: "instrumen" | "rekap";
+  hideHeaderButtons?: boolean;
+  headerRight?: React.ReactNode;
 }) {
   const [activeTab, setActiveTab] = useState<"instrumen" | "rekap">(defaultTab);
   const [filterStandar, setFilterStandar] = useState<string>("SEMUA");
@@ -60,75 +64,92 @@ export function TabelInstrumenDanRekap({
 
   return (
     <div className="card space-y-3">
-      {/* Header 2 Tab + Tombol Print & Download Excel */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/15 pb-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setActiveTab("instrumen")}
-            className={activeTab === "instrumen" ? "btn text-xs" : "btn-secondary text-xs"}
-          >
-            📑 1. Tabel Standar, Pernyataan Standar &amp; Indikator ({indikator.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("rekap")}
-            className={activeTab === "rekap" ? "btn text-xs" : "btn-secondary text-xs"}
-          >
-            📊 2. Tabel Rekap Audit Sesi (Sebelum Print)
-          </button>
-        </div>
+      {/* Header 2 Tab + Tombol Print & Download Excel (Disembunyikan jika hideHeaderButtons=true di halaman Indikator LPM) */}
+      {!hideHeaderButtons ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/15 pb-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setActiveTab("instrumen")}
+              className={activeTab === "instrumen" ? "btn text-xs" : "btn-secondary text-xs"}
+            >
+              📑 1. Tabel Standar, Pernyataan Standar &amp; Indikator ({indikator.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("rekap")}
+              className={activeTab === "rekap" ? "btn text-xs" : "btn-secondary text-xs"}
+            >
+              📊 2. Tabel Rekap Audit Sesi (Sebelum Print)
+            </button>
+          </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <a
-            href={printUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn-secondary text-xs"
-          >
-            🖨️ Print Rekap
-          </a>
-          <a href={excelUrl} className="btn-success text-xs">
-            📥 Download Excel
-          </a>
+          <div className="flex flex-wrap items-center gap-2">
+            <a
+              href={printUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-secondary text-xs"
+            >
+              🖨️ Print Rekap
+            </a>
+            <a href={excelUrl} className="btn-success text-xs">
+              📥 Download Excel
+            </a>
+          </div>
         </div>
-      </div>
+      ) : (
+        (periodeNama || headerRight) && (
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/15 pb-2.5">
+            {periodeNama && (
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-sm font-black text-black">{periodeNama}</h3>
+                <Badge tone="blue">{standarGroups.length} Standar</Badge>
+                <Badge tone="purple">{indikator.length} Indikator</Badge>
+              </div>
+            )}
+            {headerRight && <div className="flex flex-wrap items-center gap-2">{headerRight}</div>}
+          </div>
+        )
+      )}
 
-      {periodeNama && (
+      {!hideHeaderButtons && periodeNama && (
         <div className="text-xs font-bold text-slate-700">
           Sesi: <strong className="text-black">{periodeNama}</strong>
         </div>
       )}
 
-      {/* Filter Standar */}
-      {standarGroups.length > 1 && (
-        <div className="flex flex-wrap items-center gap-1.5 rounded-2xl border border-black/20 bg-[#FAF7EE] px-3 py-2 text-xs">
-          <span className="font-black text-black">📂 Filter Standar:</span>
-          <button
-            type="button"
-            onClick={() => setFilterStandar("SEMUA")}
-            className={`rounded-lg border border-black px-2.5 py-0.5 font-black transition ${
-              filterStandar === "SEMUA"
-                ? "bg-[#FF5C38] text-white"
-                : "bg-white text-black hover:bg-[#FEF08A]"
-            }`}
-          >
-            Semua ({indikator.length})
-          </button>
-          {standarGroups.map((g) => (
-            <button
-              key={g.standar}
-              type="button"
-              onClick={() => setFilterStandar(g.standar)}
-              className={`rounded-lg border border-black px-2.5 py-0.5 font-bold transition ${
-                filterStandar === g.standar
-                  ? "bg-[#FEF08A] font-black text-black"
-                  : "bg-white text-black hover:bg-[#FEF08A]/50"
-              }`}
+      {/* Filter Standar Top-Down (Dropdown 1 Baris Minimalis, siap untuk 18 Standar LLDIKTI) */}
+      {standarGroups.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-black/20 bg-[#FAF7EE] px-3 py-2 text-xs">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+            <label className="shrink-0 font-black uppercase text-black">
+              📂 Pilih Standar:
+            </label>
+            <select
+              value={filterStandar}
+              onChange={(e) => setFilterStandar(e.target.value)}
+              className="min-w-[240px] max-w-full flex-1 rounded-xl border-2 border-black bg-white px-3 py-1.5 text-xs font-black text-black sm:max-w-md"
             >
-              {g.standar} ({g.startIndex}–{g.endIndex})
-            </button>
-          ))}
+              <option value="SEMUA">
+                Semua Standar ({standarGroups.length} Standar — {indikator.length} Indikator)
+              </option>
+              {standarGroups.map((g, idx) => (
+                <option key={g.standar} value={g.standar}>
+                  {idx + 1}. {g.standar} (Indikator #{g.startIndex}–#{g.endIndex} • {g.items.length} Butir)
+                </option>
+              ))}
+            </select>
+            {filterStandar !== "SEMUA" && (
+              <button
+                type="button"
+                onClick={() => setFilterStandar("SEMUA")}
+                className="btn-secondary px-2.5 py-1 text-xs"
+              >
+                ✕ Semua
+              </button>
+            )}
+          </div>
         </div>
       )}
 
