@@ -676,34 +676,38 @@ export default function AuditorClient({
         </div>
       )}
 
-      {standarGroups.length > 1 && (
-        <div className="flex flex-wrap items-center gap-2 rounded-2xl border-2 border-black bg-[#FAF7EE] px-4 py-2.5 text-xs shadow-[2px_2px_0px_#000]">
-          <span className="font-black text-black">📂 Filter Standar:</span>
-          <button
-            type="button"
-            onClick={() => setFilterStandar("SEMUA")}
-            className={`rounded-xl border border-black px-2.5 py-1 font-black transition ${
-              filterStandar === "SEMUA"
-                ? "bg-[#FF5C38] text-white"
-                : "bg-white text-black hover:bg-[#FEF08A]"
-            }`}
-          >
-            Semua Standar ({indikator.length})
-          </button>
-          {standarGroups.map((g) => (
-            <button
-              key={g.standar}
-              type="button"
-              onClick={() => setFilterStandar(g.standar)}
-              className={`rounded-xl border border-black px-2.5 py-1 font-bold transition ${
-                filterStandar === g.standar
-                  ? "bg-[#FEF08A] font-black text-black"
-                  : "bg-white text-black hover:bg-[#FEF08A]/50"
-              }`}
+      {standarGroups.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border-2 border-black bg-[#FAF7EE] px-4 py-2.5 text-xs shadow-[2px_2px_0px_#000]">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+            <label htmlFor="auditor-select-standar" className="shrink-0 font-black uppercase text-black">
+              📂 Filter Standar SPMI:
+            </label>
+            <select
+              id="auditor-select-standar"
+              value={filterStandar}
+              onChange={(e) => setFilterStandar(e.target.value)}
+              className="min-w-[240px] max-w-full flex-1 rounded-xl border-2 border-black bg-white px-3 py-1.5 text-xs font-black text-black sm:max-w-md"
             >
-              {g.standar} ({g.startIndex}–{g.endIndex})
-            </button>
-          ))}
+              <option value="SEMUA">
+                Semua Standar ({standarGroups.length} Standar — {indikator.length} Indikator)
+              </option>
+              {standarGroups.map((g, idx) => (
+                <option key={g.standar} value={g.standar}>
+                  {idx + 1}. {g.standar} (Indikator #{g.startIndex}–#{g.endIndex})
+                </option>
+              ))}
+            </select>
+            {filterStandar !== "SEMUA" && (
+              <button
+                type="button"
+                onClick={() => setFilterStandar("SEMUA")}
+                className="btn-secondary px-2.5 py-1 text-xs"
+              >
+                ✕ Semua
+              </button>
+            )}
+          </div>
+          <Badge tone="blue">{standarGroups.length} Standar SPMI</Badge>
         </div>
       )}
 

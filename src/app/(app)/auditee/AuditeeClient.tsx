@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { Klasifikasi, StatusDokumen, StatusRtl } from "@prisma/client";
@@ -344,7 +343,8 @@ export default function AuditeeClient({
       ? allGroups
       : allGroups.filter((g) => g.standar === standarFilter);
   const visibleFlatItems = visibleGroups.flatMap((g) => g.items.map((x) => x.item));
-  const detailHref = arsipId ? `/auditee/detail?arsipId=${arsipId}` : "/auditee/detail";
+  const allVisibleExpanded =
+    visibleFlatItems.length > 0 && visibleFlatItems.every((item) => Boolean(expandedIds[item.id]));
 
   return (
     <div className="space-y-4">
@@ -359,28 +359,43 @@ export default function AuditeeClient({
         </div>
       )}
 
-      {/* Bar Filter Standar SPMI + Tombol Cepat Minimize/Buka + Tombol Detail Indikator */}
-      <div className="card space-y-3 py-3 text-xs">
+      {/* Bar Filter Standar SPMI (1 Baris Minimalis via Dropdown) + 1 Tombol Toggle Buka/Minimize */}
+      <div className="card space-y-2.5 py-3 text-xs">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="font-black uppercase text-black">Standar SPMI:</span>
-            <button
-              type="button"
-              onClick={() => setStandarFilter("ALL")}
-              className={standarFilter === "ALL" ? "btn text-xs" : "btn-secondary text-xs"}
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+            <label htmlFor="select-standar-spmi" className="shrink-0 font-black uppercase text-black">
+              📂 Standar SPMI:
+            </label>
+            <select
+              id="select-standar-spmi"
+              value={standarFilter}
+              onChange={(e) => setStandarFilter(e.target.value)}
+              className="min-w-[240px] max-w-full flex-1 rounded-xl border-2 border-black bg-white px-3 py-1.5 text-xs font-black text-black sm:max-w-md"
             >
-              Semua Standar ({indikator.length})
-            </button>
-            {allGroups.map((g) => (
+              <option value="ALL">
+                Semua Standar ({allGroups.length} Standar — {indikator.length} Indikator)
+              </option>
+              {allGroups.map((g, idx) => {
+                const savedInGroup = g.items.filter(({ item }) =>
+                  Boolean((savedValues[item.id]?.linkDrive ?? item.isian?.linkDrive ?? "").trim()),
+                ).length;
+                return (
+                  <option key={g.standar} value={g.standar}>
+                    {idx + 1}. {g.standar} (#{g.startIndex}–#{g.endIndex}) — {savedInGroup}/{g.items.length} Terisi
+                  </option>
+                );
+              })}
+            </select>
+            {standarFilter !== "ALL" && (
               <button
-                key={g.standar}
                 type="button"
-                onClick={() => setStandarFilter(g.standar)}
-                className={standarFilter === g.standar ? "btn text-xs" : "btn-secondary text-xs"}
+                onClick={() => setStandarFilter("ALL")}
+                className="btn-secondary px-2.5 py-1 text-xs"
+                title="Tampilkan kembali semua standar"
               >
-                📂 {g.standar} ({g.startIndex}–{g.endIndex})
+                ✕ Semua
               </button>
-            ))}
+            )}
           </div>
 
           <div className="flex flex-wrap items-center gap-1.5">
@@ -389,29 +404,23 @@ export default function AuditeeClient({
             </Badge>
             <button
               type="button"
-              onClick={() => expandAllVisible(visibleFlatItems)}
-              className="btn-secondary px-2.5 py-1 text-xs"
-              title="Buka semua kotak isian indikator"
+              onClick={() => {
+                if (allVisibleExpanded) {
+                  minimizeAll();
+                } else {
+                  expandAllVisible(visibleFlatItems);
+                }
+              }}
+              className="btn-secondary px-3 py-1 text-xs"
             >
-              🔽 Buka Semua
+              {allVisibleExpanded ? "🔼 Minimize Semua" : "🔽 Buka Semua"}
             </button>
-            <button
-              type="button"
-              onClick={minimizeAll}
-              className="btn-secondary px-2.5 py-1 text-xs"
-              title="Minimize semua kotak isian indikator"
-            >
-              🔼 Minimize Semua
-            </button>
-            <Link href={detailHref} className="btn px-3 py-1 text-xs">
-              📑 Detail Indikator, Rekap &amp; TTD
-            </Link>
           </div>
         </div>
 
         {/* Ringkasan Siapa yang Sudah Menyimpan Indikator (Kolaborasi Tim Auditee) */}
         {kontribusiMap.size > 0 && (
-          <div className="flex flex-wrap items-center gap-2 border-t border-black/15 pt-2.5">
+          <div className="flex flex-wrap items-center gap-2 border-t border-black/15 pt-2">
             <span className="text-xs font-black uppercase text-black">Sudah Disimpan Oleh:</span>
             {Array.from(kontribusiMap.entries()).map(([nama, kodes]) => (
               <Badge key={nama} tone="blue">
