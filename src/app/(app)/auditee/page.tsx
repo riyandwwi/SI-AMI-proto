@@ -4,7 +4,6 @@ import { prisma } from "@/lib/prisma";
 import { sortPeriodesChronological } from "@/lib/periode";
 import { Badge, Empty, Flash, PageHeader, one, type SP } from "@/components/ui";
 import { SignaturePadCard } from "@/components/SignaturePadCard";
-import { TabelInstrumenDanRekap } from "@/components/TabelInstrumenDanRekap";
 import AuditeeClient, { type AuditeeIndikatorItem } from "./AuditeeClient";
 
 export default async function AuditeePage({ searchParams }: { searchParams: SP }) {
@@ -137,6 +136,16 @@ export default async function AuditeePage({ searchParams }: { searchParams: SP }
                 ? "🟢 Sesi Aktif Terbuka"
                 : "🔒 Sesi Terkunci"}
           </Badge>
+          <Link
+            href={
+              isReadOnlyArchive
+                ? `/auditee/detail?arsipId=${periode.id}`
+                : "/auditee/detail"
+            }
+            className="btn text-xs"
+          >
+            📑 Detail Indikator &amp; Rekap
+          </Link>
           <a
             href={`/api/rekap-excel?periodeId=${periode.id}&print=1`}
             target="_blank"
@@ -197,21 +206,13 @@ export default async function AuditeePage({ searchParams }: { searchParams: SP }
       ) : clientItems.length === 0 ? (
         <Empty>Belum ada indikator.</Empty>
       ) : (
-        <>
-          <TabelInstrumenDanRekap
-            periodeId={periode.id}
-            periodeNama={periode.nama}
-            indikator={clientItems}
-            defaultTab="instrumen"
-          />
-
-          <AuditeeClient
-            periodeId={periode.id}
-            unitId={user.unitId}
-            buka={buka}
-            indikator={clientItems}
-          />
-        </>
+        <AuditeeClient
+          periodeId={periode.id}
+          unitId={user.unitId}
+          buka={buka}
+          arsipId={isReadOnlyArchive ? periode.id : undefined}
+          indikator={clientItems}
+        />
       )}
 
       {/* Panel Tanda Tangan Ketua Auditee */}

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { Klasifikasi, StatusDokumen, StatusRtl } from "@prisma/client";
@@ -52,11 +53,13 @@ export default function AuditeeClient({
   periodeId,
   unitId,
   buka,
+  arsipId,
   indikator,
 }: {
   periodeId: string;
   unitId: string;
   buka: boolean;
+  arsipId?: string;
   indikator: AuditeeIndikatorItem[];
 }) {
   const router = useRouter();
@@ -89,6 +92,8 @@ export default function AuditeeClient({
     return init;
   });
 
+  // State buka/minimize per indikator (default semua ter-minimize agar ringkas)
+  const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [notice, setNotice] = useState<{ ok?: string; err?: string } | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [standarFilter, setStandarFilter] = useState<string>("ALL");
@@ -192,6 +197,41 @@ export default function AuditeeClient({
 
   const dirtyIds = indikator.map((i) => i.id).filter(isDirty);
 
+  // Single-Expand pintar: membuka indikator yang diklik & menutup indikator lain yang tidak punya ketikan belum disimpan
+  const toggleExpand = (indId: string) => {
+    setExpandedIds((prev) => {
+      const willOpen = !prev[indId];
+      if (!willOpen) {
+        const next = { ...prev };
+        delete next[indId];
+        return next;
+      }
+      const next: Record<string, boolean> = {};
+      // Pertahankan indikator lain yang sedang diketik (dirty) agar ketikan tidak tertutup tiba-tiba
+      for (const id of Object.keys(prev)) {
+        if (prev[id] && isDirty(id)) {
+          next[id] = true;
+        }
+      }
+      next[indId] = true;
+      return next;
+    });
+  };
+
+  const expandAllVisible = (visibleItems: AuditeeIndikatorItem[]) => {
+    setExpandedIds((prev) => {
+      const next = { ...prev };
+      for (const item of visibleItems) {
+        next[item.id] = true;
+      }
+      return next;
+    });
+  };
+
+  const minimizeAll = () => {
+    setExpandedIds({});
+  };
+
   const handleSaveIndikator = (targetIndikatorId?: string) => {
     setNotice(null);
     setSavingId(targetIndikatorId ?? "ALL");
@@ -222,6 +262,15 @@ export default function AuditeeClient({
               linkDrive: values[id]?.linkDrive ?? "",
               diisiOleh: res.diisiOleh ?? prev[id]?.diisiOleh ?? null,
             };
+          }
+          return next;
+        });
+
+        // Otomatis minimize indikator yang baru saja berhasil disimpan
+        setExpandedIds((prev) => {
+          const next = { ...prev };
+          for (const id of res.savedIds!) {
+            delete next[id];
           }
           return next;
         });
@@ -263,6 +312,13 @@ export default function AuditeeClient({
         return;
       }
 
+      // Otomatis minimize setelah RTL tersimpan
+      setExpandedIds((prev) => {
+        const next = { ...prev };
+        delete next[indId];
+        return next;
+      });
+
       setNotice({ ok: res.message ?? "RTL disimpan." });
       router.refresh();
     });
@@ -270,7 +326,10 @@ export default function AuditeeClient({
 
   // Kelompokkan indikator berdasarkan siapa Auditee yang sudah menyimpan
   const kontribusiMap = new Map<string, string[]>();
+  let totalTersimpan = 0;
   for (const ind of indikator) {
+    const savDrive = (savedValues[ind.id]?.linkDrive ?? ind.isian?.linkDrive ?? "").trim();
+    if (savDrive) totalTersimpan++;
     const namaPengisi = savedValues[ind.id]?.diisiOleh ?? ind.isian?.diisiOleh;
     if (namaPengisi) {
       const list = kontribusiMap.get(namaPengisi) ?? [];
@@ -284,6 +343,8 @@ export default function AuditeeClient({
     standarFilter === "ALL"
       ? allGroups
       : allGroups.filter((g) => g.standar === standarFilter);
+  const visibleFlatItems = visibleGroups.flatMap((g) => g.items.map((x) => x.item));
+  const detailHref = arsipId ? `/auditee/detail?arsipId=${arsipId}` : "/auditee/detail";
 
   return (
     <div className="space-y-4">
@@ -298,46 +359,73 @@ export default function AuditeeClient({
         </div>
       )}
 
-      {/* Filter Cepat per Standar SPMI */}
-      {allGroups.length > 1 && (
-        <div className="card flex flex-wrap items-center gap-2 py-3 text-xs">
-          <span className="font-black uppercase text-black">Standar SPMI:</span>
-          <button
-            type="button"
-            onClick={() => setStandarFilter("ALL")}
-            className={standarFilter === "ALL" ? "btn text-xs" : "btn-secondary text-xs"}
-          >
-            Semua Standar ({indikator.length} Indikator)
-          </button>
-          {allGroups.map((g) => (
+      {/* Bar Filter Standar SPMI + Tombol Cepat Minimize/Buka + Tombol Detail Indikator */}
+      <div className="card space-y-3 py-3 text-xs">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-black uppercase text-black">Standar SPMI:</span>
             <button
-              key={g.standar}
               type="button"
-              onClick={() => setStandarFilter(g.standar)}
-              className={standarFilter === g.standar ? "btn text-xs" : "btn-secondary text-xs"}
+              onClick={() => setStandarFilter("ALL")}
+              className={standarFilter === "ALL" ? "btn text-xs" : "btn-secondary text-xs"}
             >
-              📂 {g.standar} ({g.startIndex}–{g.endIndex})
+              Semua Standar ({indikator.length})
             </button>
-          ))}
-        </div>
-      )}
+            {allGroups.map((g) => (
+              <button
+                key={g.standar}
+                type="button"
+                onClick={() => setStandarFilter(g.standar)}
+                className={standarFilter === g.standar ? "btn text-xs" : "btn-secondary text-xs"}
+              >
+                📂 {g.standar} ({g.startIndex}–{g.endIndex})
+              </button>
+            ))}
+          </div>
 
-      {/* Ringkasan Siapa yang Sudah Menyimpan Indikator */}
-      {kontribusiMap.size > 0 && (
-        <div className="card flex flex-wrap items-center gap-2 py-3">
-          <span className="text-xs font-black uppercase text-black">Sudah Disimpan Oleh:</span>
-          {Array.from(kontribusiMap.entries()).map(([nama, kodes]) => (
-            <Badge key={nama} tone="blue">
-              👤 {nama}: {kodes.join(", ")}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Badge tone={totalTersimpan === indikator.length ? "green" : "blue"}>
+              ✅ Tersimpan: {totalTersimpan}/{indikator.length}
             </Badge>
-          ))}
+            <button
+              type="button"
+              onClick={() => expandAllVisible(visibleFlatItems)}
+              className="btn-secondary px-2.5 py-1 text-xs"
+              title="Buka semua kotak isian indikator"
+            >
+              🔽 Buka Semua
+            </button>
+            <button
+              type="button"
+              onClick={minimizeAll}
+              className="btn-secondary px-2.5 py-1 text-xs"
+              title="Minimize semua kotak isian indikator"
+            >
+              🔼 Minimize Semua
+            </button>
+            <Link href={detailHref} className="btn px-3 py-1 text-xs">
+              📑 Detail Indikator &amp; Rekap
+            </Link>
+          </div>
         </div>
-      )}
+
+        {/* Ringkasan Siapa yang Sudah Menyimpan Indikator (Kolaborasi Tim Auditee) */}
+        {kontribusiMap.size > 0 && (
+          <div className="flex flex-wrap items-center gap-2 border-t border-black/15 pt-2.5">
+            <span className="text-xs font-black uppercase text-black">Sudah Disimpan Oleh:</span>
+            {Array.from(kontribusiMap.entries()).map(([nama, kodes]) => (
+              <Badge key={nama} tone="blue">
+                👤 {nama}: {kodes.join(", ")}
+              </Badge>
+            ))}
+          </div>
+        )}
+      </div>
 
       {buka && dirtyIds.length > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-black bg-[#FEF08A] px-4 py-3 text-xs shadow-[4px_4px_0px_#000]">
           <div className="font-black text-black">
-            📝 {dirtyIds.length} indikator belum disimpan
+            📝 {dirtyIds.length} indikator sedang diketik &amp; belum disimpan
           </div>
           <button
             type="button"
@@ -350,241 +438,319 @@ export default function AuditeeClient({
         </div>
       )}
 
-      {visibleGroups.map((group) => (
-        <div key={group.standar} className="space-y-3 pt-1">
-          {/* Kepala Kelompok Standar (Misal: Standar Isi Pembelajaran — Indikator 1 s/d 6) */}
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border-2 border-black bg-[#FEF08A] px-4 py-2.5 shadow-[3px_3px_0px_#000]">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-black text-black">📂 {group.standar}</span>
-              <Badge tone="slate">
-                Indikator {group.startIndex} – {group.endIndex}
-              </Badge>
-            </div>
-            <Badge tone="blue">{group.items.length} Indikator</Badge>
-          </div>
+      {visibleGroups.map((group) => {
+        const groupSavedCount = group.items.filter(({ item }) =>
+          Boolean((savedValues[item.id]?.linkDrive ?? item.isian?.linkDrive ?? "").trim()),
+        ).length;
 
-          {group.items.map(({ item: ind, noUrut }) => {
-            const isian = ind.isian;
-            const cur = values[ind.id] ?? { klaim: "", linkDrive: "", rtlRencana: "", rtlLinkBukti: "" };
-            const sav = savedValues[ind.id] ?? { klaim: "", linkDrive: "", diisiOleh: null };
-            const dirty = isDirty(ind.id);
-            const hasSavedDrive = Boolean(sav.linkDrive.trim());
-            const lockedByAuditor = Boolean(isian?.terverifikasiAuditor || isian?.terverifikasiLapangan);
-            const lockedLapangan = Boolean(isian?.terverifikasiLapangan);
-            const canEdit = buka && !lockedByAuditor;
-            const perluRtl = isian?.klasifikasi && BUTUH_RTL.includes(isian.klasifikasi);
-            const namaPengisi = sav.diisiOleh ?? isian?.diisiOleh;
-
-            return (
-              <div
-                key={ind.id}
-                className={`card space-y-3 transition ${dirty ? "ring-2 ring-amber-300" : ""}`}
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/15 pb-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge tone="purple">Indikator #{noUrut}</Badge>
-                    <code className="rounded-xl border border-black/30 bg-[#BAE6FD] px-2.5 py-0.5 text-xs font-black text-black">
-                      {ind.kode}
-                    </code>
-                    <span className="text-sm font-black text-black">{ind.standar}</span>
-                    {ind.buktiDiminta && <Badge tone="slate">📋 Bukti: {ind.buktiDiminta}</Badge>}
-                  </div>
+        return (
+          <div key={group.standar} className="space-y-2.5 pt-1">
+            {/* Kepala Kelompok Standar */}
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border-2 border-black bg-[#FEF08A] px-4 py-2.5 shadow-[3px_3px_0px_#000]">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-black text-black">📂 {group.standar}</span>
+                <Badge tone="slate">
+                  Indikator #{group.startIndex} – #{group.endIndex}
+                </Badge>
+              </div>
               <div className="flex flex-wrap items-center gap-1.5">
-                {dirty && <Badge tone="amber">📝 Belum Disimpan</Badge>}
-                {namaPengisi && <Badge tone="blue">👤 {namaPengisi}</Badge>}
-                {lockedByAuditor ? (
-                  <Badge tone="purple">
-                    🔒 Dokumen Dikunci Auditor{isian?.diperiksaOleh ? ` (${isian.diperiksaOleh})` : ""}
-                  </Badge>
-                ) : (
-                  <Badge tone={hasSavedDrive ? "green" : "amber"}>
-                    {hasSavedDrive ? "✓ Tersimpan" : "Belum Diisi"}
-                  </Badge>
-                )}
-                {lockedLapangan && (
-                  <Badge tone="purple">🔒 Lapangan Terverifikasi</Badge>
-                )}
-                {isian?.klasifikasi && (
-                  <Badge
-                    tone={
-                      isian.klasifikasi === "MELAMPAUI" || isian.klasifikasi === "MENCAPAI"
-                        ? "green"
-                        : isian.klasifikasi === "OBSERVASI"
-                          ? "blue"
-                          : isian.klasifikasi === "KTS_MINOR"
-                            ? "amber"
-                            : "red"
-                    }
-                  >
-                    {KLASIFIKASI_LABEL[isian.klasifikasi]}
-                  </Badge>
-                )}
+                <Badge tone={groupSavedCount === group.items.length ? "green" : "blue"}>
+                  ✓ {groupSavedCount}/{group.items.length} Terisi
+                </Badge>
               </div>
             </div>
 
-            {ind.pernyataanStandar && (
-              <div className="rounded-xl border border-black/15 bg-[#FAF7EE] px-3 py-2 text-xs text-slate-800">
-                <strong className="font-black text-black">📜 Isi Pernyataan Standar:</strong>{" "}
-                {ind.pernyataanStandar}
-              </div>
-            )}
+            {group.items.map(({ item: ind, noUrut }) => {
+              const isian = ind.isian;
+              const cur = values[ind.id] ?? { klaim: "", linkDrive: "", rtlRencana: "", rtlLinkBukti: "" };
+              const sav = savedValues[ind.id] ?? { klaim: "", linkDrive: "", diisiOleh: null };
+              const dirty = isDirty(ind.id);
+              const hasSavedDrive = Boolean(sav.linkDrive.trim());
+              const lockedByAuditor = Boolean(isian?.terverifikasiAuditor || isian?.terverifikasiLapangan);
+              const lockedLapangan = Boolean(isian?.terverifikasiLapangan);
+              const canEdit = buka && !lockedByAuditor;
+              const perluRtl = isian?.klasifikasi && BUTUH_RTL.includes(isian.klasifikasi);
+              const namaPengisi = sav.diisiOleh ?? isian?.diisiOleh;
+              const isExpanded = Boolean(expandedIds[ind.id]);
 
-            <p className="text-sm font-semibold text-slate-900">
-              <strong className="text-black">🎯 Indikator Kinerja ({ind.kode}):</strong>{" "}
-              {ind.pernyataan}
-            </p>
+              // Gaya visual kartu saat ter-minimize vs terbuka agar yang sudah disave sangat jelas
+              const cardStyle = dirty
+                ? "border-l-8 border-l-amber-500 bg-[#FFFBEB] ring-2 ring-amber-300"
+                : hasSavedDrive
+                  ? "border-l-8 border-l-emerald-600 bg-[#F0FDF4]"
+                  : "bg-white";
 
-            {/* Form Evaluasi Diri & Link Google Drive */}
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleSaveIndikator(ind.id);
-              }}
-              className="grid grid-cols-1 gap-3 pt-1 md:grid-cols-2"
-            >
-              <div className="space-y-1">
-                <label>Evaluasi Diri</label>
-                <textarea
-                  name="klaim"
-                  rows={2}
-                  required
-                  disabled={!canEdit}
-                  value={cur.klaim}
-                  onChange={(e) => updateField(ind.id, "klaim", e.target.value)}
-                  placeholder="Isi evaluasi diri..."
-                  className="w-full"
-                />
-              </div>
-              <div className="space-y-1">
-                <label>Link Google Drive</label>
-                <div className="flex gap-2">
-                  <input
-                    name="linkDrive"
-                    type="url"
-                    required
-                    disabled={!canEdit}
-                    value={cur.linkDrive}
-                    onChange={(e) => updateField(ind.id, "linkDrive", e.target.value)}
-                    placeholder="https://drive.google.com/..."
-                    className="w-full font-mono text-xs"
-                  />
-                  {canEdit && (
-                    <button
-                      type="submit"
-                      disabled={isPending}
-                      className="btn shrink-0"
-                    >
-                      {isPending && (savingId === ind.id || savingId === "ALL")
-                        ? "..."
-                        : "Simpan"}
-                    </button>
-                  )}
-                </div>
-                {(sav.linkDrive || cur.linkDrive) && (
-                  <div className="pt-1 text-right text-xs">
-                    <a
-                      href={cur.linkDrive || sav.linkDrive}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-black text-blue-700 hover:underline"
-                    >
-                      ↗ Buka Drive
-                    </a>
-                  </div>
-                )}
-              </div>
-            </form>
-
-            {/* Catatan Auditor (Jika sudah diperiksa) */}
-            {(isian?.catatanDokumen || isian?.catatanLapangan || isian?.rekomendasi) && (
-              <div className="rounded-2xl border border-black/15 bg-[#FAF7EE] p-3.5 text-xs space-y-1">
-                {isian.diperiksaOleh && (
-                  <div className="font-black text-slate-700">🕵️ Auditor: {isian.diperiksaOleh}</div>
-                )}
-                {isian.catatanDokumen && (
-                  <div>
-                    <strong className="font-black text-black">Catatan Dokumen ({STATUS_DOK_LABEL[isian.statusDokumen]}):</strong> {isian.catatanDokumen}
-                  </div>
-                )}
-                {isian.catatanLapangan && (
-                  <div>
-                    <strong className="font-black text-black">Temuan Lapangan:</strong> {isian.catatanLapangan}
-                  </div>
-                )}
-                {isian.rekomendasi && (
-                  <div>
-                    <strong className="font-black text-black">Rekomendasi:</strong> {isian.rekomendasi}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Form Rencana Tindak Lanjut (RTL) jika terdapat temuan OB / KTS */}
-            {isian && perluRtl && (
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  handleSaveRtl(ind.id, isian.id);
-                }}
-                className="rounded-2xl border border-black/20 bg-[#FEF08A]/35 p-3.5 space-y-2.5"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-xs font-black text-black">
-                    🛠️ Tindak Lanjut (RTL) — {KLASIFIKASI_LABEL[isian.klasifikasi!]}
-                  </span>
-                  <Badge tone={isian.rtlStatus === "TERVERIFIKASI" ? "green" : "amber"}>
-                    {RTL_LABEL[isian.rtlStatus]}
-                  </Badge>
-                </div>
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                  <div className="space-y-1">
-                    <label>Tindakan Perbaikan</label>
-                    <input
-                      name="rtlRencana"
-                      required
-                      disabled={!buka || isian.rtlStatus === "TERVERIFIKASI"}
-                      value={cur.rtlRencana}
-                      onChange={(e) => updateField(ind.id, "rtlRencana", e.target.value)}
-                      placeholder="Tindakan perbaikan..."
-                      className="w-full"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label>Link Drive Bukti RTL</label>
-                    <div className="flex gap-2">
-                      <input
-                        name="rtlLinkBukti"
-                        type="url"
-                        disabled={!buka || isian.rtlStatus === "TERVERIFIKASI"}
-                        value={cur.rtlLinkBukti}
-                        onChange={(e) => updateField(ind.id, "rtlLinkBukti", e.target.value)}
-                        placeholder="https://drive.google.com/..."
-                        className="w-full font-mono text-xs"
-                      />
-                      {buka && isian.rtlStatus !== "TERVERIFIKASI" && (
-                        <button
-                          type="submit"
-                          disabled={isPending}
-                          className="btn shrink-0 text-xs"
-                        >
-                          {isPending && savingId === `RTL_${ind.id}` ? "..." : "Simpan RTL"}
-                        </button>
+              return (
+                <div
+                  key={ind.id}
+                  className={`card transition ${cardStyle} ${isExpanded ? "space-y-3 py-4" : "py-2.5"}`}
+                >
+                  {/* Baris Header Indikator (Klik untuk Buka / Minimize) */}
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => toggleExpand(ind.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        toggleExpand(ind.id);
+                      }
+                    }}
+                    className={`flex cursor-pointer select-none flex-wrap items-center justify-between gap-2 ${
+                      isExpanded ? "border-b border-black/15 pb-3" : ""
+                    }`}
+                  >
+                    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                      <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-black bg-white text-xs font-black text-black">
+                        {isExpanded ? "▼" : "▶"}
+                      </span>
+                      <Badge tone="purple">Indikator #{noUrut}</Badge>
+                      <code className="rounded-xl border border-black/30 bg-[#BAE6FD] px-2.5 py-0.5 text-xs font-black text-black">
+                        {ind.kode}
+                      </code>
+                      {!isExpanded ? (
+                        <span className="line-clamp-1 max-w-xl text-xs font-bold text-slate-800">
+                          {ind.pernyataan}
+                        </span>
+                      ) : (
+                        <span className="text-sm font-black text-black">{ind.standar}</span>
+                      )}
+                      {isExpanded && ind.buktiDiminta && (
+                        <Badge tone="slate">📋 Bukti: {ind.buktiDiminta}</Badge>
                       )}
                     </div>
+
+                    {/* Tanda Status Visual (Sangat Jelas Saat Minimize Maupun Expand) */}
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {dirty && <Badge tone="amber">📝 Belum Disimpan</Badge>}
+
+                      {hasSavedDrive ? (
+                        <Badge tone="green">
+                          ✅ Sudah Disimpan{namaPengisi ? ` (${namaPengisi})` : ""}
+                        </Badge>
+                      ) : (
+                        <Badge tone="amber">⏳ Belum Diisi</Badge>
+                      )}
+
+                      {lockedByAuditor && (
+                        <Badge tone="purple">
+                          🔒 Dikunci Auditor{isian?.diperiksaOleh ? ` (${isian.diperiksaOleh})` : ""}
+                        </Badge>
+                      )}
+
+                      {lockedLapangan && (
+                        <Badge tone="purple">🔒 Lapangan Terverifikasi</Badge>
+                      )}
+
+                      {isian?.klasifikasi && (
+                        <Badge
+                          tone={
+                            isian.klasifikasi === "MELAMPAUI" || isian.klasifikasi === "MENCAPAI"
+                              ? "green"
+                              : isian.klasifikasi === "OBSERVASI"
+                                ? "blue"
+                                : isian.klasifikasi === "KTS_MINOR"
+                                  ? "amber"
+                                  : "red"
+                          }
+                        >
+                          {KLASIFIKASI_LABEL[isian.klasifikasi]}
+                        </Badge>
+                      )}
+
+                      {perluRtl && (
+                        <Badge tone={isian?.rtlStatus === "TERVERIFIKASI" ? "green" : "red"}>
+                          🛠️ RTL: {RTL_LABEL[isian!.rtlStatus]}
+                        </Badge>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleExpand(ind.id);
+                        }}
+                        className="rounded-xl border border-black bg-white px-2.5 py-1 text-[11px] font-black text-black hover:bg-slate-100"
+                      >
+                        {isExpanded ? "▲ Minimize" : canEdit ? "▼ Isi" : "▼ Lihat"}
+                      </button>
+                    </div>
                   </div>
+
+                  {/* Isi Lengkap Indikator & Form Pengisian (Hanya tampil saat Expanded) */}
+                  {isExpanded && (
+                    <div className="space-y-3 pt-1">
+                      {ind.pernyataanStandar && (
+                        <div className="rounded-xl border border-black/15 bg-[#FAF7EE] px-3 py-2 text-xs text-slate-800">
+                          <strong className="font-black text-black">📜 Isi Pernyataan Standar:</strong>{" "}
+                          {ind.pernyataanStandar}
+                        </div>
+                      )}
+
+                      <p className="text-sm font-semibold text-slate-900">
+                        <strong className="text-black">🎯 Indikator Kinerja ({ind.kode}):</strong>{" "}
+                        {ind.pernyataan}
+                      </p>
+
+                      {/* Form Evaluasi Diri & Link Google Drive */}
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          handleSaveIndikator(ind.id);
+                        }}
+                        className="grid grid-cols-1 gap-3 pt-1 md:grid-cols-2"
+                      >
+                        <div className="space-y-1">
+                          <label>Evaluasi Diri</label>
+                          <textarea
+                            name="klaim"
+                            rows={2}
+                            required
+                            disabled={!canEdit}
+                            value={cur.klaim}
+                            onChange={(e) => updateField(ind.id, "klaim", e.target.value)}
+                            placeholder="Isi evaluasi diri..."
+                            className="w-full"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label>Link Google Drive</label>
+                          <div className="flex gap-2">
+                            <input
+                              name="linkDrive"
+                              type="url"
+                              required
+                              disabled={!canEdit}
+                              value={cur.linkDrive}
+                              onChange={(e) => updateField(ind.id, "linkDrive", e.target.value)}
+                              placeholder="https://drive.google.com/..."
+                              className="w-full font-mono text-xs"
+                            />
+                            {canEdit && (
+                              <button
+                                type="submit"
+                                disabled={isPending}
+                                className="btn shrink-0"
+                              >
+                                {isPending && (savingId === ind.id || savingId === "ALL")
+                                  ? "..."
+                                  : "💾 Simpan"}
+                              </button>
+                            )}
+                          </div>
+                          {(sav.linkDrive || cur.linkDrive) && (
+                            <div className="pt-1 text-right text-xs">
+                              <a
+                                href={cur.linkDrive || sav.linkDrive}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-black text-blue-700 hover:underline"
+                              >
+                                ↗ Buka Drive
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      </form>
+
+                      {/* Catatan Auditor (Jika sudah diperiksa) */}
+                      {(isian?.catatanDokumen || isian?.catatanLapangan || isian?.rekomendasi) && (
+                        <div className="space-y-1 rounded-2xl border border-black/15 bg-[#FAF7EE] p-3.5 text-xs">
+                          {isian.diperiksaOleh && (
+                            <div className="font-black text-slate-700">🕵️ Auditor: {isian.diperiksaOleh}</div>
+                          )}
+                          {isian.catatanDokumen && (
+                            <div>
+                              <strong className="font-black text-black">
+                                Catatan Dokumen ({STATUS_DOK_LABEL[isian.statusDokumen]}):
+                              </strong>{" "}
+                              {isian.catatanDokumen}
+                            </div>
+                          )}
+                          {isian.catatanLapangan && (
+                            <div>
+                              <strong className="font-black text-black">Temuan Lapangan:</strong>{" "}
+                              {isian.catatanLapangan}
+                            </div>
+                          )}
+                          {isian.rekomendasi && (
+                            <div>
+                              <strong className="font-black text-black">Rekomendasi:</strong>{" "}
+                              {isian.rekomendasi}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Form Rencana Tindak Lanjut (RTL) jika terdapat temuan OB / KTS */}
+                      {isian && perluRtl && (
+                        <form
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            handleSaveRtl(ind.id, isian.id);
+                          }}
+                          className="space-y-2.5 rounded-2xl border border-black/20 bg-[#FEF08A]/35 p-3.5"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="text-xs font-black text-black">
+                              🛠️ Tindak Lanjut (RTL) — {KLASIFIKASI_LABEL[isian.klasifikasi!]}
+                            </span>
+                            <Badge tone={isian.rtlStatus === "TERVERIFIKASI" ? "green" : "amber"}>
+                              {RTL_LABEL[isian.rtlStatus]}
+                            </Badge>
+                          </div>
+                          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                            <div className="space-y-1">
+                              <label>Tindakan Perbaikan</label>
+                              <input
+                                name="rtlRencana"
+                                required
+                                disabled={!buka || isian.rtlStatus === "TERVERIFIKASI"}
+                                value={cur.rtlRencana}
+                                onChange={(e) => updateField(ind.id, "rtlRencana", e.target.value)}
+                                placeholder="Tindakan perbaikan..."
+                                className="w-full"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label>Link Drive Bukti RTL</label>
+                              <div className="flex gap-2">
+                                <input
+                                  name="rtlLinkBukti"
+                                  type="url"
+                                  disabled={!buka || isian.rtlStatus === "TERVERIFIKASI"}
+                                  value={cur.rtlLinkBukti}
+                                  onChange={(e) => updateField(ind.id, "rtlLinkBukti", e.target.value)}
+                                  placeholder="https://drive.google.com/..."
+                                  className="w-full font-mono text-xs"
+                                />
+                                {buka && isian.rtlStatus !== "TERVERIFIKASI" && (
+                                  <button
+                                    type="submit"
+                                    disabled={isPending}
+                                    className="btn shrink-0 text-xs"
+                                  >
+                                    {isPending && savingId === `RTL_${ind.id}` ? "..." : "Simpan RTL"}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          {isian.rtlCatatanAuditor && (
+                            <div className="text-xs text-slate-700">
+                              <strong>Catatan RTL Auditor:</strong> {isian.rtlCatatanAuditor}
+                            </div>
+                          )}
+                        </form>
+                      )}
+                    </div>
+                  )}
                 </div>
-                {isian.rtlCatatanAuditor && (
-                  <div className="text-xs text-slate-700">
-                    <strong>Catatan RTL Auditor:</strong> {isian.rtlCatatanAuditor}
-                  </div>
-                )}
-              </form>
-            )}
+              );
+            })}
           </div>
-            );
-          })}
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
