@@ -3,7 +3,6 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { sortPeriodesChronological } from "@/lib/periode";
 import { Badge, Empty, Flash, PageHeader, one, type SP } from "@/components/ui";
-import { SignaturePadCard } from "@/components/SignaturePadCard";
 import AuditeeClient, { type AuditeeIndikatorItem } from "./AuditeeClient";
 
 export default async function AuditeePage({ searchParams }: { searchParams: SP }) {
@@ -144,7 +143,7 @@ export default async function AuditeePage({ searchParams }: { searchParams: SP }
             }
             className="btn text-xs"
           >
-            📑 Detail Indikator &amp; Rekap
+            📑 Detail Indikator, Rekap &amp; TTD
           </Link>
           <a
             href={`/api/rekap-excel?periodeId=${periode.id}&print=1`}
@@ -214,30 +213,6 @@ export default async function AuditeePage({ searchParams }: { searchParams: SP }
           indikator={clientItems}
         />
       )}
-
-      {/* Panel Tanda Tangan Ketua Auditee */}
-      <SignaturePadCard
-        session={{
-          periodeId: periode.id,
-          periodeNama: periode.nama,
-          ketuaAuditeeId: periode.ketuaAuditeeId,
-          ketuaAuditeeNama: periode.ketuaAuditeeNama,
-          ketuaAuditeeNip: periode.ketuaAuditeeNip,
-          hasTtdAuditee: Boolean(periode.ttdAuditee),
-          ttdAuditeePreview: periode.ttdAuditee,
-          ketuaAuditorId: periode.ketuaAuditorId,
-          ketuaAuditorNama: periode.ketuaAuditorNama,
-          ketuaAuditorNip: periode.ketuaAuditorNip,
-          hasTtdAuditor: Boolean(periode.ttdAuditor),
-          ttdAuditorPreview: periode.ttdAuditor,
-          kepalaLpmNama: periode.kepalaLpmNama ?? periode.disahkanOleh,
-          kepalaLpmNip: periode.kepalaLpmNip,
-          hasTtdLpm: Boolean(periode.ttdLpm),
-          ttdLpmPreview: periode.ttdLpm,
-        }}
-        currentUserId={user.id}
-        currentRole="AUDITEE"
-      />
     </>
   );
 }

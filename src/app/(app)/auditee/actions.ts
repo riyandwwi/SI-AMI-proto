@@ -136,6 +136,7 @@ export async function simpanBatchIsianAuditee(
   );
 
   revalidatePath("/auditee");
+  revalidatePath("/auditee/detail");
   revalidatePath("/auditor");
   revalidatePath("/lpm");
 
@@ -201,6 +202,7 @@ export async function simpanRtlAuditeeClient(payload: {
 
   await catat(user.id, "ISI_RTL_AUDITEE", `${user.nama}: ${isian.indikator.kode} -> ${nextStatus}`);
   revalidatePath("/auditee");
+  revalidatePath("/auditee/detail");
   revalidatePath("/auditor");
   revalidatePath("/lpm");
 

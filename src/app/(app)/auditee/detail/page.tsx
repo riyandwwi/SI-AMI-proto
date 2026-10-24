@@ -2,7 +2,8 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { sortPeriodesChronological } from "@/lib/periode";
-import { Badge, Empty, PageHeader, one, type SP } from "@/components/ui";
+import { Badge, Empty, Flash, PageHeader, one, type SP } from "@/components/ui";
+import { SignaturePadCard } from "@/components/SignaturePadCard";
 import { TabelInstrumenDanRekap } from "@/components/TabelInstrumenDanRekap";
 import type { AuditeeIndikatorItem } from "../AuditeeClient";
 
@@ -89,7 +90,7 @@ export default async function AuditeeDetailIndikatorPage({ searchParams }: { sea
   return (
     <>
       <PageHeader
-        title={`📑 Detail Indikator & Rekap — Prodi ${user.unit.nama} (${periode.tahun} ${periode.semester})`}
+        title={`📑 Detail Indikator, Rekap & TTD — Prodi ${user.unit.nama} (${periode.tahun} ${periode.semester})`}
       >
         <div className="flex flex-wrap items-center gap-2">
           <Link href={backHref} className="btn text-xs">
@@ -111,6 +112,7 @@ export default async function AuditeeDetailIndikatorPage({ searchParams }: { sea
           </a>
         </div>
       </PageHeader>
+      <Flash ok={one(sp.ok)} err={one(sp.err)} />
 
       {olderPeriodes.length > 0 && (
         <div className="card flex flex-wrap items-center justify-between gap-2 py-3 text-xs">
@@ -152,6 +154,30 @@ export default async function AuditeeDetailIndikatorPage({ searchParams }: { sea
           defaultTab={tabParam === "rekap" ? "rekap" : "instrumen"}
         />
       )}
+
+      {/* Panel Status & Tanda Tangan Laporan Ketua Auditee */}
+      <SignaturePadCard
+        session={{
+          periodeId: periode.id,
+          periodeNama: periode.nama,
+          ketuaAuditeeId: periode.ketuaAuditeeId,
+          ketuaAuditeeNama: periode.ketuaAuditeeNama,
+          ketuaAuditeeNip: periode.ketuaAuditeeNip,
+          hasTtdAuditee: Boolean(periode.ttdAuditee),
+          ttdAuditeePreview: periode.ttdAuditee,
+          ketuaAuditorId: periode.ketuaAuditorId,
+          ketuaAuditorNama: periode.ketuaAuditorNama,
+          ketuaAuditorNip: periode.ketuaAuditorNip,
+          hasTtdAuditor: Boolean(periode.ttdAuditor),
+          ttdAuditorPreview: periode.ttdAuditor,
+          kepalaLpmNama: periode.kepalaLpmNama ?? periode.disahkanOleh,
+          kepalaLpmNip: periode.kepalaLpmNip,
+          hasTtdLpm: Boolean(periode.ttdLpm),
+          ttdLpmPreview: periode.ttdLpm,
+        }}
+        currentUserId={user.id}
+        currentRole="AUDITEE"
+      />
     </>
   );
 }
