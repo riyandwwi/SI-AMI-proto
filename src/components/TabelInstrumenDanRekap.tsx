@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import type { Klasifikasi, StatusDokumen, StatusRtl } from "@prisma/client";
 import {
   KLASIFIKASI_LABEL,
@@ -52,12 +52,44 @@ export function TabelInstrumenDanRekap({
 }) {
   const [activeTab, setActiveTab] = useState<"instrumen" | "rekap">(defaultTab);
   const [filterStandar, setFilterStandar] = useState<string>("SEMUA");
+  // State buka/minimize per Standar (default semua ter-minimize agar ringkas saat ada 18 Standar)
+  const [expandedStandar, setExpandedStandar] = useState<Record<string, boolean>>({});
 
   const standarGroups = groupIndikatorByStandar(indikator);
   const visibleGroups =
     filterStandar === "SEMUA"
       ? standarGroups
       : standarGroups.filter((g) => g.standar === filterStandar);
+
+  const allVisibleExpanded =
+    visibleGroups.length > 0 &&
+    visibleGroups.every((g) => Boolean(expandedStandar[g.standar]));
+
+  const toggleStandar = (standarName: string) => {
+    setExpandedStandar((prev) => ({
+      ...prev,
+      [standarName]: !prev[standarName],
+    }));
+  };
+
+  const handleToggleAllStandar = () => {
+    if (allVisibleExpanded) {
+      setExpandedStandar({});
+    } else {
+      const next: Record<string, boolean> = { ...expandedStandar };
+      for (const g of visibleGroups) {
+        next[g.standar] = true;
+      }
+      setExpandedStandar(next);
+    }
+  };
+
+  const handleChangeFilterStandar = (val: string) => {
+    setFilterStandar(val);
+    if (val !== "SEMUA") {
+      setExpandedStandar((prev) => ({ ...prev, [val]: true }));
+    }
+  };
 
   const printUrl = `/api/rekap-excel?print=1${periodeId ? `&periodeId=${encodeURIComponent(periodeId)}` : ""}`;
   const excelUrl = `/api/rekap-excel${periodeId ? `?periodeId=${encodeURIComponent(periodeId)}` : ""}`;
@@ -119,7 +151,7 @@ export function TabelInstrumenDanRekap({
         </div>
       )}
 
-      {/* Filter Standar Top-Down (Dropdown 1 Baris Minimalis, siap untuk 18 Standar LLDIKTI) */}
+      {/* Filter Standar Top-Down (Dropdown 1 Baris Minimalis + 1 Tombol Toggle Buka/Minimize Semua Standar) */}
       {standarGroups.length > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-black/20 bg-[#FAF7EE] px-3 py-2 text-xs">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
@@ -128,7 +160,7 @@ export function TabelInstrumenDanRekap({
             </label>
             <select
               value={filterStandar}
-              onChange={(e) => setFilterStandar(e.target.value)}
+              onChange={(e) => handleChangeFilterStandar(e.target.value)}
               className="min-w-[240px] max-w-full flex-1 rounded-xl border-2 border-black bg-white px-3 py-1.5 text-xs font-black text-black sm:max-w-md"
             >
               <option value="SEMUA">
@@ -150,13 +182,21 @@ export function TabelInstrumenDanRekap({
               </button>
             )}
           </div>
+
+          <button
+            type="button"
+            onClick={handleToggleAllStandar}
+            className="btn-secondary px-3 py-1 text-xs"
+          >
+            {allVisibleExpanded ? "🔼 Minimize Semua Standar" : "🔽 Buka Semua Standar"}
+          </button>
         </div>
       )}
 
       {indikator.length === 0 ? (
         <Empty>Belum ada Standar &amp; Indikator pada sesi ini.</Empty>
       ) : activeTab === "instrumen" ? (
-        /* TAB 1: TABEL STANDAR, PERNYATAAN STANDAR & INDIKATOR */
+        /* TAB 1: TABEL STANDAR, PERNYATAAN STANDAR & INDIKATOR (Minimize per Standar) */
         <div className="overflow-x-auto">
           <table>
             <thead>
@@ -170,50 +210,71 @@ export function TabelInstrumenDanRekap({
               </tr>
             </thead>
             <tbody>
-              {visibleGroups.map((grp) => (
-                <>
-                  <tr key={`hdr-${grp.standar}`} className="bg-[#FEF08A]/80">
-                    <td colSpan={6} className="font-black text-xs text-black">
-                      📂 {grp.standar} — Indikator {grp.startIndex} s/d {grp.endIndex} ({grp.items.length} Indikator)
-                    </td>
-                  </tr>
-                  {grp.items.map(({ item: ind, noUrut }, idx) => {
-                    const prev = idx > 0 ? grp.items[idx - 1].item : null;
-                    const samePernyataanStandar =
-                      prev &&
-                      (prev.pernyataanStandar || "") !== "" &&
-                      (prev.pernyataanStandar || "") === (ind.pernyataanStandar || "");
-
-                    return (
-                      <tr key={ind.id}>
-                        <td className="text-center font-mono text-sm font-black text-black">#{noUrut}</td>
-                        <td className="text-sm font-black text-black">{ind.standar}</td>
-                        <td className="text-sm font-semibold leading-relaxed text-black">
-                          {samePernyataanStandar ? (
-                            <span className="font-semibold text-black">
-                              {ind.pernyataanStandar}
+              {visibleGroups.map((grp) => {
+                const isOpen = Boolean(expandedStandar[grp.standar]);
+                return (
+                  <Fragment key={`grp-${grp.standar}`}>
+                    <tr
+                      onClick={() => toggleStandar(grp.standar)}
+                      className="cursor-pointer select-none bg-[#FEF08A] transition hover:bg-[#fde047]"
+                    >
+                      <td colSpan={6} className="py-2.5">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex flex-wrap items-center gap-2 font-black text-sm text-black">
+                            <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg border border-black bg-white text-xs font-black text-black">
+                              {isOpen ? "▼" : "▶"}
                             </span>
-                          ) : (
-                            ind.pernyataanStandar || <span>—</span>
-                          )}
-                        </td>
-                        <td>
-                          <code className="rounded bg-[#BAE6FD] px-2.5 py-0.5 text-xs font-black text-black">
-                            {ind.kode}
-                          </code>
-                        </td>
-                        <td className="text-sm font-semibold leading-relaxed text-black">{ind.pernyataan}</td>
-                        <td className="text-sm font-semibold text-black">{ind.buktiDiminta || "—"}</td>
-                      </tr>
-                    );
-                  })}
-                </>
-              ))}
+                            <span>📂 {grp.standar}</span>
+                            <Badge tone="blue">
+                              Indikator #{grp.startIndex} – #{grp.endIndex} ({grp.items.length} Indikator)
+                            </Badge>
+                          </div>
+                          <span className="rounded-xl border border-black bg-white px-2.5 py-1 text-[11px] font-black text-black">
+                            {isOpen ? "▲ Minimize Standar" : "▼ Buka Standar"}
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+
+                    {isOpen &&
+                      grp.items.map(({ item: ind, noUrut }, idx) => {
+                        const prev = idx > 0 ? grp.items[idx - 1].item : null;
+                        const samePernyataanStandar =
+                          prev &&
+                          (prev.pernyataanStandar || "") !== "" &&
+                          (prev.pernyataanStandar || "") === (ind.pernyataanStandar || "");
+
+                        return (
+                          <tr key={ind.id}>
+                            <td className="text-center font-mono text-sm font-black text-black">#{noUrut}</td>
+                            <td className="text-sm font-black text-black">{ind.standar}</td>
+                            <td className="text-sm font-semibold leading-relaxed text-black">
+                              {samePernyataanStandar ? (
+                                <span className="font-semibold text-black">
+                                  {ind.pernyataanStandar}
+                                </span>
+                              ) : (
+                                ind.pernyataanStandar || <span>—</span>
+                              )}
+                            </td>
+                            <td>
+                              <code className="rounded bg-[#BAE6FD] px-2.5 py-0.5 text-xs font-black text-black">
+                                {ind.kode}
+                              </code>
+                            </td>
+                            <td className="text-sm font-semibold leading-relaxed text-black">{ind.pernyataan}</td>
+                            <td className="text-sm font-semibold text-black">{ind.buktiDiminta || "—"}</td>
+                          </tr>
+                        );
+                      })}
+                  </Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>
       ) : (
-        /* TAB 2: TABEL REKAP AUDIT SELAMA SESI (SEBELUM DI-PRINT) */
+        /* TAB 2: TABEL REKAP AUDIT SELAMA SESI (SEBELUM DI-PRINT) (Minimize per Standar) */
         <div className="overflow-x-auto">
           <table>
             <thead>
@@ -232,117 +293,138 @@ export function TabelInstrumenDanRekap({
               </tr>
             </thead>
             <tbody>
-              {visibleGroups.map((grp) => (
-                <>
-                  <tr key={`rekap-hdr-${grp.standar}`} className="bg-[#FEF08A]/80">
-                    <td colSpan={11} className="font-black text-xs text-black">
-                      📂 {grp.standar} — Indikator {grp.startIndex} s/d {grp.endIndex} ({grp.items.length} Indikator)
-                    </td>
-                  </tr>
-                  {grp.items.map(({ item: ind, noUrut }) => {
-                    const isian = ind.isian;
-                    return (
-                      <tr key={ind.id}>
-                        <td className="text-center font-mono text-sm font-black text-black">#{noUrut}</td>
-                        <td className="text-sm font-black text-black">{ind.standar}</td>
-                        <td className="text-sm font-semibold leading-relaxed text-black">{ind.pernyataanStandar || "—"}</td>
-                        <td>
-                          <code className="rounded bg-[#BAE6FD] px-2.5 py-0.5 text-xs font-black text-black">
-                            {ind.kode}
-                          </code>
-                        </td>
-                        <td className="text-sm font-semibold leading-relaxed text-black">{ind.pernyataan}</td>
-                        <td className="text-sm font-semibold text-black">{ind.buktiDiminta || "—"}</td>
-                        <td className="text-xs space-y-1">
-                          <div>{isian?.klaim || <span className="text-slate-400">Belum diisi</span>}</div>
-                          {isian?.linkDrive && (
-                            <div>
-                              <a
-                                href={isian.linkDrive}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="font-bold text-blue-700 underline"
-                              >
-                                📂 Buka Bukti Drive ↗
-                              </a>
-                            </div>
-                          )}
-                          {isian?.diisiOleh && (
-                            <div className="text-[11px] text-slate-500">Oleh: {isian.diisiOleh}</div>
-                          )}
-                        </td>
-                        <td className="text-xs space-y-1">
-                          <div>
-                            <Badge
-                              tone={
-                                isian?.statusDokumen === "LENGKAP"
-                                  ? "green"
-                                  : isian?.statusDokumen === "PERLU_KLARIFIKASI"
-                                    ? "amber"
-                                    : "slate"
-                              }
-                            >
-                              {isian ? STATUS_DOK_LABEL[isian.statusDokumen] : "Belum Diperiksa"}
+              {visibleGroups.map((grp) => {
+                const isOpen = Boolean(expandedStandar[grp.standar]);
+                return (
+                  <Fragment key={`rekap-grp-${grp.standar}`}>
+                    <tr
+                      onClick={() => toggleStandar(grp.standar)}
+                      className="cursor-pointer select-none bg-[#FEF08A] transition hover:bg-[#fde047]"
+                    >
+                      <td colSpan={11} className="py-2.5">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex flex-wrap items-center gap-2 font-black text-sm text-black">
+                            <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg border border-black bg-white text-xs font-black text-black">
+                              {isOpen ? "▼" : "▶"}
+                            </span>
+                            <span>📂 {grp.standar}</span>
+                            <Badge tone="blue">
+                              Indikator #{grp.startIndex} – #{grp.endIndex} ({grp.items.length} Indikator)
                             </Badge>
                           </div>
-                          {isian?.catatanDokumen && (
-                            <div className="text-slate-700">{isian.catatanDokumen}</div>
-                          )}
-                        </td>
-                        <td className="text-xs space-y-1">
-                          {isian?.klasifikasi ? (
-                            <Badge
-                              tone={
-                                isian.klasifikasi === "MELAMPAUI" || isian.klasifikasi === "MENCAPAI"
-                                  ? "green"
-                                  : isian.klasifikasi === "OBSERVASI"
-                                    ? "amber"
-                                    : "red"
-                              }
-                            >
-                              {KLASIFIKASI_LABEL[isian.klasifikasi]}
-                            </Badge>
-                          ) : (
-                            <span className="text-slate-400">—</span>
-                          )}
-                          {isian?.catatanLapangan && (
-                            <div className="text-slate-700">{isian.catatanLapangan}</div>
-                          )}
-                        </td>
-                        <td className="text-xs text-slate-700">
-                          {isian?.rekomendasi || "—"}
-                        </td>
-                        <td className="text-xs space-y-1">
-                          {isian?.rtlRencana ? (
-                            <>
-                              <div>{isian.rtlRencana}</div>
-                              {isian.rtlLinkBukti && (
-                                <a
-                                  href={isian.rtlLinkBukti}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="font-bold text-blue-700 underline"
-                                >
-                                  📂 Bukti RTL ↗
-                                </a>
+                          <span className="rounded-xl border border-black bg-white px-2.5 py-1 text-[11px] font-black text-black">
+                            {isOpen ? "▲ Minimize Standar" : "▼ Buka Standar"}
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+
+                    {isOpen &&
+                      grp.items.map(({ item: ind, noUrut }) => {
+                        const isian = ind.isian;
+                        return (
+                          <tr key={ind.id}>
+                            <td className="text-center font-mono text-sm font-black text-black">#{noUrut}</td>
+                            <td className="text-sm font-black text-black">{ind.standar}</td>
+                            <td className="text-sm font-semibold leading-relaxed text-black">{ind.pernyataanStandar || "—"}</td>
+                            <td>
+                              <code className="rounded bg-[#BAE6FD] px-2.5 py-0.5 text-xs font-black text-black">
+                                {ind.kode}
+                              </code>
+                            </td>
+                            <td className="text-sm font-semibold leading-relaxed text-black">{ind.pernyataan}</td>
+                            <td className="text-sm font-semibold text-black">{ind.buktiDiminta || "—"}</td>
+                            <td className="text-xs space-y-1">
+                              <div>{isian?.klaim || <span className="text-slate-400">Belum diisi</span>}</div>
+                              {isian?.linkDrive && (
+                                <div>
+                                  <a
+                                    href={isian.linkDrive}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="font-bold text-blue-700 underline"
+                                  >
+                                    📂 Buka Bukti Drive ↗
+                                  </a>
+                                </div>
                               )}
+                              {isian?.diisiOleh && (
+                                <div className="text-[11px] text-slate-500">Oleh: {isian.diisiOleh}</div>
+                              )}
+                            </td>
+                            <td className="text-xs space-y-1">
                               <div>
                                 <Badge
-                                  tone={isian.rtlStatus === "TERVERIFIKASI" ? "green" : "amber"}
+                                  tone={
+                                    isian?.statusDokumen === "LENGKAP"
+                                      ? "green"
+                                      : isian?.statusDokumen === "PERLU_KLARIFIKASI"
+                                        ? "amber"
+                                        : "slate"
+                                  }
                                 >
-                                  {RTL_LABEL[isian.rtlStatus]}
+                                  {isian ? STATUS_DOK_LABEL[isian.statusDokumen] : "Belum Diperiksa"}
                                 </Badge>
                               </div>
-                            </>
-                          ) : (
-                            <span className="text-slate-400">—</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </>
-              ))}
+                              {isian?.catatanDokumen && (
+                                <div className="text-slate-700">{isian.catatanDokumen}</div>
+                              )}
+                            </td>
+                            <td className="text-xs space-y-1">
+                              {isian?.klasifikasi ? (
+                                <Badge
+                                  tone={
+                                    isian.klasifikasi === "MELAMPAUI" || isian.klasifikasi === "MENCAPAI"
+                                      ? "green"
+                                      : isian.klasifikasi === "OBSERVASI"
+                                        ? "amber"
+                                        : "red"
+                                  }
+                                >
+                                  {KLASIFIKASI_LABEL[isian.klasifikasi]}
+                                </Badge>
+                              ) : (
+                                <span className="text-slate-400">—</span>
+                              )}
+                              {isian?.catatanLapangan && (
+                                <div className="text-slate-700">{isian.catatanLapangan}</div>
+                              )}
+                            </td>
+                            <td className="text-xs text-slate-700">
+                              {isian?.rekomendasi || "—"}
+                            </td>
+                            <td className="text-xs space-y-1">
+                              {isian?.rtlRencana ? (
+                                <>
+                                  <div>{isian.rtlRencana}</div>
+                                  {isian.rtlLinkBukti && (
+                                    <a
+                                      href={isian.rtlLinkBukti}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="font-bold text-blue-700 underline"
+                                    >
+                                      📂 Bukti RTL ↗
+                                    </a>
+                                  )}
+                                  <div>
+                                    <Badge
+                                      tone={isian.rtlStatus === "TERVERIFIKASI" ? "green" : "amber"}
+                                    >
+                                      {RTL_LABEL[isian.rtlStatus]}
+                                    </Badge>
+                                  </div>
+                                </>
+                              ) : (
+                                <span className="text-slate-400">—</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>

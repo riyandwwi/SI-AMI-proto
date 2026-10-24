@@ -618,34 +618,49 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                 groupIndikatorByStandar(activePeriodeForPantau.indikator)
                   .filter((g) => standarFilter === "ALL" || g.standar === standarFilter)
                   .map((group) => (
-                    <div key={group.standar} className="card overflow-x-auto space-y-3">
-                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/15 pb-2.5">
+                    <details
+                      key={group.standar}
+                      open={standarFilter !== "ALL"}
+                      className="card group overflow-x-auto py-3"
+                    >
+                      <summary className="flex cursor-pointer list-none select-none flex-wrap items-center justify-between gap-2">
                         <div className="flex flex-wrap items-center gap-2">
+                          <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg border border-black bg-white text-xs font-black text-black">
+                            <span className="group-open:hidden">▶</span>
+                            <span className="hidden group-open:inline">▼</span>
+                          </span>
                           <span className="rounded-xl border border-black bg-[#FEF08A] px-3 py-1 text-xs font-black text-black">
                             📂 {group.standar}
                           </span>
                           <Badge tone="blue">
-                            Indikator {group.startIndex} – {group.endIndex} ({group.items.length} Butir)
+                            Indikator #{group.startIndex} – #{group.endIndex} ({group.items.length} Butir)
                           </Badge>
                         </div>
 
-                        {!activePeriodeForPantau.sourceLocked && (
-                          <form action={hapusStandarEmergency}>
-                            <input type="hidden" name="periodeId" value={activePeriodeForPantau.id} />
-                            <input type="hidden" name="standar" value={group.standar} />
-                            <input
-                              type="hidden"
-                              name="returnTo"
-                              value={`/lpm?tab=pantau&periodeId=${activePeriodeForPantau.id}`}
-                            />
-                            <button className="btn-danger text-xs">
-                              🗑️ Hapus Standar Ini
-                            </button>
-                          </form>
-                        )}
-                      </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="rounded-xl border border-black bg-white px-2.5 py-1 text-[11px] font-black text-black">
+                            <span className="group-open:hidden">▼ Buka Standar</span>
+                            <span className="hidden group-open:inline">▲ Minimize</span>
+                          </span>
+                          {!activePeriodeForPantau.sourceLocked && (
+                            <form action={hapusStandarEmergency}>
+                              <input type="hidden" name="periodeId" value={activePeriodeForPantau.id} />
+                              <input type="hidden" name="standar" value={group.standar} />
+                              <input
+                                type="hidden"
+                                name="returnTo"
+                                value={`/lpm?tab=pantau&periodeId=${activePeriodeForPantau.id}`}
+                              />
+                              <button className="btn-danger text-xs">
+                                🗑️ Hapus Standar Ini
+                              </button>
+                            </form>
+                          )}
+                        </div>
+                      </summary>
 
-                      <table>
+                      <div className="mt-3 border-t border-black/15 pt-3">
+                        <table>
                         <thead>
                           <tr>
                             <th className="w-64">Indikator</th>
@@ -821,7 +836,8 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                           })}
                         </tbody>
                       </table>
-                    </div>
+                      </div>
+                    </details>
                   ))
               )}
             </>
