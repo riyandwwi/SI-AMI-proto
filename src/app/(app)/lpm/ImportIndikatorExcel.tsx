@@ -52,46 +52,50 @@ export function ImportIndikatorExcel({
   }
 
   const handleDownloadTemplate = () => {
+    const contohPernyataanStandar1 =
+      "UPPS memastikan setiap program studi memiliki capaian pembelajaran lulusan mencakup kompetensi yang meliputi (1) penguasaan ilmu pengetahuan dan teknologi, (2) kecakapan umum, (3) pengetahuan dan ketrampilan, dan (4) kemampuan intelektual";
+
     const templateData = [
       {
+        NO: 1,
+        STANDAR: "Standar Kompetensi Lulusan",
+        PERNYATAAN_STANDAR: contohPernyataanStandar1,
+        KODE: "IK1",
+        PERNYATAAN:
+          "Tersedia CPL PS yang mencakup kompetensi penguasaan ilmu pengetahuan, teknologi, serta kecakapan/keterampilan spesifik dan aplikasinya sesuai bidang ilmu yang dipelajarinya",
+        DOKUMEN_BUKTI: "Dokumen Kurikulum Program Studi yang memuat CPL",
+      },
+      {
+        NO: 2,
+        STANDAR: "Standar Kompetensi Lulusan",
+        PERNYATAAN_STANDAR: contohPernyataanStandar1,
+        KODE: "IK2",
+        PERNYATAAN:
+          "Tersedia CPL PS yang mencakup kompetensi kecakapan umum sebagai dasar penguasaan IPTEK dan kesiapan kerja yang mencakup komunikasi, kolaborasi, literasi digital, serta etika profesional",
+        DOKUMEN_BUKTI: "Dokumen Kurikulum Program Studi yang memuat CPL",
+      },
+      {
+        NO: 3,
         STANDAR: "Standar Isi Pembelajaran",
-        KODE: "STD-ISI-01",
+        PERNYATAAN_STANDAR:
+          "UPPS memastikan materi pembelajaran setiap program studi wajib memperhatikan perkembangan ilmu pengetahuan dan teknologi yang menjadi dasar keilmuan program studi.",
+        KODE: "IK1",
         PERNYATAAN:
-          "Ketersediaan dokumen Kurikulum Berbasis OBE dan pemetaan CPL pada seluruh mata kuliah.",
-        DOKUMEN_BUKTI: "SK Kurikulum OBE, Dokumen Pemetaan CPL",
-      },
-      {
-        STANDAR: "Standar Isi Pembelajaran",
-        KODE: "STD-ISI-02",
-        PERNYATAAN:
-          "Ketersediaan RPS lengkap untuk seluruh mata kuliah aktif pada semester berjalan.",
-        DOKUMEN_BUKTI: "Folder RPS Mata Kuliah Semester Berjalan",
-      },
-      {
-        STANDAR: "Standar Proses Pembelajaran",
-        KODE: "STD-PROSES-01",
-        PERNYATAAN:
-          "Pelaksanaan perkuliahan minimal 14-16 pertemuan per semester disertai berita acara dan presensi.",
-        DOKUMEN_BUKTI: "Rekap Presensi Dosen & Mahasiswa, Jurnal Perkuliahan",
-      },
-      {
-        STANDAR: "Standar Proses Pembelajaran",
-        KODE: "STD-PROSES-02",
-        PERNYATAAN:
-          "Pelaksanaan monitoring dan evaluasi (monev) proses pembelajaran tengah dan akhir semester.",
-        DOKUMEN_BUKTI: "Laporan Monev Pembelajaran",
-      },
-      {
-        STANDAR: "Standar Penilaian Pembelajaran",
-        KODE: "STD-NILAI-01",
-        PERNYATAAN:
-          "Ketersediaan rubrik penilaian dan transparansi nilai akhir mahasiswa pada seluruh mata kuliah.",
-        DOKUMEN_BUKTI: "Rubrik Penilaian, Rekap Nilai SIAKAD",
+          "Tersedia dokumen kurikulum yang memuat materi pembelajaran sesuai perkembangan dasar keilmuan",
+        DOKUMEN_BUKTI:
+          "Dokumen Kurikulum PS yang memuat materi pembelajaran sesuai perkembangan keilmuan",
       },
     ];
 
     const ws = XLSX.utils.json_to_sheet(templateData);
-    ws["!cols"] = [{ wch: 32 }, { wch: 18 }, { wch: 65 }, { wch: 45 }];
+    ws["!cols"] = [
+      { wch: 6 },
+      { wch: 28 },
+      { wch: 55 },
+      { wch: 12 },
+      { wch: 55 },
+      { wch: 40 },
+    ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Template_Indikator_AMI");
     XLSX.writeFile(wb, "Template_Indikator_AMI_ITBMP.xlsx");
@@ -109,126 +113,137 @@ export function ImportIndikatorExcel({
     try {
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array" });
-      const firstSheetName = wb.SheetNames[0];
-      if (!firstSheetName) {
+      if (!wb.SheetNames || wb.SheetNames.length === 0) {
         setParseError("File Excel kosong atau tidak memiliki sheet.");
         return;
       }
 
-      const sheet = wb.Sheets[firstSheetName];
-      const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
-        header: 1,
-        defval: "",
-      });
+      const parsed: PreviewRow[] = [];
 
-      if (!matrix || matrix.length === 0) {
-        setParseError("File Excel tidak memiliki baris data.");
-        return;
-      }
+      // Iterasi seluruh sheet agar mendukung baik 1 sheet Template maupun banyak sheet Instrumen AMI (per Standar)
+      for (const sheetName of wb.SheetNames) {
+        const normSheet = normalizeHeader(sheetName);
+        if (normSheet === "judul" || normSheet === "temuan" || normSheet === "ptk" || normSheet === "sheet1") {
+          // Lewati sheet sampul/rekap jika menggunakan workbook Instrumen AMI multi-sheet
+          if (wb.SheetNames.length > 1) continue;
+        }
 
-      // Cari baris header pada 10 baris pertama agar aman jika ada judul di baris 1
-      let headerRowIndex = -1;
-      let colKode = -1;
-      let colStandar = -1;
-      let colPernyataan = -1;
-      let colBukti = -1;
-
-      for (let r = 0; r < Math.min(matrix.length, 10); r++) {
-        const row = matrix[r];
-        if (!Array.isArray(row)) continue;
-
-        let k = -1;
-        let s = -1;
-        let p = -1;
-        let b = -1;
-
-        row.forEach((cell, idx) => {
-          const norm = normalizeHeader(cell);
-          if (!norm) return;
-          if (k === -1 && (norm === "kode" || norm === "kodeindikator" || norm === "nokode")) {
-            k = idx;
-          } else if (
-            s === -1 &&
-            (norm === "standar" || norm === "standarspmi" || norm === "namastandar")
-          ) {
-            s = idx;
-          } else if (
-            p === -1 &&
-            (norm === "pernyataan" ||
-              norm === "pernyataanindikator" ||
-              norm === "indikator" ||
-              norm === "deskripsi")
-          ) {
-            p = idx;
-          } else if (
-            b === -1 &&
-            (norm.includes("bukti") || norm.includes("dokumen") || norm === "target")
-          ) {
-            b = idx;
-          }
+        const sheet = wb.Sheets[sheetName];
+        const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+          header: 1,
+          defval: "",
         });
+        if (!matrix || matrix.length === 0) continue;
 
-        if (k !== -1 || s !== -1 || p !== -1) {
-          headerRowIndex = r;
-          colKode = k;
-          colStandar = s;
-          colPernyataan = p;
-          colBukti = b;
-          break;
+        let headerRowIndex = -1;
+        let colKode = -1;
+        let colStandar = -1;
+        let colPernyataanStandar = -1;
+        let colPernyataan = -1;
+        let colBukti = -1;
+
+        for (let r = 0; r < Math.min(matrix.length, 15); r++) {
+          const row = matrix[r];
+          if (!Array.isArray(row)) continue;
+
+          let k = -1;
+          let s = -1;
+          let ps = -1;
+          let p = -1;
+          let b = -1;
+
+          row.forEach((cell, idx) => {
+            const norm = normalizeHeader(cell);
+            if (!norm) return;
+            if (
+              k === -1 &&
+              (norm === "kode" || norm === "kodeindikator" || norm === "nokode" || norm === "ik")
+            ) {
+              k = idx;
+            } else if (
+              ps === -1 &&
+              (norm === "pernyataanstandar" ||
+                norm === "isipernyataanstandar" ||
+                norm === "deskripsistandar")
+            ) {
+              ps = idx;
+            } else if (
+              s === -1 &&
+              (norm === "standar" || norm === "standarspmi" || norm === "namastandar")
+            ) {
+              s = idx;
+            } else if (
+              p === -1 &&
+              (norm === "pernyataan" ||
+                norm === "pernyataanindikator" ||
+                norm === "indikatorkinerja" ||
+                norm === "indikator" ||
+                norm === "deskripsi")
+            ) {
+              p = idx;
+            } else if (
+              b === -1 &&
+              (norm.includes("bukti") || norm === "dokumenbukti" || norm === "target")
+            ) {
+              b = idx;
+            }
+          });
+
+          if (k !== -1 && p !== -1) {
+            headerRowIndex = r;
+            colKode = k;
+            colStandar = s;
+            colPernyataanStandar = ps;
+            colPernyataan = p;
+            colBukti = b;
+            break;
+          }
+        }
+
+        if (headerRowIndex === -1) continue;
+
+        let lastStandar = colStandar === -1 ? sheetName.trim() : "";
+        let lastPernyataanStandar = "";
+
+        for (let r = headerRowIndex + 1; r < matrix.length; r++) {
+          const row = matrix[r];
+          if (!Array.isArray(row)) continue;
+
+          const kode = String(row[colKode] ?? "")
+            .trim()
+            .toUpperCase()
+            .replace(/\s+/g, "-");
+          const rawStandar = colStandar !== -1 ? String(row[colStandar] ?? "").trim() : "";
+          const rawPernyataanStandar =
+            colPernyataanStandar !== -1 ? String(row[colPernyataanStandar] ?? "").trim() : "";
+          const pernyataan = String(row[colPernyataan] ?? "").trim();
+          const buktiDiminta = colBukti !== -1 ? String(row[colBukti] ?? "").trim() : "";
+
+          if (!kode && !rawStandar && !pernyataan && !buktiDiminta) continue;
+          if (pernyataan.toLowerCase() === "dst") continue;
+
+          const standar = rawStandar || lastStandar;
+          if (rawStandar) lastStandar = rawStandar;
+
+          // Jika ganti standar baru dan pernyataan standar kosong, reset pernyataan standar
+          const pernyataanStandar = rawPernyataanStandar || lastPernyataanStandar;
+          if (rawPernyataanStandar) lastPernyataanStandar = rawPernyataanStandar;
+
+          parsed.push({
+            rowNum: r + 1,
+            kode,
+            standar,
+            pernyataanStandar,
+            pernyataan,
+            buktiDiminta,
+          });
         }
       }
 
-      if (headerRowIndex === -1) {
-        setParseError(
-          "Header kolom tidak dikenali! Pastikan baris judul di Excel memiliki kolom: KODE, STANDAR, PERNYATAAN, dan DOKUMEN_BUKTI (gunakan tombol Download Template)."
-        );
-        return;
-      }
-
-      const missingCols: string[] = [];
-      if (colKode === -1) missingCols.push("KODE");
-      if (colStandar === -1) missingCols.push("STANDAR");
-      if (colPernyataan === -1) missingCols.push("PERNYATAAN");
-
-      if (missingCols.length > 0) {
-        setParseError(
-          `Kolom wajib tidak ditemukan di Excel: ${missingCols.join(", ")}. Import dibatalkan agar data antar kolom tidak bergeser / tumpang tindih.`
-        );
-        return;
-      }
-
-      const parsed: PreviewRow[] = [];
-      let lastStandar = "";
-      for (let r = headerRowIndex + 1; r < matrix.length; r++) {
-        const row = matrix[r];
-        if (!Array.isArray(row)) continue;
-
-        const kode = String(row[colKode] ?? "")
-          .trim()
-          .toUpperCase()
-          .replace(/\s+/g, "-");
-        const rawStandar = String(row[colStandar] ?? "").trim();
-        const pernyataan = String(row[colPernyataan] ?? "").trim();
-        const buktiDiminta = colBukti !== -1 ? String(row[colBukti] ?? "").trim() : "";
-
-        // Lewati baris yang benar-benar kosong seluruhnya
-        if (!kode && !rawStandar && !pernyataan && !buktiDiminta) continue;
-
-        // Jika kolom STANDAR di-merge ke bawah di Excel (kosong pada baris lanjutan), otomatis warisi Standar di atasnya!
-        const standar = rawStandar || lastStandar;
-        if (rawStandar) lastStandar = rawStandar;
-
-        parsed.push({
-          rowNum: r + 1,
-          kode,
-          standar,
-          pernyataan,
-          buktiDiminta,
-        });
-      }
-
       if (parsed.length === 0) {
-        setParseError("Tidak ada baris indikator yang terisi di bawah baris judul.");
+        setParseError(
+          "Tidak ditemukan baris indikator yang valid. Pastikan kolom di Excel memiliki: STANDAR, PERNYATAAN_STANDAR, KODE (atau IK), PERNYATAAN (atau Indikator Kinerja), dan DOKUMEN_BUKTI."
+        );
         return;
       }
 
@@ -241,7 +256,9 @@ export function ImportIndikatorExcel({
   const validRowsToImport = previewRows.filter((r) => {
     const isComplete = Boolean(r.kode && r.standar && r.pernyataan);
     if (!isComplete) return false;
-    const isDuplicate = existingCodeSet.has(r.kode.toUpperCase());
+    const key = `${r.standar.toUpperCase()}|||${r.kode.toUpperCase()}`;
+    const isDuplicate =
+      existingCodeSet.has(key) || existingCodeSet.has(r.kode.toUpperCase());
     if (isDuplicate && mode === "SKIP_EXISTING") return false;
     return true;
   });
@@ -381,41 +398,47 @@ export function ImportIndikatorExcel({
             <table>
               <thead>
                 <tr>
-                  <th>Baris</th>
-                  <th>Status Validasi</th>
-                  <th>Kode</th>
+                  <th>No</th>
+                  <th>Status</th>
                   <th>Standar</th>
-                  <th>Pernyataan Indikator</th>
+                  <th>Isi Pernyataan Standar</th>
+                  <th>Kode IK</th>
+                  <th>Indikator Kinerja</th>
                   <th>Dokumen Bukti</th>
                 </tr>
               </thead>
               <tbody>
                 {previewRows.map((row, idx) => {
                   const isMissingRequired = !row.kode || !row.standar || !row.pernyataan;
+                  const key = `${row.standar.toUpperCase()}|||${row.kode.toUpperCase()}`;
                   const isDuplicate =
-                    !isMissingRequired && existingCodeSet.has(row.kode.toUpperCase());
+                    !isMissingRequired &&
+                    (existingCodeSet.has(key) || existingCodeSet.has(row.kode.toUpperCase()));
 
                   return (
                     <tr key={idx}>
-                      <td className="font-mono text-xs">{row.rowNum}</td>
+                      <td className="font-mono text-xs">{idx + 1}</td>
                       <td>
                         {isMissingRequired ? (
-                          <Badge tone="red">🔴 Kolom Kosong (Di-skip)</Badge>
+                          <Badge tone="red">🔴 Kosong (Skip)</Badge>
                         ) : isDuplicate ? (
                           mode === "SKIP_EXISTING" ? (
-                            <Badge tone="amber">🟡 Sudah Ada (Aman Di-skip)</Badge>
+                            <Badge tone="amber">🟡 Sudah Ada (Skip)</Badge>
                           ) : (
-                            <Badge tone="blue">🔄 Sudah Ada (Akan Diupdate)</Badge>
+                            <Badge tone="blue">🔄 Update</Badge>
                           )
                         ) : (
-                          <Badge tone="green">🟢 Baru (Siap Masuk)</Badge>
+                          <Badge tone="green">🟢 Baru</Badge>
                         )}
-                      </td>
-                      <td className="font-mono text-xs font-black">
-                        {row.kode || <span className="text-red-600">(Kosong)</span>}
                       </td>
                       <td className="text-xs font-bold">
                         {row.standar || <span className="text-red-600">(Kosong)</span>}
+                      </td>
+                      <td className="text-xs text-slate-700">
+                        {row.pernyataanStandar || "—"}
+                      </td>
+                      <td className="font-mono text-xs font-black">
+                        {row.kode || <span className="text-red-600">(Kosong)</span>}
                       </td>
                       <td className="text-xs">
                         {row.pernyataan || <span className="text-red-600">(Kosong)</span>}

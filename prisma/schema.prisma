@@ -122,18 +122,19 @@ model Periode {
 }
 
 model Indikator {
-  id           String  @id @default(cuid())
-  periodeId    String
-  periode      Periode @relation(fields: [periodeId], references: [id], onDelete: Cascade)
-  kode         String
-  standar      String
-  pernyataan   String
-  target       String  @default("-")
-  buktiDiminta String?
-  urutan       Int     @default(0)
-  isian        Isian[]
+  id                String  @id @default(cuid())
+  periodeId         String
+  periode           Periode @relation(fields: [periodeId], references: [id], onDelete: Cascade)
+  kode              String
+  standar           String
+  pernyataanStandar String?
+  pernyataan        String
+  target            String  @default("-")
+  buktiDiminta      String?
+  urutan            Int     @default(0)
+  isian             Isian[]
 
-  @@unique([periodeId, kode])
+  @@unique([periodeId, standar, kode])
 }
 
 model Penugasan {

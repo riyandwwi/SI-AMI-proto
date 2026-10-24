@@ -10,6 +10,7 @@ import {
 } from "@/lib/periode";
 import { Badge, Empty, Flash, PageHeader, Stat, one, type SP } from "@/components/ui";
 import { SignaturePadCard } from "@/components/SignaturePadCard";
+import { TabelInstrumenDanRekap } from "@/components/TabelInstrumenDanRekap";
 import { sahkanLaporanAkhir } from "../actions";
 
 export default async function LpmRekapPage({ searchParams }: { searchParams: SP }) {
@@ -21,7 +22,10 @@ export default async function LpmRekapPage({ searchParams }: { searchParams: SP 
     prisma.periode.findMany({
       include: {
         unit: true,
-        indikator: { include: { isian: true } },
+        indikator: {
+          orderBy: [{ urutan: "asc" }, { kode: "asc" }],
+          include: { isian: true },
+        },
       },
     }),
     prisma.isian.findMany({
@@ -234,33 +238,53 @@ export default async function LpmRekapPage({ searchParams }: { searchParams: SP 
         </table>
       </div>
 
-      {/* Panel Tempel Tanda Tangan Kepala LPM per Sesi */}
-      <div className="space-y-4">
-        {periodes.map((p) => (
-          <SignaturePadCard
-            key={p.id}
-            session={{
-              periodeId: p.id,
-              periodeNama: p.nama,
-              ketuaAuditeeId: p.ketuaAuditeeId,
-              ketuaAuditeeNama: p.ketuaAuditeeNama,
-              ketuaAuditeeNip: p.ketuaAuditeeNip,
-              hasTtdAuditee: Boolean(p.ttdAuditee),
-              ttdAuditeePreview: p.ttdAuditee,
-              ketuaAuditorId: p.ketuaAuditorId,
-              ketuaAuditorNama: p.ketuaAuditorNama,
-              ketuaAuditorNip: p.ketuaAuditorNip,
-              hasTtdAuditor: Boolean(p.ttdAuditor),
-              ttdAuditorPreview: p.ttdAuditor,
-              kepalaLpmNama: p.kepalaLpmNama ?? user.nama,
-              kepalaLpmNip: p.kepalaLpmNip ?? user.nimNuptk,
-              hasTtdLpm: Boolean(p.ttdLpm),
-              ttdLpmPreview: p.ttdLpm,
-            }}
-            currentUserId={user.id}
-            currentRole="LPM"
-          />
-        ))}
+      {/* Panel Tempel Tanda Tangan Kepala LPM & 2 Tab Tabel Rekap per Sesi */}
+      <div className="space-y-6">
+        {periodes.map((p) => {
+          const rekapRows = p.indikator.map((ind) => ({
+            id: ind.id,
+            kode: ind.kode,
+            standar: ind.standar,
+            pernyataanStandar: ind.pernyataanStandar,
+            pernyataan: ind.pernyataan,
+            buktiDiminta: ind.buktiDiminta,
+            isian: ind.isian.find((i) => !p.unitId || i.unitId === p.unitId) ?? ind.isian[0] ?? null,
+          }));
+
+          return (
+            <div key={p.id} className="space-y-3">
+              <SignaturePadCard
+                session={{
+                  periodeId: p.id,
+                  periodeNama: p.nama,
+                  ketuaAuditeeId: p.ketuaAuditeeId,
+                  ketuaAuditeeNama: p.ketuaAuditeeNama,
+                  ketuaAuditeeNip: p.ketuaAuditeeNip,
+                  hasTtdAuditee: Boolean(p.ttdAuditee),
+                  ttdAuditeePreview: p.ttdAuditee,
+                  ketuaAuditorId: p.ketuaAuditorId,
+                  ketuaAuditorNama: p.ketuaAuditorNama,
+                  ketuaAuditorNip: p.ketuaAuditorNip,
+                  hasTtdAuditor: Boolean(p.ttdAuditor),
+                  ttdAuditorPreview: p.ttdAuditor,
+                  kepalaLpmNama: p.kepalaLpmNama ?? user.nama,
+                  kepalaLpmNip: p.kepalaLpmNip ?? user.nimNuptk,
+                  hasTtdLpm: Boolean(p.ttdLpm),
+                  ttdLpmPreview: p.ttdLpm,
+                }}
+                currentUserId={user.id}
+                currentRole="LPM"
+              />
+
+              <TabelInstrumenDanRekap
+                periodeId={p.id}
+                periodeNama={p.nama}
+                indikator={rekapRows}
+                defaultTab="rekap"
+              />
+            </div>
+          );
+        })}
       </div>
 
       {/* Daftar Temuan & RTL */}

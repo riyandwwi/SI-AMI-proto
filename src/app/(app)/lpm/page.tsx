@@ -11,7 +11,9 @@ import {
   sortPeriodesChronological,
 } from "@/lib/periode";
 import { Badge, Empty, Flash, PageHeader, one, type SP } from "@/components/ui";
+import { TabelInstrumenDanRekap } from "@/components/TabelInstrumenDanRekap";
 import { ImportIndikatorExcel } from "./ImportIndikatorExcel";
+import { FormStandarBertahap, type ExistingStandarInfo } from "./FormStandarBertahap";
 import {
   buatSesiAmi,
   editIndikator,
@@ -477,80 +479,60 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                 periodes={periodes.map((p) => ({
                   id: p.id,
                   nama: p.nama,
-                  existingCodes: p.indikator.map((i) => i.kode),
+                  existingCodes: p.indikator.map(
+                    (i) => `${i.standar.toUpperCase()}|||${i.kode.toUpperCase()}`
+                  ),
                 }))}
                 defaultPeriodeId={activePeriodeForPantau.id}
               />
 
-              {/* Form Cepat Tambah Indikator oleh LPM */}
-              <form action={tambahIndikator} className="card space-y-3">
-                <input type="hidden" name="returnTo" value={`/lpm?tab=pantau&periodeId=${activePeriodeForPantau.id}`} />
-                <h3 className="border-b border-black/15 pb-2 text-sm font-black text-black">
-                  + Tambah Standar / Indikator
-                </h3>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
-                  <div className="space-y-1">
-                    <label>Sesi</label>
-                    <select name="periodeId" defaultValue={activePeriodeForPantau.id} className="w-full text-xs">
-                      <option value={activePeriodeForPantau.id}>Sesi Ini ({activePeriodeForPantau.unit?.nama})</option>
-                      <option value="ALL">Semua Sesi</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1">
-                    <label>Pilih Standar SPMI</label>
-                    <select
-                      name="standar"
-                      defaultValue="Standar Isi Pembelajaran"
-                      className="w-full text-xs font-bold"
-                    >
-                      {Array.from(
-                        new Set([
-                          ...DEFAULT_STANDAR_SPMI,
-                          ...activePeriodeForPantau.indikator.map((i) => i.standar),
-                        ])
-                      ).map((st) => (
-                        <option key={st} value={st}>
-                          {st}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="space-y-1">
-                    <label>Atau Standar Baru (Emergency)</label>
-                    <input
-                      name="standarBaru"
-                      placeholder="Ketik jika standar baru..."
-                      className="w-full text-xs"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label>Kode</label>
-                    <input name="kode" required placeholder="STD-ISI-01" className="w-full font-mono text-xs" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  <div className="space-y-1 sm:col-span-2">
-                    <label>Pernyataan Indikator</label>
-                    <input
-                      name="pernyataan"
-                      required
-                      placeholder="Pernyataan indikator..."
-                      className="w-full text-xs"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label>Dokumen Bukti</label>
-                    <div className="flex gap-2">
-                      <input
-                        name="buktiDiminta"
-                        placeholder="SK, RPS, Laporan..."
-                        className="w-full text-xs"
-                      />
-                      <button className="btn shrink-0 text-xs">+ Tambah</button>
-                    </div>
-                  </div>
-                </div>
-              </form>
+              {/* Form Bertahap Manual: 1. Standar -> 2. Pernyataan Standar -> 3. Indikator */}
+              <FormStandarBertahap
+                returnTo={`/lpm?tab=pantau&periodeId=${activePeriodeForPantau.id}`}
+                periodes={periodes.map((p) => ({ id: p.id, nama: p.nama }))}
+                defaultPeriodeId={activePeriodeForPantau.id}
+                existingStandarList={(() => {
+                  const stdMap = new Map<string, Set<string>>();
+                  const cntMap = new Map<string, number>();
+                  for (const ind of activePeriodeForPantau.indikator) {
+                    if (!ind.standar) continue;
+                    if (!stdMap.has(ind.standar)) stdMap.set(ind.standar, new Set<string>());
+                    if (ind.pernyataanStandar) stdMap.get(ind.standar)!.add(ind.pernyataanStandar);
+                    cntMap.set(ind.standar, (cntMap.get(ind.standar) ?? 0) + 1);
+                  }
+                  const list: ExistingStandarInfo[] = Array.from(stdMap.entries()).map(
+                    ([standar, psSet]) => ({
+                      standar,
+                      pernyataanStandarList: Array.from(psSet),
+                      nextIkNumber: (cntMap.get(standar) ?? 0) + 1,
+                    })
+                  );
+                  return list;
+                })()}
+              />
+
+              {/* 2 Tab Tabel (1. Tabel Standar, Pernyataan Standar & Indikator | 2. Tabel Rekap Audit Sesi Sebelum Print) */}
+              <TabelInstrumenDanRekap
+                periodeId={activePeriodeForPantau.id}
+                periodeNama={activePeriodeForPantau.nama}
+                indikator={activePeriodeForPantau.indikator.map((ind) => ({
+                  id: ind.id,
+                  kode: ind.kode,
+                  standar: ind.standar,
+                  pernyataanStandar: ind.pernyataanStandar,
+                  pernyataan: ind.pernyataan,
+                  buktiDiminta: ind.buktiDiminta,
+                  isian:
+                    ind.isian.find((i) =>
+                      activePeriodeForPantau.unitId
+                        ? i.unitId === activePeriodeForPantau.unitId
+                        : true
+                    ) ??
+                    ind.isian[0] ??
+                    null,
+                }))}
+                defaultTab="rekap"
+              />
 
               {/* Filter / Sort Indikator per Standar */}
               {activePeriodeForPantau.indikator.length > 0 && (
@@ -636,6 +618,11 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                                       <Badge tone="slate">📋 {ind.buktiDiminta}</Badge>
                                     )}
                                   </div>
+                                  {ind.pernyataanStandar && (
+                                    <div className="mt-1 rounded-lg border border-black/15 bg-[#FAF7EE] p-1.5 text-[11px] text-slate-700">
+                                      <strong>Pernyataan Standar:</strong> {ind.pernyataanStandar}
+                                    </div>
+                                  )}
                                   <div className="mt-1 text-xs text-slate-800">{ind.pernyataan}</div>
 
                                   <details className="mt-2">
@@ -656,7 +643,7 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                                         name="kode"
                                         required
                                         defaultValue={ind.kode}
-                                        placeholder="Kode"
+                                        placeholder="Kode (IK)"
                                         className="w-full font-mono text-xs"
                                       />
                                       <input
@@ -664,6 +651,13 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                                         required
                                         defaultValue={ind.standar}
                                         placeholder="Standar"
+                                        className="w-full text-xs"
+                                      />
+                                      <textarea
+                                        name="pernyataanStandar"
+                                        rows={2}
+                                        defaultValue={ind.pernyataanStandar ?? ""}
+                                        placeholder="Isi pernyataan standar..."
                                         className="w-full text-xs"
                                       />
                                       <input
@@ -677,7 +671,7 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                                         rows={2}
                                         required
                                         defaultValue={ind.pernyataan}
-                                        placeholder="Pernyataan"
+                                        placeholder="Indikator kinerja..."
                                         className="w-full text-xs"
                                       />
                                       <button type="submit" className="btn-success w-full py-1 text-xs">

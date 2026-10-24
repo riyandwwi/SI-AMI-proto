@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
     for (const grp of groups) {
       rowsHtml += `
         <tr style="background-color:#E0F2FE; font-weight:bold;">
-          <td colspan="24" style="padding:6px 8px; border:1px solid #000000;">
+          <td colspan="25" style="padding:6px 8px; border:1px solid #000000;">
             📂 STANDAR SPMI: ${esc(grp.standar)} — Indikator ${grp.startIndex} s/d ${grp.endIndex} (${grp.items.length} Indikator) | ${esc(p.nama)} (${esc(p.unit?.nama ?? "-")})
           </td>
         </tr>
@@ -61,12 +61,9 @@ export async function GET(req: NextRequest) {
         rowsHtml += `
           <tr>
             <td style="text-align:center;">${no++}</td>
-            <td>${esc(p.nama)}</td>
-            <td>${esc(p.tahun)}</td>
-            <td>${esc(p.semester)}</td>
-            <td>${esc(p.unit?.nama ?? "-")}</td>
+            <td><b>${esc(ind.standar)}</b></td>
+            <td>${esc(ind.pernyataanStandar ?? "-")}</td>
             <td><b>${esc(ind.kode)}</b></td>
-            <td>${esc(ind.standar)}</td>
             <td>${esc(ind.pernyataan)}</td>
             <td>${esc(ind.buktiDiminta ?? "-")}</td>
             <td>${esc(isian?.klaim ?? "-")}</td>
@@ -83,6 +80,10 @@ export async function GET(req: NextRequest) {
             <td>${esc(isian?.rtlLinkBukti ?? "-")}</td>
             <td>${esc(isian ? RTL_LABEL[isian.rtlStatus] : "-")}</td>
             <td>${esc(isian?.rtlCatatanAuditor ?? "-")}</td>
+            <td>${esc(p.nama)}</td>
+            <td>${esc(p.tahun)}</td>
+            <td>${esc(p.semester)}</td>
+            <td>${esc(p.unit?.nama ?? "-")}</td>
             <td>${esc(statusSah)}</td>
           </tr>
         `;
@@ -233,13 +234,10 @@ export async function GET(req: NextRequest) {
           <thead>
             <tr>
               <th>No</th>
-              <th>Sesi AMI</th>
-              <th>Tahun Akademik</th>
-              <th>Semester</th>
-              <th>Program Studi</th>
-              <th>Kode Indikator</th>
               <th>Standar SPMI</th>
-              <th>Pernyataan Indikator</th>
+              <th>Isi Pernyataan Standar</th>
+              <th>Kode Indikator (IK)</th>
+              <th>Indikator Kinerja</th>
               <th>Dokumen Bukti</th>
               <th>Evaluasi Diri Auditee</th>
               <th>Link Google Drive Bukti</th>
@@ -255,6 +253,10 @@ export async function GET(req: NextRequest) {
               <th>Link Drive Bukti RTL</th>
               <th>Status RTL</th>
               <th>Catatan RTL Auditor</th>
+              <th>Sesi AMI</th>
+              <th>Tahun Akademik</th>
+              <th>Semester</th>
+              <th>Program Studi</th>
               <th>Status Pengesahan LPM</th>
             </tr>
           </thead>

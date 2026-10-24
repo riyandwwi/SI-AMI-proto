@@ -2,12 +2,13 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import {
-  DEFAULT_STANDAR_SPMI,
   groupIndikatorByStandar,
   sortPeriodesChronological,
 } from "@/lib/periode";
 import { Badge, Empty, Flash, PageHeader, one, type SP } from "@/components/ui";
+import { TabelInstrumenDanRekap } from "@/components/TabelInstrumenDanRekap";
 import { ImportIndikatorExcel } from "../ImportIndikatorExcel";
+import { FormStandarBertahap, type ExistingStandarInfo } from "../FormStandarBertahap";
 import {
   editIndikator,
   hapusIndikator,
@@ -22,7 +23,13 @@ export default async function LpmIndikatorPage({ searchParams }: { searchParams:
   const standarFilter = one(sp.standar) ?? "ALL";
 
   const rawPeriodes = await prisma.periode.findMany({
-    include: { unit: true, indikator: { orderBy: [{ urutan: "asc" }, { kode: "asc" }] } },
+    include: {
+      unit: true,
+      indikator: {
+        orderBy: [{ urutan: "asc" }, { kode: "asc" }],
+        include: { isian: true },
+      },
+    },
   });
 
   const periodes = sortPeriodesChronological(rawPeriodes);
@@ -30,112 +37,50 @@ export default async function LpmIndikatorPage({ searchParams }: { searchParams:
   const periodeOptions = periodes.map((p) => ({
     id: p.id,
     nama: p.nama,
-    existingCodes: p.indikator.map((i) => i.kode),
+    existingCodes: p.indikator.map((i) => `${i.standar.toUpperCase()}|||${i.kode.toUpperCase()}`),
   }));
 
-  // Kumpulkan semua nama Standar unik (bawaan + yang sudah ada di database)
-  const allStandarSet = new Set<string>(DEFAULT_STANDAR_SPMI);
-  const existingStandarInDb = new Set<string>();
+  // Kumpulkan semua Standar yang sudah dibuat manual di database beserta daftar Pernyataan Standarnya
+  const standarMap = new Map<string, Set<string>>();
+  const standarCountMap = new Map<string, number>();
   for (const p of periodes) {
     for (const ind of p.indikator) {
-      if (ind.standar) {
-        allStandarSet.add(ind.standar);
-        existingStandarInDb.add(ind.standar);
+      if (!ind.standar) continue;
+      if (!standarMap.has(ind.standar)) {
+        standarMap.set(ind.standar, new Set<string>());
       }
+      if (ind.pernyataanStandar) {
+        standarMap.get(ind.standar)!.add(ind.pernyataanStandar);
+      }
+      standarCountMap.set(ind.standar, (standarCountMap.get(ind.standar) ?? 0) + 1);
     }
   }
-  const allStandarList = Array.from(allStandarSet);
-  const filterStandarList = Array.from(existingStandarInDb);
+
+  const existingStandarList: ExistingStandarInfo[] = Array.from(standarMap.entries()).map(
+    ([standar, psSet]) => ({
+      standar,
+      pernyataanStandarList: Array.from(psSet),
+      nextIkNumber: (standarCountMap.get(standar) ?? 0) + 1,
+    })
+  );
+  const filterStandarList = existingStandarList.map((s) => s.standar);
 
   return (
     <>
-      <PageHeader title="Master Standar & Indikator SPMI" />
+      <PageHeader title="Master Standar, Pernyataan Standar & Indikator SPMI" />
       <Flash ok={one(sp.ok)} err={one(sp.err)} />
 
       {periodes.length > 0 && (
         <ImportIndikatorExcel periodes={periodeOptions} defaultPeriodeId="ALL" />
       )}
 
-      {/* Form Tambah Indikator (Pilih Standar yang Ada atau Buat Standar Baru) */}
-      <form action={tambahIndikator} className="card space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/15 pb-2">
-          <h2 className="text-base font-black text-black">
-            + Tambah Standar / Indikator Baru
-          </h2>
-          <Badge tone="blue">1 Standar Bisa Memiliki Banyak Indikator</Badge>
-        </div>
-
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
-          <div className="space-y-1">
-            <label>Sesi AMI</label>
-            <select name="periodeId" defaultValue="ALL" className="w-full text-xs">
-              <option value="ALL">Semua Sesi AMI</option>
-              {periodes.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.nama}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="space-y-1">
-            <label>Pilih Standar SPMI</label>
-            <select
-              name="standar"
-              defaultValue={allStandarList[0] ?? "Standar Isi Pembelajaran"}
-              className="w-full text-xs font-bold"
-            >
-              {allStandarList.map((st) => (
-                <option key={st} value={st}>
-                  {st}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="space-y-1">
-            <label>Atau Ketik Standar Baru (Emergency)</label>
-            <input
-              name="standarBaru"
-              placeholder="Kosongkan jika pilih di samping..."
-              className="w-full text-xs"
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label>Kode Indikator</label>
-            <input
-              name="kode"
-              required
-              placeholder="STD-ISI-01"
-              className="w-full font-mono text-xs"
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <div className="space-y-1 sm:col-span-2">
-            <label>Pernyataan Indikator</label>
-            <input
-              name="pernyataan"
-              required
-              placeholder="Pernyataan indikator..."
-              className="w-full text-xs"
-            />
-          </div>
-          <div className="space-y-1">
-            <label>Dokumen Bukti</label>
-            <div className="flex gap-2">
-              <input
-                name="buktiDiminta"
-                placeholder="Contoh: SK Kurikulum, RPS..."
-                className="w-full text-xs"
-              />
-              <button className="btn shrink-0 text-xs">+ Tambah</button>
-            </div>
-          </div>
-        </div>
-      </form>
+      {/* Form Bertahap Manual: 1. Standar -> 2. Pernyataan Standar -> 3. Indikator */}
+      <FormStandarBertahap
+        returnTo="/lpm/indikator"
+        periodes={periodes.map((p) => ({ id: p.id, nama: p.nama }))}
+        defaultPeriodeId="ALL"
+        existingStandarList={existingStandarList}
+      />
 
       {/* Filter / Sort Indikator per Standar */}
       {filterStandarList.length > 0 && (
@@ -169,174 +114,228 @@ export default async function LpmIndikatorPage({ searchParams }: { searchParams:
               ? allGroups
               : allGroups.filter((g) => g.standar === standarFilter);
 
+          const rekapRows = p.indikator.map((ind) => ({
+            id: ind.id,
+            kode: ind.kode,
+            standar: ind.standar,
+            pernyataanStandar: ind.pernyataanStandar,
+            pernyataan: ind.pernyataan,
+            buktiDiminta: ind.buktiDiminta,
+            isian: ind.isian.find((i) => !p.unitId || i.unitId === p.unitId) ?? ind.isian[0] ?? null,
+          }));
+
           return (
-            <div key={p.id} className="card space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/15 pb-2.5">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-base font-black text-black">{p.nama}</h3>
-                  <Badge tone="blue">{p.indikator.length} Indikator</Badge>
-                  <Badge tone="purple">{allGroups.length} Standar</Badge>
+            <div key={p.id} className="space-y-4">
+              {/* 2 Tab Tabel (1. Tabel Standar, Pernyataan Standar & Indikator | 2. Tabel Rekap Audit Sesi Sebelum Print) */}
+              <TabelInstrumenDanRekap
+                periodeId={p.id}
+                periodeNama={p.nama}
+                indikator={rekapRows}
+                defaultTab="instrumen"
+              />
+
+              <div className="card space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/15 pb-2.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-base font-black text-black">
+                      ✏️ Kelola / Edit Standar &amp; Indikator — {p.nama}
+                    </h3>
+                    <Badge tone="blue">{p.indikator.length} Indikator</Badge>
+                    <Badge tone="purple">{allGroups.length} Standar</Badge>
+                  </div>
                 </div>
-              </div>
 
-              {visibleGroups.length === 0 ? (
-                <Empty>Belum ada indikator untuk standar ini.</Empty>
-              ) : (
-                <div className="space-y-4">
-                  {visibleGroups.map((group) => (
-                    <div
-                      key={group.standar}
-                      className="rounded-2xl border-2 border-black bg-[#FAF7EE] p-4 space-y-3 shadow-[3px_3px_0px_#000]"
-                    >
-                      {/* Header Kelompok Standar + Ubah Nama Standar + Hapus Standar (Emergency) */}
-                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/15 pb-2.5">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-xl border border-black bg-[#FEF08A] px-3 py-1 text-xs font-black text-black">
-                            📂 {group.standar}
-                          </span>
-                          <Badge tone="blue">
-                            Indikator {group.startIndex} – {group.endIndex} ({group.items.length} Butir)
-                          </Badge>
-                        </div>
+                {visibleGroups.length === 0 ? (
+                  <Empty>Belum ada indikator untuk standar ini.</Empty>
+                ) : (
+                  <div className="space-y-4">
+                    {visibleGroups.map((group) => {
+                      const lastPs =
+                        group.items[group.items.length - 1]?.item.pernyataanStandar ?? "";
 
-                        <div className="flex flex-wrap items-center gap-2">
-                          {/* Emergency: Ubah Nama Standar */}
-                          <details className="relative">
-                            <summary className="btn-secondary text-xs list-none">
-                              ✏️ Ubah Nama Standar
-                            </summary>
-                            <form
-                              action={ubahNamaStandar}
-                              className="mt-2 flex items-center gap-1.5 rounded-xl border border-black bg-white p-2"
-                            >
-                              <input type="hidden" name="periodeId" value={p.id} />
-                              <input type="hidden" name="standarLama" value={group.standar} />
-                              <input type="hidden" name="returnTo" value="/lpm/indikator" />
-                              <input
-                                name="standarBaru"
-                                required
-                                defaultValue={group.standar}
-                                className="w-48 text-xs"
-                              />
-                              <button className="btn-success text-xs">Simpan</button>
-                            </form>
-                          </details>
+                      return (
+                        <div
+                          key={group.standar}
+                          className="rounded-2xl border-2 border-black bg-[#FAF7EE] p-4 space-y-3 shadow-[3px_3px_0px_#000]"
+                        >
+                          {/* Header Kelompok Standar + Ubah Nama Standar + Hapus Standar (Emergency) */}
+                          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/15 pb-2.5">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="rounded-xl border border-black bg-[#FEF08A] px-3 py-1 text-xs font-black text-black">
+                                📂 {group.standar}
+                              </span>
+                              <Badge tone="blue">
+                                Indikator {group.startIndex} – {group.endIndex} ({group.items.length} Butir)
+                              </Badge>
+                            </div>
 
-                          {/* Emergency: Hapus 1 Standar Sekaligus */}
-                          <form action={hapusStandarEmergency}>
-                            <input type="hidden" name="periodeId" value={p.id} />
-                            <input type="hidden" name="standar" value={group.standar} />
-                            <input type="hidden" name="returnTo" value="/lpm/indikator" />
-                            <button className="btn-danger text-xs">
-                              🗑️ Hapus Standar Ini
-                            </button>
-                          </form>
-                        </div>
-                      </div>
-
-                      {/* Daftar Indikator di dalam Standar Ini */}
-                      <div className="space-y-2.5">
-                        {group.items.map(({ item: ind, noUrut }) => (
-                          <div
-                            key={ind.id}
-                            className="rounded-xl border border-black/15 bg-white p-3 space-y-2"
-                          >
-                            <form action={editIndikator} className="space-y-2">
-                              <input type="hidden" name="indikatorId" value={ind.id} />
-                              <input type="hidden" name="returnTo" value="/lpm/indikator" />
-                              <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
-                                <div className="space-y-1">
-                                  <label>No. {noUrut} — Kode</label>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <details className="relative">
+                                <summary className="btn-secondary text-xs list-none">
+                                  ✏️ Ubah Nama Standar
+                                </summary>
+                                <form
+                                  action={ubahNamaStandar}
+                                  className="mt-2 flex items-center gap-1.5 rounded-xl border border-black bg-white p-2"
+                                >
+                                  <input type="hidden" name="periodeId" value={p.id} />
+                                  <input type="hidden" name="standarLama" value={group.standar} />
+                                  <input type="hidden" name="returnTo" value="/lpm/indikator" />
                                   <input
-                                    name="kode"
+                                    name="standarBaru"
                                     required
-                                    defaultValue={ind.kode}
-                                    className="w-full font-mono text-xs"
+                                    defaultValue={group.standar}
+                                    className="w-48 text-xs"
                                   />
-                                </div>
-                                <div className="space-y-1">
-                                  <label>Standar</label>
-                                  <input
-                                    name="standar"
-                                    required
-                                    defaultValue={ind.standar}
-                                    className="w-full text-xs"
-                                  />
-                                </div>
-                                <div className="space-y-1 sm:col-span-2">
-                                  <label>Dokumen Bukti</label>
-                                  <input
-                                    name="buktiDiminta"
-                                    defaultValue={ind.buktiDiminta ?? ""}
-                                    placeholder="Contoh: SK Kurikulum, RPS..."
-                                    className="w-full text-xs"
-                                  />
-                                </div>
-                              </div>
+                                  <button className="btn-success text-xs">Simpan</button>
+                                </form>
+                              </details>
 
-                              <div className="flex flex-wrap items-end gap-2">
-                                <div className="flex-1 space-y-1">
-                                  <label>Pernyataan Indikator #{noUrut}</label>
-                                  <textarea
-                                    name="pernyataan"
-                                    rows={2}
-                                    required
-                                    defaultValue={ind.pernyataan}
-                                    className="w-full text-xs"
-                                  />
-                                </div>
-                                <button type="submit" className="btn-success shrink-0 text-xs">
-                                  💾 Simpan Edit
-                                </button>
-                              </div>
-                            </form>
-
-                            <div className="flex justify-end border-t border-black/10 pt-1.5">
-                              <form action={hapusIndikator}>
-                                <input type="hidden" name="indikatorId" value={ind.id} />
+                              <form action={hapusStandarEmergency}>
+                                <input type="hidden" name="periodeId" value={p.id} />
+                                <input type="hidden" name="standar" value={group.standar} />
                                 <input type="hidden" name="returnTo" value="/lpm/indikator" />
-                                <button className="btn-danger px-2.5 py-1 text-xs">
-                                  Hapus Indikator #{noUrut}
+                                <button className="btn-danger text-xs">
+                                  🗑️ Hapus Standar Ini
                                 </button>
                               </form>
                             </div>
                           </div>
-                        ))}
-                      </div>
 
-                      {/* Form Cepat: + Tambah Indikator Langsung ke Standar Ini */}
-                      <form
-                        action={tambahIndikator}
-                        className="grid grid-cols-1 gap-2 rounded-xl border border-dashed border-black/30 bg-[#EFE9DB]/60 p-2.5 sm:grid-cols-4"
-                      >
-                        <input type="hidden" name="periodeId" value={p.id} />
-                        <input type="hidden" name="standar" value={group.standar} />
-                        <input type="hidden" name="returnTo" value="/lpm/indikator" />
-                        <input
-                          name="kode"
-                          required
-                          placeholder="+ Kode baru..."
-                          className="font-mono text-xs"
-                        />
-                        <input
-                          name="pernyataan"
-                          required
-                          placeholder={`+ Tambah indikator ke ${group.standar}...`}
-                          className="text-xs sm:col-span-2"
-                        />
-                        <div className="flex gap-1.5">
-                          <input
-                            name="buktiDiminta"
-                            placeholder="Dokumen bukti..."
-                            className="w-full text-xs"
-                          />
-                          <button className="btn shrink-0 px-3 py-1 text-xs">+ Tambah</button>
+                          {/* Daftar Indikator di dalam Standar Ini */}
+                          <div className="space-y-2.5">
+                            {group.items.map(({ item: ind, noUrut }) => (
+                              <div
+                                key={ind.id}
+                                className="rounded-xl border border-black/15 bg-white p-3 space-y-2"
+                              >
+                                <form action={editIndikator} className="space-y-2">
+                                  <input type="hidden" name="indikatorId" value={ind.id} />
+                                  <input type="hidden" name="returnTo" value="/lpm/indikator" />
+                                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
+                                    <div className="space-y-1">
+                                      <label>No. {noUrut} — Kode (IK)</label>
+                                      <input
+                                        name="kode"
+                                        required
+                                        defaultValue={ind.kode}
+                                        className="w-full font-mono text-xs"
+                                      />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <label>Standar</label>
+                                      <input
+                                        name="standar"
+                                        required
+                                        defaultValue={ind.standar}
+                                        className="w-full text-xs"
+                                      />
+                                    </div>
+                                    <div className="space-y-1 sm:col-span-2">
+                                      <label>Dokumen Bukti</label>
+                                      <input
+                                        name="buktiDiminta"
+                                        defaultValue={ind.buktiDiminta ?? ""}
+                                        placeholder="Contoh: Dokumen Kurikulum Program Studi yang memuat CPL"
+                                        className="w-full text-xs"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  <div className="space-y-1">
+                                    <label>Isi Pernyataan Standar</label>
+                                    <textarea
+                                      name="pernyataanStandar"
+                                      rows={2}
+                                      defaultValue={ind.pernyataanStandar ?? ""}
+                                      placeholder="Isi pernyataan standar..."
+                                      className="w-full text-xs"
+                                    />
+                                  </div>
+
+                                  <div className="flex flex-wrap items-end gap-2">
+                                    <div className="flex-1 space-y-1">
+                                      <label>Indikator Kinerja ({ind.kode})</label>
+                                      <textarea
+                                        name="pernyataan"
+                                        rows={2}
+                                        required
+                                        defaultValue={ind.pernyataan}
+                                        className="w-full text-xs"
+                                      />
+                                    </div>
+                                    <button type="submit" className="btn-success shrink-0 text-xs">
+                                      💾 Simpan Edit
+                                    </button>
+                                  </div>
+                                </form>
+
+                                <div className="flex justify-end border-t border-black/10 pt-1.5">
+                                  <form action={hapusIndikator}>
+                                    <input type="hidden" name="indikatorId" value={ind.id} />
+                                    <input type="hidden" name="returnTo" value="/lpm/indikator" />
+                                    <button className="btn-danger px-2.5 py-1 text-xs">
+                                      Hapus Indikator #{noUrut} ({ind.kode})
+                                    </button>
+                                  </form>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Form Cepat: + Tambah Indikator (IK) Lanjutan ke Standar Ini */}
+                          <form
+                            action={tambahIndikator}
+                            className="space-y-2 rounded-xl border border-dashed border-black/30 bg-[#EFE9DB]/60 p-3"
+                          >
+                            <div className="text-xs font-black text-black">
+                              ➕ Tambah Indikator Lanjutan ke &ldquo;{group.standar}&rdquo;
+                            </div>
+                            <input type="hidden" name="periodeId" value={p.id} />
+                            <input type="hidden" name="standar" value={group.standar} />
+                            <input type="hidden" name="returnTo" value="/lpm/indikator" />
+
+                            <div className="space-y-1">
+                              <label>Isi Pernyataan Standar</label>
+                              <textarea
+                                name="pernyataanStandar"
+                                rows={2}
+                                defaultValue={lastPs}
+                                placeholder="Isi pernyataan standar..."
+                                className="w-full text-xs"
+                              />
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
+                              <input
+                                name="kode"
+                                required
+                                defaultValue={`IK${group.items.length + 1}`}
+                                placeholder="IK..."
+                                className="font-mono text-xs"
+                              />
+                              <input
+                                name="pernyataan"
+                                required
+                                placeholder="Indikator kinerja..."
+                                className="text-xs sm:col-span-2"
+                              />
+                              <div className="flex gap-1.5">
+                                <input
+                                  name="buktiDiminta"
+                                  placeholder="Dokumen bukti..."
+                                  className="w-full text-xs"
+                                />
+                                <button className="btn shrink-0 text-xs">+ Tambah</button>
+                              </div>
+                            </div>
+                          </form>
                         </div>
-                      </form>
-                    </div>
-                  ))}
-                </div>
-              )}
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           );
         })

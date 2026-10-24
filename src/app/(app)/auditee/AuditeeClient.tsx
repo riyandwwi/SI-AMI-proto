@@ -17,6 +17,7 @@ export interface AuditeeIndikatorItem {
   id: string;
   kode: string;
   standar: string;
+  pernyataanStandar: string | null;
   pernyataan: string;
   target: string;
   buktiDiminta: string | null;
@@ -421,7 +422,17 @@ export default function AuditeeClient({
               </div>
             </div>
 
-            <p className="text-sm font-semibold text-slate-900">{ind.pernyataan}</p>
+            {ind.pernyataanStandar && (
+              <div className="rounded-xl border border-black/15 bg-[#FAF7EE] px-3 py-2 text-xs text-slate-800">
+                <strong className="font-black text-black">📜 Isi Pernyataan Standar:</strong>{" "}
+                {ind.pernyataanStandar}
+              </div>
+            )}
+
+            <p className="text-sm font-semibold text-slate-900">
+              <strong className="text-black">🎯 Indikator Kinerja ({ind.kode}):</strong>{" "}
+              {ind.pernyataan}
+            </p>
 
             {/* Form Evaluasi Diri & Link Google Drive */}
             <form

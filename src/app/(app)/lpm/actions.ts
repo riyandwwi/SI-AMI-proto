@@ -14,6 +14,8 @@ const DEFAULT_INDIKATOR = [
   {
     kode: "STD-PEND-01",
     standar: "Standar Isi Pembelajaran",
+    pernyataanStandar:
+      "UPPS memastikan materi pembelajaran dan kurikulum setiap program studi berbasis OBE serta memperhatikan perkembangan IPTEK dan kebutuhan DUDIKA.",
     pernyataan:
       "Ketersediaan dokumen Kurikulum Berbasis OBE dan RPS lengkap untuk seluruh mata kuliah aktif semester berjalan.",
     target: "-",
@@ -23,6 +25,8 @@ const DEFAULT_INDIKATOR = [
   {
     kode: "STD-PEND-02",
     standar: "Standar Proses Pembelajaran",
+    pernyataanStandar:
+      "Pelaksanaan proses pembelajaran dilakukan secara terstruktur sesuai perencanaan pembelajaran (RPS) dengan memanfaatkan sumber pembelajaran yang tepat.",
     pernyataan:
       "Pelaksanaan monitoring kehadiran dosen dan kesesuaian materi perkuliahan minimal 14-16 pertemuan per semester beserta berita acara.",
     target: "-",
@@ -32,6 +36,8 @@ const DEFAULT_INDIKATOR = [
   {
     kode: "STD-PENEL-01",
     standar: "Standar Penelitian & PKM",
+    pernyataanStandar:
+      "Program studi melibatkan mahasiswa dalam kegiatan penelitian dan pengabdian kepada masyarakat dosen sesuai peta jalan penelitian.",
     pernyataan:
       "Keterlibatan mahasiswa dalam peta jalan penelitian dosen tetap program studi yang dibuktikan dengan SK/Kontrak atau publikasi bersama.",
     target: "-",
@@ -74,6 +80,7 @@ export async function buatSesiAmi(fd: FormData) {
       ? lastPeriode.indikator.map((i, idx) => ({
           kode: i.kode,
           standar: i.standar,
+          pernyataanStandar: i.pernyataanStandar,
           pernyataan: i.pernyataan,
           target: i.target,
           buktiDiminta: i.buktiDiminta,
@@ -398,6 +405,7 @@ export async function tambahIndikator(fd: FormData) {
   const standarPilihan = str(fd, "standar", 120);
   const standarBaru = str(fd, "standarBaru", 120);
   const standar = standarBaru || standarPilihan;
+  const pernyataanStandar = str(fd, "pernyataanStandar", 2000) || null;
   const pernyataan = str(fd, "pernyataan", 1000);
   const buktiDiminta = str(fd, "buktiDiminta", 500) || null;
 
@@ -417,12 +425,13 @@ export async function tambahIndikator(fd: FormData) {
   for (const p of periodes) {
     const jml = await prisma.indikator.count({ where: { periodeId: p.id } });
     await prisma.indikator.upsert({
-      where: { periodeId_kode: { periodeId: p.id, kode } },
-      update: { standar, pernyataan, buktiDiminta },
+      where: { periodeId_standar_kode: { periodeId: p.id, standar, kode } },
+      update: { standar, pernyataanStandar, pernyataan, buktiDiminta },
       create: {
         periodeId: p.id,
         kode,
         standar,
+        pernyataanStandar,
         pernyataan,
         target: "-",
         buktiDiminta,
@@ -434,9 +443,10 @@ export async function tambahIndikator(fd: FormData) {
   await catat(user.id, "TAMBAH_INDIKATOR", `[${kode}] ${standar}`);
   revalidatePath("/lpm/indikator");
   revalidatePath("/lpm");
+  revalidatePath("/lpm/rekap");
   revalidatePath("/auditee");
   revalidatePath("/auditor");
-  ok(returnTo, `Indikator "${kode}" ditambahkan.`);
+  ok(returnTo, `Indikator "${kode}" pada "${standar}" ditambahkan.`);
 }
 
 export async function editIndikator(fd: FormData) {
@@ -445,6 +455,7 @@ export async function editIndikator(fd: FormData) {
   const indikatorId = str(fd, "indikatorId", 64);
   const kode = str(fd, "kode", 32).toUpperCase().replace(/\s+/g, "-");
   const standar = str(fd, "standar", 120);
+  const pernyataanStandar = str(fd, "pernyataanStandar", 2000) || null;
   const pernyataan = str(fd, "pernyataan", 1000);
   const buktiDiminta = str(fd, "buktiDiminta", 500) || null;
 
@@ -455,24 +466,31 @@ export async function editIndikator(fd: FormData) {
   const existing = await prisma.indikator.findUnique({ where: { id: indikatorId } });
   if (!existing) fail(returnTo, "Indikator tidak ditemukan.");
 
-  // Cek duplikat kode dalam sesi yang sama jika kode diubah
-  if (kode !== existing.kode) {
+  // Cek duplikat kode dalam sesi & standar yang sama jika kode/standar diubah
+  if (kode !== existing.kode || standar !== existing.standar) {
     const duplicate = await prisma.indikator.findUnique({
-      where: { periodeId_kode: { periodeId: existing.periodeId, kode } },
+      where: {
+        periodeId_standar_kode: {
+          periodeId: existing.periodeId,
+          standar,
+          kode,
+        },
+      },
     });
-    if (duplicate) {
-      fail(returnTo, `Kode indikator "${kode}" sudah digunakan pada sesi ini.`);
+    if (duplicate && duplicate.id !== existing.id) {
+      fail(returnTo, `Kode indikator "${kode}" sudah digunakan pada standar "${standar}".`);
     }
   }
 
   await prisma.indikator.update({
     where: { id: indikatorId },
-    data: { kode, standar, pernyataan, buktiDiminta },
+    data: { kode, standar, pernyataanStandar, pernyataan, buktiDiminta },
   });
 
   await catat(user.id, "EDIT_INDIKATOR", `[${kode}] ${standar}`);
   revalidatePath("/lpm/indikator");
   revalidatePath("/lpm");
+  revalidatePath("/lpm/rekap");
   revalidatePath("/auditee");
   revalidatePath("/auditor");
   ok(returnTo, `Indikator "${kode}" berhasil diperbarui.`);
@@ -559,6 +577,7 @@ export async function hapusStandarEmergency(fd: FormData) {
 export interface ExcelIndikatorRowInput {
   kode: string;
   standar: string;
+  pernyataanStandar?: string;
   pernyataan: string;
   buktiDiminta: string;
 }
@@ -600,12 +619,18 @@ export async function importBatchIndikatorExcel(
   let skippedCount = 0;
 
   for (const p of periodes) {
-    const existingMap = new Map(p.indikator.map((ind) => [ind.kode.toUpperCase(), ind]));
+    const existingMap = new Map(
+      p.indikator.map((ind) => [
+        `${ind.standar.trim().toUpperCase()}|||${ind.kode.trim().toUpperCase()}`,
+        ind,
+      ])
+    );
     let nextUrutan = p.indikator.length + 1;
 
     for (const raw of rows) {
       const kode = (raw.kode || "").trim().toUpperCase().replace(/\s+/g, "-").slice(0, 32);
       const standar = (raw.standar || "").trim().slice(0, 120);
+      const pernyataanStandar = (raw.pernyataanStandar || "").trim().slice(0, 2000) || null;
       const pernyataan = (raw.pernyataan || "").trim().slice(0, 1000);
       const buktiDiminta = (raw.buktiDiminta || "").trim().slice(0, 500) || null;
 
@@ -614,7 +639,8 @@ export async function importBatchIndikatorExcel(
         continue;
       }
 
-      const existing = existingMap.get(kode);
+      const mapKey = `${standar.toUpperCase()}|||${kode}`;
+      const existing = existingMap.get(mapKey);
       if (existing) {
         if (mode === "SKIP_EXISTING") {
           skippedCount++;
@@ -622,7 +648,7 @@ export async function importBatchIndikatorExcel(
         } else {
           await prisma.indikator.update({
             where: { id: existing.id },
-            data: { standar, pernyataan, buktiDiminta },
+            data: { standar, pernyataanStandar, pernyataan, buktiDiminta },
           });
           updatedCount++;
         }
@@ -632,13 +658,14 @@ export async function importBatchIndikatorExcel(
             periodeId: p.id,
             kode,
             standar,
+            pernyataanStandar,
             pernyataan,
             target: "-",
             buktiDiminta,
             urutan: nextUrutan++,
           },
         });
-        existingMap.set(kode, created);
+        existingMap.set(mapKey, created);
         addedCount++;
       }
     }

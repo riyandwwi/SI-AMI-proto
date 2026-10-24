@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { sortPeriodesChronological } from "@/lib/periode";
 import { Badge, Empty, Flash, PageHeader, one, type SP } from "@/components/ui";
 import { SignaturePadCard } from "@/components/SignaturePadCard";
+import { TabelInstrumenDanRekap } from "@/components/TabelInstrumenDanRekap";
 import AuditeeClient, { type AuditeeIndikatorItem } from "./AuditeeClient";
 
 export default async function AuditeePage({ searchParams }: { searchParams: SP }) {
@@ -87,6 +88,7 @@ export default async function AuditeePage({ searchParams }: { searchParams: SP }
       id: ind.id,
       kode: ind.kode,
       standar: ind.standar,
+      pernyataanStandar: ind.pernyataanStandar,
       pernyataan: ind.pernyataan,
       target: ind.target,
       buktiDiminta: ind.buktiDiminta,
@@ -191,12 +193,21 @@ export default async function AuditeePage({ searchParams }: { searchParams: SP }
       {clientItems.length === 0 ? (
         <Empty>Belum ada indikator.</Empty>
       ) : (
-        <AuditeeClient
-          periodeId={periode.id}
-          unitId={user.unitId}
-          buka={buka}
-          indikator={clientItems}
-        />
+        <>
+          <TabelInstrumenDanRekap
+            periodeId={periode.id}
+            periodeNama={periode.nama}
+            indikator={clientItems}
+            defaultTab="instrumen"
+          />
+
+          <AuditeeClient
+            periodeId={periode.id}
+            unitId={user.unitId}
+            buka={buka}
+            indikator={clientItems}
+          />
+        </>
       )}
 
       {/* Panel Tanda Tangan Ketua Auditee */}

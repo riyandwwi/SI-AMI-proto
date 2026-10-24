@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Badge, Empty, Flash, PageHeader, one, type SP } from "@/components/ui";
 import { SignaturePadCard } from "@/components/SignaturePadCard";
+import { TabelInstrumenDanRekap } from "@/components/TabelInstrumenDanRekap";
 import AuditorClient, { type AuditorIndikatorItem } from "./AuditorClient";
 
 export default async function AuditorUnitWorkspacePage({
@@ -62,6 +63,7 @@ export default async function AuditorUnitWorkspacePage({
       id: ind.id,
       kode: ind.kode,
       standar: ind.standar,
+      pernyataanStandar: ind.pernyataanStandar,
       pernyataan: ind.pernyataan,
       target: ind.target,
       buktiDiminta: ind.buktiDiminta,
@@ -140,13 +142,22 @@ export default async function AuditorUnitWorkspacePage({
       {clientItems.length === 0 ? (
         <Empty>Belum ada indikator.</Empty>
       ) : (
-        <AuditorClient
-          periodeId={periode.id}
-          unitId={targetUnitId}
-          mode={mode}
-          buka={buka}
-          indikator={clientItems}
-        />
+        <>
+          <TabelInstrumenDanRekap
+            periodeId={periode.id}
+            periodeNama={periode.nama}
+            indikator={clientItems}
+            defaultTab="rekap"
+          />
+
+          <AuditorClient
+            periodeId={periode.id}
+            unitId={targetUnitId}
+            mode={mode}
+            buka={buka}
+            indikator={clientItems}
+          />
+        </>
       )}
 
       {/* Panel Tanda Tangan Ketua Auditor */}
