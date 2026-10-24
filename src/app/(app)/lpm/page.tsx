@@ -496,6 +496,21 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                       : "🔓 Setelah selesai mengisi/mengimport indikator, klik Kunci agar indikator tampil di halaman Auditor & Auditee."}
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
+                    {!activePeriodeForPantau.sourceLocked && (
+                      <form action={toggleKunciIndikator}>
+                        <input type="hidden" name="periodeId" value={activePeriodeForPantau.id} />
+                        <input type="hidden" name="lockAction" value="DRAFT" />
+                        <input
+                          type="hidden"
+                          name="returnTo"
+                          value={`/lpm?tab=pantau&periodeId=${activePeriodeForPantau.id}`}
+                        />
+                        <button className="btn-secondary text-xs">
+                          💾 Simpan sebagai Draft
+                        </button>
+                      </form>
+                    )}
+
                     <form action={toggleKunciIndikator}>
                       <input type="hidden" name="periodeId" value={activePeriodeForPantau.id} />
                       <input
@@ -516,7 +531,7 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                         }
                       >
                         {activePeriodeForPantau.sourceLocked
-                          ? "🔓 Buka Kunci Indikator (Untuk Edit)"
+                          ? "🔓 Buka Kunci (Kembali ke Draft / Edit)"
                           : "🔒 Kunci & Terbitkan ke Auditor/Auditee"}
                       </button>
                     </form>
@@ -750,9 +765,24 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                                           placeholder="Indikator kinerja..."
                                           className="w-full text-xs"
                                         />
-                                        <button type="submit" className="btn-success w-full py-1 text-xs">
-                                          💾 Simpan Edit
-                                        </button>
+                                        <div className="flex flex-wrap gap-1.5">
+                                          <button
+                                            type="submit"
+                                            name="aksiSimpan"
+                                            value="DRAFT"
+                                            className="btn-secondary flex-1 py-1 text-xs"
+                                          >
+                                            💾 Simpan Draft
+                                          </button>
+                                          <button
+                                            type="submit"
+                                            name="aksiSimpan"
+                                            value="LOCK"
+                                            className="btn-success flex-1 py-1 text-xs"
+                                          >
+                                            🔒 Simpan &amp; Kunci
+                                          </button>
+                                        </div>
                                       </form>
                                     </details>
                                   )}

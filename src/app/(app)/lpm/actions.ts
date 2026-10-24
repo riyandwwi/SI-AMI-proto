@@ -408,6 +408,7 @@ export async function tambahIndikator(fd: FormData) {
   const pernyataanStandar = str(fd, "pernyataanStandar", 2000) || null;
   const pernyataan = str(fd, "pernyataan", 1000);
   const buktiDiminta = str(fd, "buktiDiminta", 500) || null;
+  const aksiSimpan = str(fd, "aksiSimpan", 20) || "DRAFT"; // "DRAFT" | "LOCK"
 
   if (!kode || !standar || !pernyataan) {
     fail(returnTo, "Kode, standar, dan pernyataan indikator wajib diisi.");
@@ -447,15 +448,26 @@ export async function tambahIndikator(fd: FormData) {
         urutan: jml + 1,
       },
     });
+    if (aksiSimpan === "LOCK") {
+      await prisma.periode.update({
+        where: { id: p.id },
+        data: { sourceLocked: true },
+      });
+    }
   }
 
-  await catat(user.id, "TAMBAH_INDIKATOR", `[${kode}] ${standar}`);
+  await catat(user.id, "TAMBAH_INDIKATOR", `[${kode}] ${standar} (${aksiSimpan})`);
   revalidatePath("/lpm/indikator");
   revalidatePath("/lpm");
   revalidatePath("/lpm/rekap");
   revalidatePath("/auditee");
   revalidatePath("/auditor");
-  ok(returnTo, `Indikator "${kode}" pada "${standar}" ditambahkan.`);
+  ok(
+    returnTo,
+    aksiSimpan === "LOCK"
+      ? `🔒 Indikator "${kode}" disimpan, DIKUNCI & DITERBITKAN ke Auditor/Auditee!`
+      : `💾 Indikator "${kode}" pada "${standar}" disimpan sebagai Draft.`
+  );
 }
 
 export async function editIndikator(fd: FormData) {
@@ -467,6 +479,7 @@ export async function editIndikator(fd: FormData) {
   const pernyataanStandar = str(fd, "pernyataanStandar", 2000) || null;
   const pernyataan = str(fd, "pernyataan", 1000);
   const buktiDiminta = str(fd, "buktiDiminta", 500) || null;
+  const aksiSimpan = str(fd, "aksiSimpan", 20) || "DRAFT"; // "DRAFT" | "LOCK"
 
   if (!indikatorId || !kode || !standar || !pernyataan) {
     fail(returnTo, "Kode, standar, dan pernyataan indikator wajib diisi.");
@@ -505,13 +518,25 @@ export async function editIndikator(fd: FormData) {
     data: { kode, standar, pernyataanStandar, pernyataan, buktiDiminta },
   });
 
-  await catat(user.id, "EDIT_INDIKATOR", `[${kode}] ${standar}`);
+  if (aksiSimpan === "LOCK") {
+    await prisma.periode.update({
+      where: { id: existing.periodeId },
+      data: { sourceLocked: true },
+    });
+  }
+
+  await catat(user.id, "EDIT_INDIKATOR", `[${kode}] ${standar} (${aksiSimpan})`);
   revalidatePath("/lpm/indikator");
   revalidatePath("/lpm");
   revalidatePath("/lpm/rekap");
   revalidatePath("/auditee");
   revalidatePath("/auditor");
-  ok(returnTo, `Indikator "${kode}" berhasil diperbarui.`);
+  ok(
+    returnTo,
+    aksiSimpan === "LOCK"
+      ? `🔒 Indikator "${kode}" diperbarui, DIKUNCI & DITERBITKAN ke Auditor/Auditee!`
+      : `💾 Perubahan indikator "${kode}" disimpan sebagai Draft.`
+  );
 }
 
 export async function hapusIndikator(fd: FormData) {
@@ -589,7 +614,7 @@ export async function toggleKunciIndikator(fd: FormData) {
   const user = await requireUser("LPM");
   const returnTo = str(fd, "returnTo", 200) || "/lpm/indikator";
   const periodeId = str(fd, "periodeId", 64) || "ALL";
-  const lockAction = str(fd, "lockAction", 16); // "LOCK" | "UNLOCK"
+  const lockAction = str(fd, "lockAction", 16); // "DRAFT" | "LOCK" | "UNLOCK"
 
   const nextLocked = lockAction === "LOCK";
 
@@ -606,7 +631,11 @@ export async function toggleKunciIndikator(fd: FormData) {
 
   await catat(
     user.id,
-    nextLocked ? "KUNCI_TERBITKAN_INDIKATOR" : "BUKA_KUNCI_INDIKATOR",
+    lockAction === "LOCK"
+      ? "KUNCI_TERBITKAN_INDIKATOR"
+      : lockAction === "DRAFT"
+        ? "SIMPAN_DRAFT_INDIKATOR"
+        : "BUKA_KUNCI_INDIKATOR",
     `Target: ${periodeId}`
   );
   revalidatePath("/lpm/indikator");
@@ -616,9 +645,11 @@ export async function toggleKunciIndikator(fd: FormData) {
   revalidatePath("/auditor");
   ok(
     returnTo,
-    nextLocked
+    lockAction === "LOCK"
       ? "🔒 Indikator berhasil DIKUNCI & DITERBITKAN ke halaman Auditor dan Auditee!"
-      : "🔓 Kunci Indikator DIBUKA. Silakan tambah/edit/hapus indikator, lalu klik Kunci kembali setelah selesai."
+      : lockAction === "DRAFT"
+        ? "💾 Indikator berhasil disimpan sebagai DRAFT LPM (Belum masuk ke Auditor/Auditee)."
+        : "🔓 Kunci Indikator DIBUKA (Mode Draft). Silakan tambah/edit/hapus indikator, lalu Simpan Draft atau Kunci kembali."
   );
 }
 

@@ -184,6 +184,17 @@ export default async function LpmIndikatorPage({ searchParams }: { searchParams:
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
+                    {!p.sourceLocked && (
+                      <form action={toggleKunciIndikator}>
+                        <input type="hidden" name="periodeId" value={p.id} />
+                        <input type="hidden" name="lockAction" value="DRAFT" />
+                        <input type="hidden" name="returnTo" value="/lpm/indikator" />
+                        <button className="btn-secondary text-xs">
+                          💾 Simpan sebagai Draft
+                        </button>
+                      </form>
+                    )}
+
                     <form action={toggleKunciIndikator}>
                       <input type="hidden" name="periodeId" value={p.id} />
                       <input
@@ -196,7 +207,7 @@ export default async function LpmIndikatorPage({ searchParams }: { searchParams:
                         className={p.sourceLocked ? "btn-secondary text-xs" : "btn-success text-xs"}
                       >
                         {p.sourceLocked
-                          ? "🔓 Buka Kunci Indikator (Untuk Edit)"
+                          ? "🔓 Buka Kunci (Kembali ke Draft / Edit)"
                           : "🔒 Kunci & Terbitkan ke Auditor/Auditee"}
                       </button>
                     </form>
@@ -346,9 +357,24 @@ export default async function LpmIndikatorPage({ searchParams }: { searchParams:
                                       />
                                     </div>
                                     {!p.sourceLocked && (
-                                      <button type="submit" className="btn-success shrink-0 text-xs">
-                                        💾 Simpan Edit
-                                      </button>
+                                      <div className="flex flex-wrap gap-1.5">
+                                        <button
+                                          type="submit"
+                                          name="aksiSimpan"
+                                          value="DRAFT"
+                                          className="btn-secondary shrink-0 text-xs"
+                                        >
+                                          💾 Simpan Draft
+                                        </button>
+                                        <button
+                                          type="submit"
+                                          name="aksiSimpan"
+                                          value="LOCK"
+                                          className="btn-success shrink-0 text-xs"
+                                        >
+                                          🔒 Simpan &amp; Kunci
+                                        </button>
+                                      </div>
                                     )}
                                   </div>
                                 </form>
