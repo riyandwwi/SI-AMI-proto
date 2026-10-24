@@ -33,8 +33,8 @@ export function ImportIndikatorExcel({
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const [selectedPeriodeId, setSelectedPeriodeId] = useState<string>(defaultPeriodeId);
-  const [mode, setMode] = useState<"SKIP_EXISTING" | "UPDATE_EXISTING">("SKIP_EXISTING");
+  const selectedPeriodeId = defaultPeriodeId;
+  const mode: "SKIP_EXISTING" | "UPDATE_EXISTING" = "UPDATE_EXISTING";
   const [fileName, setFileName] = useState<string>("");
   const [previewRows, setPreviewRows] = useState<PreviewRow[]>([]);
   const [parseError, setParseError] = useState<string | null>(null);
@@ -253,15 +253,7 @@ export function ImportIndikatorExcel({
     }
   };
 
-  const validRowsToImport = previewRows.filter((r) => {
-    const isComplete = Boolean(r.kode && r.standar && r.pernyataan);
-    if (!isComplete) return false;
-    const key = `${r.standar.toUpperCase()}|||${r.kode.toUpperCase()}`;
-    const isDuplicate =
-      existingCodeSet.has(key) || existingCodeSet.has(r.kode.toUpperCase());
-    if (isDuplicate && mode === "SKIP_EXISTING") return false;
-    return true;
-  });
+  const validRowsToImport = previewRows.filter((r) => Boolean(r.kode && r.standar && r.pernyataan));
 
   const handleConfirmImport = () => {
     if (validRowsToImport.length === 0) {
@@ -293,19 +285,26 @@ export function ImportIndikatorExcel({
   };
 
   return (
-    <div className="card space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/15 pb-2.5">
+    <div className="card space-y-3 py-3.5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-sm font-black text-black">📊 Import Indikator dari Excel</h2>
+
         <div className="flex flex-wrap items-center gap-2">
-          <h2 className="text-base font-black text-black">📊 Import Indikator dari Excel</h2>
-          <Badge tone="green">🔒 Aman untuk Indikator Manual</Badge>
+          <button
+            type="button"
+            onClick={handleDownloadTemplate}
+            className="btn-secondary text-xs"
+          >
+            📥 Download Template Excel (.xlsx)
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            onChange={handleFileChange}
+            className="max-w-xs text-xs file:mr-2 file:cursor-pointer file:rounded-lg file:border file:border-black file:bg-[#FEF08A] file:px-3 file:py-1 file:text-xs file:font-black hover:file:bg-[#fde047]"
+          />
         </div>
-        <button
-          type="button"
-          onClick={handleDownloadTemplate}
-          className="btn-secondary text-xs"
-        >
-          📥 Download Template Excel (.xlsx)
-        </button>
       </div>
 
       {parseError && (
@@ -319,58 +318,6 @@ export function ImportIndikatorExcel({
           ✓ {successMsg}
         </div>
       )}
-
-      <div className="rounded-xl border border-black/15 bg-[#FAF7EE] px-3 py-2 text-xs text-slate-700">
-        <strong>Format Kolom Excel yang Didukung:</strong>{" "}
-        <code className="rounded bg-[#FEF08A] px-1.5 py-0.5 font-black text-black">
-          No. | Standar (atau otomatis dari Nama Sheet) | Isi Pernyataan Standar | IK | Indikator Kinerja | Dokumen Bukti
-        </code>
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="space-y-1">
-          <label>Target Sesi AMI</label>
-          <select
-            value={selectedPeriodeId}
-            onChange={(e) => setSelectedPeriodeId(e.target.value)}
-            className="w-full text-xs"
-          >
-            <option value="ALL">Semua Sesi AMI</option>
-            {periodes.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.nama}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="space-y-1">
-          <label>Mode Perlindungan Indikator Manual</label>
-          <select
-            value={mode}
-            onChange={(e) => setMode(e.target.value as "SKIP_EXISTING" | "UPDATE_EXISTING")}
-            className="w-full text-xs font-bold"
-          >
-            <option value="SKIP_EXISTING">
-              🔒 Aman: Lewati Kode yang Sudah Ada (Indikator Manual Tidak Diubah)
-            </option>
-            <option value="UPDATE_EXISTING">
-              🔄 Update: Perbarui Standar/Pernyataan jika Kode Sama
-            </option>
-          </select>
-        </div>
-
-        <div className="space-y-1">
-          <label>Pilih File Excel (.xlsx / .xls / .csv)</label>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".xlsx,.xls,.csv"
-            onChange={handleFileChange}
-            className="w-full text-xs file:mr-2 file:rounded-lg file:border file:border-black file:bg-[#FEF08A] file:px-2.5 file:py-1 file:text-xs file:font-black"
-          />
-        </div>
-      </div>
 
       {/* Tabel Pratinjau (Preview) Sebelum Masuk Database */}
       {previewRows.length > 0 && (
@@ -429,11 +376,7 @@ export function ImportIndikatorExcel({
                         {isMissingRequired ? (
                           <Badge tone="red">🔴 Kosong (Skip)</Badge>
                         ) : isDuplicate ? (
-                          mode === "SKIP_EXISTING" ? (
-                            <Badge tone="amber">🟡 Sudah Ada (Skip)</Badge>
-                          ) : (
-                            <Badge tone="blue">🔄 Update</Badge>
-                          )
+                          <Badge tone="blue">🔄 Update</Badge>
                         ) : (
                           <Badge tone="green">🟢 Baru</Badge>
                         )}

@@ -49,6 +49,7 @@ export function FormStandarBertahap({
   const [pernyataan, setPernyataan] = useState<string>("");
   const [buktiDiminta, setBuktiDiminta] = useState<string>("");
   const [draftSavedNotice, setDraftSavedNotice] = useState<string | null>(null);
+  const [isExpanded, setIsExpanded] = useState<boolean>(false);
 
   // Pulihkan draft ketikan LPM dari localStorage saat halaman dibuka
   useEffect(() => {
@@ -127,22 +128,51 @@ export function FormStandarBertahap({
   };
 
   return (
-    <div className="card space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/15 pb-2.5">
-        <h2 className="text-base font-black text-black">
-          ➕ Input Bertahap: 1. Standar (Manual) ➔ 2. Pernyataan Standar ➔ 3. Indikator (IK)
-        </h2>
+    <div className={`card transition ${isExpanded ? "space-y-4 py-4" : "py-3"}`}>
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => setIsExpanded((prev) => !prev)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setIsExpanded((prev) => !prev);
+          }
+        }}
+        className={`flex cursor-pointer select-none flex-wrap items-center justify-between gap-2 ${
+          isExpanded ? "border-b border-black/15 pb-2.5" : ""
+        }`}
+      >
         <div className="flex flex-wrap items-center gap-2">
-          <Badge tone="amber">📝 Mode Draft Tersedia</Badge>
-          <Badge tone="blue">Urutan Sesuai Instrumen Excel AMI</Badge>
+          <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg border border-black bg-white text-xs font-black text-black">
+            {isExpanded ? "▼" : "▶"}
+          </span>
+          <h2 className="text-sm font-black text-black">
+            ➕ Input Indikator Manual (Standar ➔ Pernyataan Standar ➔ IK)
+          </h2>
+          {selectedStandar && !isExpanded && (
+            <Badge tone="blue">📂 {selectedStandar}</Badge>
+          )}
         </div>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsExpanded((prev) => !prev);
+          }}
+          className="btn-secondary px-3 py-1 text-xs"
+        >
+          {isExpanded ? "▲ Minimize Input Manual" : "▼ Buka Input Manual"}
+        </button>
       </div>
 
-      {draftSavedNotice && (
-        <div className="rounded-xl border border-black bg-[#FEF08A] px-3 py-2 text-xs font-bold text-black">
-          💾 {draftSavedNotice}
-        </div>
-      )}
+      {isExpanded && (
+        <div className="space-y-4">
+          {draftSavedNotice && (
+            <div className="rounded-xl border border-black bg-[#FEF08A] px-3 py-2 text-xs font-bold text-black">
+              💾 {draftSavedNotice}
+            </div>
+          )}
 
       {/* TAHAP 1: ISI MANUAL STANDAR DULU */}
       <div className="rounded-2xl border-2 border-black bg-[#FAF7EE] p-3.5 space-y-3">
@@ -340,6 +370,8 @@ export function FormStandarBertahap({
             </div>
           </div>
         </form>
+      )}
+        </div>
       )}
     </div>
   );

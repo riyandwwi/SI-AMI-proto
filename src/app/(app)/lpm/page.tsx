@@ -3,7 +3,6 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { HOMEBASE_LIST, PRODI_LIST } from "@/lib/roles";
 import {
-  DEFAULT_STANDAR_SPMI,
   KLASIFIKASI_LABEL,
   RTL_LABEL,
   STATUS_DOK_LABEL,
@@ -11,12 +10,11 @@ import {
   sortPeriodesChronological,
 } from "@/lib/periode";
 import { Badge, Empty, Flash, PageHeader, one, type SP } from "@/components/ui";
-import { TabelInstrumenDanRekap } from "@/components/TabelInstrumenDanRekap";
 import { ImportIndikatorExcel } from "./ImportIndikatorExcel";
 import { FormStandarBertahap, type ExistingStandarInfo } from "./FormStandarBertahap";
+import { LpmStandarFilterBar } from "./LpmStandarFilterBar";
 import {
   buatSesiAmi,
-  editIndikator,
   hapusIndikator,
   hapusSemuaIndikator,
   hapusSesiAmi,
@@ -24,7 +22,6 @@ import {
   hapusUserEmergencyOlehLpm,
   lepasAuditorDariSesi,
   pilihKetuaSesiAmi,
-  tambahIndikator,
   tambahUserEmergencyOlehLpm,
   toggleKunciIndikator,
   toggleStatusSesi,
@@ -599,49 +596,19 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                 </>
               )}
 
-              {/* 2 Tab Tabel (1. Tabel Standar, Pernyataan Standar & Indikator | 2. Tabel Rekap Audit Sesi Sebelum Print) */}
-              <TabelInstrumenDanRekap
-                periodeId={activePeriodeForPantau.id}
-                periodeNama={activePeriodeForPantau.nama}
-                indikator={activePeriodeForPantau.indikator.map((ind) => ({
-                  id: ind.id,
-                  kode: ind.kode,
-                  standar: ind.standar,
-                  pernyataanStandar: ind.pernyataanStandar,
-                  pernyataan: ind.pernyataan,
-                  buktiDiminta: ind.buktiDiminta,
-                  isian:
-                    ind.isian.find((i) =>
-                      activePeriodeForPantau.unitId
-                        ? i.unitId === activePeriodeForPantau.unitId
-                        : true
-                    ) ??
-                    ind.isian[0] ??
-                    null,
-                }))}
-                defaultTab="rekap"
-              />
-
-              {/* Filter / Sort Indikator per Standar */}
+              {/* Filter / Sort Indikator per Standar (Dropdown 1 Baris Minimalis + Print & Excel) */}
               {activePeriodeForPantau.indikator.length > 0 && (
-                <div className="card flex flex-wrap items-center gap-2 py-3 text-xs">
-                  <span className="font-black uppercase text-black">Filter / Sort Standar:</span>
-                  <Link
-                    href={`/lpm?tab=pantau&periodeId=${activePeriodeForPantau.id}&standar=ALL`}
-                    className={standarFilter === "ALL" ? "btn text-xs" : "btn-secondary text-xs"}
-                  >
-                    Semua Standar ({activePeriodeForPantau.indikator.length})
-                  </Link>
-                  {groupIndikatorByStandar(activePeriodeForPantau.indikator).map((g) => (
-                    <Link
-                      key={g.standar}
-                      href={`/lpm?tab=pantau&periodeId=${activePeriodeForPantau.id}&standar=${encodeURIComponent(g.standar)}`}
-                      className={standarFilter === g.standar ? "btn text-xs" : "btn-secondary text-xs"}
-                    >
-                      📂 {g.standar} ({g.startIndex}–{g.endIndex})
-                    </Link>
-                  ))}
-                </div>
+                <LpmStandarFilterBar
+                  periodeId={activePeriodeForPantau.id}
+                  standarFilter={standarFilter}
+                  totalIndikator={activePeriodeForPantau.indikator.length}
+                  groups={groupIndikatorByStandar(activePeriodeForPantau.indikator).map((g) => ({
+                    standar: g.standar,
+                    startIndex: g.startIndex,
+                    endIndex: g.endIndex,
+                    count: g.items.length,
+                  }))}
+                />
               )}
 
               {/* Daftar Indikator Dikelompokkan per Standar + Pekerjaan Auditee + Pekerjaan Auditor */}
@@ -714,78 +681,6 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                                     </div>
                                   )}
                                   <div className="mt-1 text-xs text-slate-800">{ind.pernyataan}</div>
-
-                                  {!activePeriodeForPantau.sourceLocked && (
-                                    <details className="mt-2">
-                                      <summary className="cursor-pointer text-xs font-black text-blue-700 hover:underline">
-                                        ✏️ Edit Indikator
-                                      </summary>
-                                      <form
-                                        action={editIndikator}
-                                        className="mt-2 space-y-1.5 rounded-xl border border-black/20 bg-[#FAF7EE] p-2.5 text-xs"
-                                      >
-                                        <input type="hidden" name="indikatorId" value={ind.id} />
-                                        <input
-                                          type="hidden"
-                                          name="returnTo"
-                                          value={`/lpm?tab=pantau&periodeId=${activePeriodeForPantau.id}`}
-                                        />
-                                        <input
-                                          name="kode"
-                                          required
-                                          defaultValue={ind.kode}
-                                          placeholder="Kode (IK)"
-                                          className="w-full font-mono text-xs"
-                                        />
-                                        <input
-                                          name="standar"
-                                          required
-                                          defaultValue={ind.standar}
-                                          placeholder="Standar"
-                                          className="w-full text-xs"
-                                        />
-                                        <textarea
-                                          name="pernyataanStandar"
-                                          rows={2}
-                                          defaultValue={ind.pernyataanStandar ?? ""}
-                                          placeholder="Isi pernyataan standar..."
-                                          className="w-full text-xs"
-                                        />
-                                        <input
-                                          name="buktiDiminta"
-                                          defaultValue={ind.buktiDiminta ?? ""}
-                                          placeholder="Dokumen bukti yang diminta..."
-                                          className="w-full text-xs"
-                                        />
-                                        <textarea
-                                          name="pernyataan"
-                                          rows={2}
-                                          required
-                                          defaultValue={ind.pernyataan}
-                                          placeholder="Indikator kinerja..."
-                                          className="w-full text-xs"
-                                        />
-                                        <div className="flex flex-wrap gap-1.5">
-                                          <button
-                                            type="submit"
-                                            name="aksiSimpan"
-                                            value="DRAFT"
-                                            className="btn-secondary flex-1 py-1 text-xs"
-                                          >
-                                            💾 Simpan Draft
-                                          </button>
-                                          <button
-                                            type="submit"
-                                            name="aksiSimpan"
-                                            value="LOCK"
-                                            className="btn-success flex-1 py-1 text-xs"
-                                          >
-                                            🔒 Simpan &amp; Kunci
-                                          </button>
-                                        </div>
-                                      </form>
-                                    </details>
-                                  )}
                                 </td>
 
                                 <td className="space-y-1.5 text-xs">
