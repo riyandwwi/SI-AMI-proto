@@ -3,7 +3,13 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { Klasifikasi, StatusDokumen, StatusRtl } from "@prisma/client";
-import { BUTUH_RTL, KLASIFIKASI_LABEL, RTL_LABEL, STATUS_DOK_LABEL } from "@/lib/periode";
+import {
+  BUTUH_RTL,
+  KLASIFIKASI_LABEL,
+  RTL_LABEL,
+  STATUS_DOK_LABEL,
+  groupIndikatorByStandar,
+} from "@/lib/periode";
 import { Badge } from "@/components/ui";
 import { simpanBatchIsianAuditee, simpanRtlAuditeeClient } from "./actions";
 
@@ -84,6 +90,7 @@ export default function AuditeeClient({
 
   const [notice, setNotice] = useState<{ ok?: string; err?: string } | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [standarFilter, setStandarFilter] = useState<string>("ALL");
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
@@ -271,6 +278,12 @@ export default function AuditeeClient({
     }
   }
 
+  const allGroups = groupIndikatorByStandar(indikator);
+  const visibleGroups =
+    standarFilter === "ALL"
+      ? allGroups
+      : allGroups.filter((g) => g.standar === standarFilter);
+
   return (
     <div className="space-y-4">
       {notice?.ok && (
@@ -281,6 +294,30 @@ export default function AuditeeClient({
       {notice?.err && (
         <div className="rounded-2xl border-2 border-black bg-[#FECDD3] px-4 py-3 text-sm font-black text-black shadow-[4px_4px_0px_#000]">
           ⚠️ {notice.err}
+        </div>
+      )}
+
+      {/* Filter Cepat per Standar SPMI */}
+      {allGroups.length > 1 && (
+        <div className="card flex flex-wrap items-center gap-2 py-3 text-xs">
+          <span className="font-black uppercase text-black">Standar SPMI:</span>
+          <button
+            type="button"
+            onClick={() => setStandarFilter("ALL")}
+            className={standarFilter === "ALL" ? "btn text-xs" : "btn-secondary text-xs"}
+          >
+            Semua Standar ({indikator.length} Indikator)
+          </button>
+          {allGroups.map((g) => (
+            <button
+              key={g.standar}
+              type="button"
+              onClick={() => setStandarFilter(g.standar)}
+              className={standarFilter === g.standar ? "btn text-xs" : "btn-secondary text-xs"}
+            >
+              📂 {g.standar} ({g.startIndex}–{g.endIndex})
+            </button>
+          ))}
         </div>
       )}
 
@@ -312,31 +349,45 @@ export default function AuditeeClient({
         </div>
       )}
 
-      {indikator.map((ind) => {
-        const isian = ind.isian;
-        const cur = values[ind.id] ?? { klaim: "", linkDrive: "", rtlRencana: "", rtlLinkBukti: "" };
-        const sav = savedValues[ind.id] ?? { klaim: "", linkDrive: "", diisiOleh: null };
-        const dirty = isDirty(ind.id);
-        const hasSavedDrive = Boolean(sav.linkDrive.trim());
-        const lockedByAuditor = Boolean(isian?.terverifikasiAuditor || isian?.terverifikasiLapangan);
-        const lockedLapangan = Boolean(isian?.terverifikasiLapangan);
-        const canEdit = buka && !lockedByAuditor;
-        const perluRtl = isian?.klasifikasi && BUTUH_RTL.includes(isian.klasifikasi);
-        const namaPengisi = sav.diisiOleh ?? isian?.diisiOleh;
+      {visibleGroups.map((group) => (
+        <div key={group.standar} className="space-y-3 pt-1">
+          {/* Kepala Kelompok Standar (Misal: Standar Isi Pembelajaran — Indikator 1 s/d 6) */}
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border-2 border-black bg-[#FEF08A] px-4 py-2.5 shadow-[3px_3px_0px_#000]">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-black text-black">📂 {group.standar}</span>
+              <Badge tone="slate">
+                Indikator {group.startIndex} – {group.endIndex}
+              </Badge>
+            </div>
+            <Badge tone="blue">{group.items.length} Indikator</Badge>
+          </div>
 
-        return (
-          <div
-            key={ind.id}
-            className={`card space-y-3 transition ${dirty ? "ring-2 ring-amber-300" : ""}`}
-          >
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/15 pb-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <code className="rounded-xl border border-black/30 bg-[#BAE6FD] px-2.5 py-0.5 text-xs font-black text-black">
-                  {ind.kode}
-                </code>
-                <span className="text-sm font-black text-black">{ind.standar}</span>
-                {ind.buktiDiminta && <Badge tone="slate">📋 Bukti: {ind.buktiDiminta}</Badge>}
-              </div>
+          {group.items.map(({ item: ind, noUrut }) => {
+            const isian = ind.isian;
+            const cur = values[ind.id] ?? { klaim: "", linkDrive: "", rtlRencana: "", rtlLinkBukti: "" };
+            const sav = savedValues[ind.id] ?? { klaim: "", linkDrive: "", diisiOleh: null };
+            const dirty = isDirty(ind.id);
+            const hasSavedDrive = Boolean(sav.linkDrive.trim());
+            const lockedByAuditor = Boolean(isian?.terverifikasiAuditor || isian?.terverifikasiLapangan);
+            const lockedLapangan = Boolean(isian?.terverifikasiLapangan);
+            const canEdit = buka && !lockedByAuditor;
+            const perluRtl = isian?.klasifikasi && BUTUH_RTL.includes(isian.klasifikasi);
+            const namaPengisi = sav.diisiOleh ?? isian?.diisiOleh;
+
+            return (
+              <div
+                key={ind.id}
+                className={`card space-y-3 transition ${dirty ? "ring-2 ring-amber-300" : ""}`}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/15 pb-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge tone="purple">Indikator #{noUrut}</Badge>
+                    <code className="rounded-xl border border-black/30 bg-[#BAE6FD] px-2.5 py-0.5 text-xs font-black text-black">
+                      {ind.kode}
+                    </code>
+                    <span className="text-sm font-black text-black">{ind.standar}</span>
+                    {ind.buktiDiminta && <Badge tone="slate">📋 Bukti: {ind.buktiDiminta}</Badge>}
+                  </div>
               <div className="flex flex-wrap items-center gap-1.5">
                 {dirty && <Badge tone="amber">📝 Belum Disimpan</Badge>}
                 {namaPengisi && <Badge tone="blue">👤 {namaPengisi}</Badge>}
@@ -519,8 +570,10 @@ export default function AuditeeClient({
               </form>
             )}
           </div>
-        );
-      })}
+            );
+          })}
+        </div>
+      ))}
     </div>
   );
 }

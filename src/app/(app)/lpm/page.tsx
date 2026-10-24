@@ -3,9 +3,11 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { HOMEBASE_LIST, PRODI_LIST } from "@/lib/roles";
 import {
+  DEFAULT_STANDAR_SPMI,
   KLASIFIKASI_LABEL,
   RTL_LABEL,
   STATUS_DOK_LABEL,
+  groupIndikatorByStandar,
   sortPeriodesChronological,
 } from "@/lib/periode";
 import { Badge, Empty, Flash, PageHeader, one, type SP } from "@/components/ui";
@@ -15,6 +17,7 @@ import {
   editIndikator,
   hapusIndikator,
   hapusSesiAmi,
+  hapusStandarEmergency,
   hapusUserEmergencyOlehLpm,
   lepasAuditorDariSesi,
   pilihKetuaSesiAmi,
@@ -29,6 +32,7 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
   const sp = await searchParams;
   const tab = one(sp.tab) ?? "sesi";
   const prodiFilter = one(sp.prodi) ?? "ALL";
+  const standarFilter = one(sp.standar) ?? "ALL";
   const selectedPeriodeId = one(sp.periodeId);
 
   const [rawPeriodes, allUsers] = await Promise.all([
@@ -481,254 +485,343 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
               {/* Form Cepat Tambah Indikator oleh LPM */}
               <form action={tambahIndikator} className="card space-y-3">
                 <input type="hidden" name="returnTo" value={`/lpm?tab=pantau&periodeId=${activePeriodeForPantau.id}`} />
-                <h3 className="border-b-2 border-black pb-2 text-sm font-black text-black">+ Tambah Indikator</h3>
+                <h3 className="border-b border-black/15 pb-2 text-sm font-black text-black">
+                  + Tambah Standar / Indikator
+                </h3>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
                   <div className="space-y-1">
                     <label>Sesi</label>
-                    <select name="periodeId" defaultValue={activePeriodeForPantau.id} className="w-full">
+                    <select name="periodeId" defaultValue={activePeriodeForPantau.id} className="w-full text-xs">
                       <option value={activePeriodeForPantau.id}>Sesi Ini ({activePeriodeForPantau.unit?.nama})</option>
                       <option value="ALL">Semua Sesi</option>
                     </select>
                   </div>
                   <div className="space-y-1">
-                    <label>Kode</label>
-                    <input name="kode" required placeholder="STD-PEND-04" className="w-full font-mono" />
+                    <label>Pilih Standar SPMI</label>
+                    <select
+                      name="standar"
+                      defaultValue="Standar Isi Pembelajaran"
+                      className="w-full text-xs font-bold"
+                    >
+                      {Array.from(
+                        new Set([
+                          ...DEFAULT_STANDAR_SPMI,
+                          ...activePeriodeForPantau.indikator.map((i) => i.standar),
+                        ])
+                      ).map((st) => (
+                        <option key={st} value={st}>
+                          {st}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div className="space-y-1">
-                    <label>Standar</label>
-                    <input name="standar" required placeholder="Standar Isi..." className="w-full" />
+                    <label>Atau Standar Baru (Emergency)</label>
+                    <input
+                      name="standarBaru"
+                      placeholder="Ketik jika standar baru..."
+                      className="w-full text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label>Kode</label>
+                    <input name="kode" required placeholder="STD-ISI-01" className="w-full font-mono text-xs" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div className="space-y-1 sm:col-span-2">
+                    <label>Pernyataan Indikator</label>
+                    <input
+                      name="pernyataan"
+                      required
+                      placeholder="Pernyataan indikator..."
+                      className="w-full text-xs"
+                    />
                   </div>
                   <div className="space-y-1">
                     <label>Dokumen Bukti</label>
-                    <input
-                      name="buktiDiminta"
-                      placeholder="SK, RPS, Laporan..."
-                      className="w-full"
-                    />
+                    <div className="flex gap-2">
+                      <input
+                        name="buktiDiminta"
+                        placeholder="SK, RPS, Laporan..."
+                        className="w-full text-xs"
+                      />
+                      <button className="btn shrink-0 text-xs">+ Tambah</button>
+                    </div>
                   </div>
-                </div>
-                <div className="flex gap-2">
-                  <input
-                    name="pernyataan"
-                    required
-                    placeholder="Pernyataan indikator..."
-                    className="w-full"
-                  />
-                  <button className="btn shrink-0">+ Tambah</button>
                 </div>
               </form>
 
-              {/* Tabel Detail Indikator + Pekerjaan Auditee + Pekerjaan Auditor */}
-              <div className="card overflow-x-auto space-y-3">
-                <h3 className="text-sm font-black text-black">
-                  Daftar Indikator ({activePeriodeForPantau.indikator.length})
-                </h3>
-                {activePeriodeForPantau.indikator.length === 0 ? (
-                  <Empty>Belum ada indikator.</Empty>
-                ) : (
-                  <table>
-                    <thead>
-                      <tr>
-                        <th className="w-56">Indikator</th>
-                        <th>Isian Auditee</th>
-                        <th>Penilaian Auditor</th>
-                        <th className="w-24 text-right">Aksi</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {activePeriodeForPantau.indikator.map((ind) => {
-                        const isian =
-                          ind.isian.find((i) =>
-                            activePeriodeForPantau.unitId ? i.unitId === activePeriodeForPantau.unitId : true
-                          ) ?? ind.isian[0];
+              {/* Filter / Sort Indikator per Standar */}
+              {activePeriodeForPantau.indikator.length > 0 && (
+                <div className="card flex flex-wrap items-center gap-2 py-3 text-xs">
+                  <span className="font-black uppercase text-black">Filter / Sort Standar:</span>
+                  <Link
+                    href={`/lpm?tab=pantau&periodeId=${activePeriodeForPantau.id}&standar=ALL`}
+                    className={standarFilter === "ALL" ? "btn text-xs" : "btn-secondary text-xs"}
+                  >
+                    Semua Standar ({activePeriodeForPantau.indikator.length})
+                  </Link>
+                  {groupIndikatorByStandar(activePeriodeForPantau.indikator).map((g) => (
+                    <Link
+                      key={g.standar}
+                      href={`/lpm?tab=pantau&periodeId=${activePeriodeForPantau.id}&standar=${encodeURIComponent(g.standar)}`}
+                      className={standarFilter === g.standar ? "btn text-xs" : "btn-secondary text-xs"}
+                    >
+                      📂 {g.standar} ({g.startIndex}–{g.endIndex})
+                    </Link>
+                  ))}
+                </div>
+              )}
 
-                        return (
-                          <tr key={ind.id}>
-                            <td>
-                              <div className="flex flex-wrap items-center gap-1.5">
-                                <code className="rounded-lg border border-black/30 bg-[#BAE6FD] px-2 py-0.5 text-xs font-black text-black">
-                                  {ind.kode}
-                                </code>
-                                {ind.buktiDiminta && (
-                                  <Badge tone="slate">📋 {ind.buktiDiminta}</Badge>
-                                )}
-                              </div>
-                              <div className="mt-1 font-bold text-black">{ind.standar}</div>
-                              <div className="mt-0.5 text-xs text-slate-700">{ind.pernyataan}</div>
+              {/* Daftar Indikator Dikelompokkan per Standar + Pekerjaan Auditee + Pekerjaan Auditor */}
+              {activePeriodeForPantau.indikator.length === 0 ? (
+                <Empty>Belum ada indikator.</Empty>
+              ) : (
+                groupIndikatorByStandar(activePeriodeForPantau.indikator)
+                  .filter((g) => standarFilter === "ALL" || g.standar === standarFilter)
+                  .map((group) => (
+                    <div key={group.standar} className="card overflow-x-auto space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/15 pb-2.5">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="rounded-xl border border-black bg-[#FEF08A] px-3 py-1 text-xs font-black text-black">
+                            📂 {group.standar}
+                          </span>
+                          <Badge tone="blue">
+                            Indikator {group.startIndex} – {group.endIndex} ({group.items.length} Butir)
+                          </Badge>
+                        </div>
 
-                              <details className="mt-2">
-                                <summary className="cursor-pointer text-xs font-black text-blue-700 hover:underline">
-                                  ✏️ Edit Indikator
-                                </summary>
-                                <form action={editIndikator} className="mt-2 space-y-1.5 rounded-xl border border-black/20 bg-[#FAF7EE] p-2.5 text-xs">
-                                  <input type="hidden" name="indikatorId" value={ind.id} />
-                                  <input
-                                    type="hidden"
-                                    name="returnTo"
-                                    value={`/lpm?tab=pantau&periodeId=${activePeriodeForPantau.id}`}
-                                  />
-                                  <input
-                                    name="kode"
-                                    required
-                                    defaultValue={ind.kode}
-                                    placeholder="Kode"
-                                    className="w-full font-mono text-xs"
-                                  />
-                                  <input
-                                    name="standar"
-                                    required
-                                    defaultValue={ind.standar}
-                                    placeholder="Standar"
-                                    className="w-full text-xs"
-                                  />
-                                  <input
-                                    name="buktiDiminta"
-                                    defaultValue={ind.buktiDiminta ?? ""}
-                                    placeholder="Dokumen bukti yang diminta..."
-                                    className="w-full text-xs"
-                                  />
-                                  <textarea
-                                    name="pernyataan"
-                                    rows={2}
-                                    required
-                                    defaultValue={ind.pernyataan}
-                                    placeholder="Pernyataan"
-                                    className="w-full text-xs"
-                                  />
-                                  <button type="submit" className="btn-success w-full py-1 text-xs">
-                                    💾 Simpan Edit
-                                  </button>
-                                </form>
-                              </details>
-                            </td>
+                        <form action={hapusStandarEmergency}>
+                          <input type="hidden" name="periodeId" value={activePeriodeForPantau.id} />
+                          <input type="hidden" name="standar" value={group.standar} />
+                          <input
+                            type="hidden"
+                            name="returnTo"
+                            value={`/lpm?tab=pantau&periodeId=${activePeriodeForPantau.id}`}
+                          />
+                          <button className="btn-danger text-xs">
+                            🗑️ Hapus Standar Ini
+                          </button>
+                        </form>
+                      </div>
 
-                            <td className="space-y-1.5 text-xs">
-                              {isian?.klaim || isian?.linkDrive ? (
-                                <>
-                                  {isian.diisiOleh && (
-                                    <div>
-                                      <Badge tone="blue">👤 {isian.diisiOleh}</Badge>
-                                    </div>
-                                  )}
-                                  <div>{isian.klaim || "—"}</div>
-                                  {isian.linkDrive && (
-                                    <div>
-                                      <a
-                                        href={isian.linkDrive}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="font-mono font-bold text-blue-700 underline"
-                                      >
-                                        ↗ Buka Google Drive
-                                      </a>
-                                    </div>
-                                  )}
-                                  {isian.rtlRencana && (
-                                    <div className="rounded-xl border border-black bg-[#FEF08A]/40 p-2">
-                                      <strong>RTL:</strong> {isian.rtlRencana}
-                                      {isian.rtlLinkBukti && (
+                      <table>
+                        <thead>
+                          <tr>
+                            <th className="w-64">Indikator</th>
+                            <th>Isian Auditee</th>
+                            <th>Penilaian Auditor</th>
+                            <th className="w-24 text-right">Aksi</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {group.items.map(({ item: ind, noUrut }) => {
+                            const isian =
+                              ind.isian.find((i) =>
+                                activePeriodeForPantau.unitId
+                                  ? i.unitId === activePeriodeForPantau.unitId
+                                  : true
+                              ) ?? ind.isian[0];
+
+                            return (
+                              <tr key={ind.id}>
+                                <td>
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    <Badge tone="purple">#{noUrut}</Badge>
+                                    <code className="rounded-lg border border-black/30 bg-[#BAE6FD] px-2 py-0.5 text-xs font-black text-black">
+                                      {ind.kode}
+                                    </code>
+                                    {ind.buktiDiminta && (
+                                      <Badge tone="slate">📋 {ind.buktiDiminta}</Badge>
+                                    )}
+                                  </div>
+                                  <div className="mt-1 text-xs text-slate-800">{ind.pernyataan}</div>
+
+                                  <details className="mt-2">
+                                    <summary className="cursor-pointer text-xs font-black text-blue-700 hover:underline">
+                                      ✏️ Edit Indikator
+                                    </summary>
+                                    <form
+                                      action={editIndikator}
+                                      className="mt-2 space-y-1.5 rounded-xl border border-black/20 bg-[#FAF7EE] p-2.5 text-xs"
+                                    >
+                                      <input type="hidden" name="indikatorId" value={ind.id} />
+                                      <input
+                                        type="hidden"
+                                        name="returnTo"
+                                        value={`/lpm?tab=pantau&periodeId=${activePeriodeForPantau.id}`}
+                                      />
+                                      <input
+                                        name="kode"
+                                        required
+                                        defaultValue={ind.kode}
+                                        placeholder="Kode"
+                                        className="w-full font-mono text-xs"
+                                      />
+                                      <input
+                                        name="standar"
+                                        required
+                                        defaultValue={ind.standar}
+                                        placeholder="Standar"
+                                        className="w-full text-xs"
+                                      />
+                                      <input
+                                        name="buktiDiminta"
+                                        defaultValue={ind.buktiDiminta ?? ""}
+                                        placeholder="Dokumen bukti yang diminta..."
+                                        className="w-full text-xs"
+                                      />
+                                      <textarea
+                                        name="pernyataan"
+                                        rows={2}
+                                        required
+                                        defaultValue={ind.pernyataan}
+                                        placeholder="Pernyataan"
+                                        className="w-full text-xs"
+                                      />
+                                      <button type="submit" className="btn-success w-full py-1 text-xs">
+                                        💾 Simpan Edit
+                                      </button>
+                                    </form>
+                                  </details>
+                                </td>
+
+                                <td className="space-y-1.5 text-xs">
+                                  {isian?.klaim || isian?.linkDrive ? (
+                                    <>
+                                      {isian.diisiOleh && (
+                                        <div>
+                                          <Badge tone="blue">👤 {isian.diisiOleh}</Badge>
+                                        </div>
+                                      )}
+                                      <div>{isian.klaim || "—"}</div>
+                                      {isian.linkDrive && (
                                         <div>
                                           <a
-                                            href={isian.rtlLinkBukti}
+                                            href={isian.linkDrive}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="font-mono text-blue-700 underline"
+                                            className="font-mono font-bold text-blue-700 underline"
                                           >
-                                            ↗ Bukti RTL
+                                            ↗ Buka Google Drive
                                           </a>
                                         </div>
                                       )}
-                                    </div>
+                                      {isian.rtlRencana && (
+                                        <div className="rounded-xl border border-black bg-[#FEF08A]/40 p-2">
+                                          <strong>RTL:</strong> {isian.rtlRencana}
+                                          {isian.rtlLinkBukti && (
+                                            <div>
+                                              <a
+                                                href={isian.rtlLinkBukti}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="font-mono text-blue-700 underline"
+                                              >
+                                                ↗ Bukti RTL
+                                              </a>
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
+                                    </>
+                                  ) : (
+                                    <Badge tone="amber">Belum Diisi</Badge>
                                   )}
-                                </>
-                              ) : (
-                                <Badge tone="amber">Belum Diisi</Badge>
-                              )}
-                            </td>
+                                </td>
 
-                            <td className="space-y-1.5 text-xs">
-                              {isian ? (
-                                <>
-                                  <div className="flex flex-wrap gap-1">
-                                    {isian.diperiksaOleh && (
-                                      <Badge tone="purple">🕵️ {isian.diperiksaOleh}</Badge>
-                                    )}
-                                    {isian.terverifikasiAuditor && (
-                                      <Badge tone="green">🔒 Terverifikasi</Badge>
-                                    )}
-                                    <Badge
-                                      tone={
-                                        isian.statusDokumen === "LENGKAP"
-                                          ? "green"
-                                          : isian.statusDokumen === "PERLU_KLARIFIKASI"
-                                            ? "amber"
-                                            : "slate"
-                                      }
-                                    >
-                                      {STATUS_DOK_LABEL[isian.statusDokumen]}
-                                    </Badge>
-                                    {isian.klasifikasi && (
-                                      <Badge
-                                        tone={
-                                          isian.klasifikasi === "MELAMPAUI" || isian.klasifikasi === "MENCAPAI"
-                                            ? "green"
-                                            : isian.klasifikasi === "OBSERVASI"
-                                              ? "blue"
-                                              : isian.klasifikasi === "KTS_MINOR"
+                                <td className="space-y-1.5 text-xs">
+                                  {isian ? (
+                                    <>
+                                      <div className="flex flex-wrap gap-1">
+                                        {isian.diperiksaOleh && (
+                                          <Badge tone="purple">🕵️ {isian.diperiksaOleh}</Badge>
+                                        )}
+                                        {isian.terverifikasiAuditor && (
+                                          <Badge tone="green">🔒 Terverifikasi</Badge>
+                                        )}
+                                        <Badge
+                                          tone={
+                                            isian.statusDokumen === "LENGKAP"
+                                              ? "green"
+                                              : isian.statusDokumen === "PERLU_KLARIFIKASI"
                                                 ? "amber"
-                                                : "red"
-                                        }
-                                      >
-                                        {KLASIFIKASI_LABEL[isian.klasifikasi]}
-                                      </Badge>
-                                    )}
-                                  </div>
-                                  {isian.catatanDokumen && (
-                                    <div>
-                                      <strong>Dokumen:</strong> {isian.catatanDokumen}
-                                    </div>
+                                                : "slate"
+                                          }
+                                        >
+                                          {STATUS_DOK_LABEL[isian.statusDokumen]}
+                                        </Badge>
+                                        {isian.klasifikasi && (
+                                          <Badge
+                                            tone={
+                                              isian.klasifikasi === "MELAMPAUI" ||
+                                              isian.klasifikasi === "MENCAPAI"
+                                                ? "green"
+                                                : isian.klasifikasi === "OBSERVASI"
+                                                  ? "blue"
+                                                  : isian.klasifikasi === "KTS_MINOR"
+                                                    ? "amber"
+                                                    : "red"
+                                            }
+                                          >
+                                            {KLASIFIKASI_LABEL[isian.klasifikasi]}
+                                          </Badge>
+                                        )}
+                                      </div>
+                                      {isian.catatanDokumen && (
+                                        <div>
+                                          <strong>Dokumen:</strong> {isian.catatanDokumen}
+                                        </div>
+                                      )}
+                                      {isian.catatanLapangan && (
+                                        <div>
+                                          <strong>Lapangan:</strong> {isian.catatanLapangan}
+                                        </div>
+                                      )}
+                                      {isian.rekomendasi && (
+                                        <div>
+                                          <strong>Rekomendasi:</strong> {isian.rekomendasi}
+                                        </div>
+                                      )}
+                                      {isian.rtlStatus !== "BELUM" && (
+                                        <div>
+                                          <Badge
+                                            tone={
+                                              isian.rtlStatus === "TERVERIFIKASI"
+                                                ? "green"
+                                                : "amber"
+                                            }
+                                          >
+                                            RTL: {RTL_LABEL[isian.rtlStatus]}
+                                          </Badge>
+                                        </div>
+                                      )}
+                                    </>
+                                  ) : (
+                                    <span className="text-slate-400">Belum diperiksa</span>
                                   )}
-                                  {isian.catatanLapangan && (
-                                    <div>
-                                      <strong>Lapangan:</strong> {isian.catatanLapangan}
-                                    </div>
-                                  )}
-                                  {isian.rekomendasi && (
-                                    <div>
-                                      <strong>Rekomendasi:</strong> {isian.rekomendasi}
-                                    </div>
-                                  )}
-                                  {isian.rtlStatus !== "BELUM" && (
-                                    <div>
-                                      <Badge tone={isian.rtlStatus === "TERVERIFIKASI" ? "green" : "amber"}>
-                                        RTL: {RTL_LABEL[isian.rtlStatus]}
-                                      </Badge>
-                                    </div>
-                                  )}
-                                </>
-                              ) : (
-                                <span className="text-slate-400">Belum diperiksa</span>
-                              )}
-                            </td>
+                                </td>
 
-                            <td className="text-right">
-                              <form action={hapusIndikator}>
-                                <input type="hidden" name="indikatorId" value={ind.id} />
-                                <input
-                                  type="hidden"
-                                  name="returnTo"
-                                  value={`/lpm?tab=pantau&periodeId=${activePeriodeForPantau.id}`}
-                                />
-                                <button className="btn-danger text-xs">Hapus</button>
-                              </form>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                )}
-              </div>
+                                <td className="text-right">
+                                  <form action={hapusIndikator}>
+                                    <input type="hidden" name="indikatorId" value={ind.id} />
+                                    <input
+                                      type="hidden"
+                                      name="returnTo"
+                                      value={`/lpm?tab=pantau&periodeId=${activePeriodeForPantau.id}`}
+                                    />
+                                    <button className="btn-danger text-xs">Hapus</button>
+                                  </form>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  ))
+              )}
             </>
           )}
         </div>

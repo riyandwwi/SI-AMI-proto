@@ -8,6 +8,7 @@ import {
   KLASIFIKASI_LABEL,
   RTL_LABEL,
   STATUS_DOK_LABEL,
+  groupIndikatorByStandar,
 } from "@/lib/periode";
 import { Badge, Empty } from "@/components/ui";
 import {
@@ -120,7 +121,14 @@ export default function AuditorClient({
 
   const [notice, setNotice] = useState<{ ok?: string; err?: string } | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [filterStandar, setFilterStandar] = useState<string>("SEMUA");
   const [isPending, startTransition] = useTransition();
+
+  const standarGroups = groupIndikatorByStandar(indikator);
+  const visibleGroups =
+    filterStandar === "SEMUA"
+      ? standarGroups
+      : standarGroups.filter((g) => g.standar === filterStandar);
 
   useEffect(() => {
     try {
@@ -667,36 +675,94 @@ export default function AuditorClient({
         </div>
       )}
 
-      {indikator.map((ind) => {
-        const isian = ind.isian;
-        const cur = values[ind.id];
-        const sav = savedValues[ind.id];
-        if (!cur || !sav) return null;
+      {standarGroups.length > 1 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-2xl border-2 border-black bg-[#FAF7EE] px-4 py-2.5 text-xs shadow-[2px_2px_0px_#000]">
+          <span className="font-black text-black">📂 Filter Standar:</span>
+          <button
+            type="button"
+            onClick={() => setFilterStandar("SEMUA")}
+            className={`rounded-xl border border-black px-2.5 py-1 font-black transition ${
+              filterStandar === "SEMUA"
+                ? "bg-[#FF5C38] text-white"
+                : "bg-white text-black hover:bg-[#FEF08A]"
+            }`}
+          >
+            Semua Standar ({indikator.length})
+          </button>
+          {standarGroups.map((g) => (
+            <button
+              key={g.standar}
+              type="button"
+              onClick={() => setFilterStandar(g.standar)}
+              className={`rounded-xl border border-black px-2.5 py-1 font-bold transition ${
+                filterStandar === g.standar
+                  ? "bg-[#FEF08A] font-black text-black"
+                  : "bg-white text-black hover:bg-[#FEF08A]/50"
+              }`}
+            >
+              {g.standar} ({g.startIndex}–{g.endIndex})
+            </button>
+          ))}
+        </div>
+      )}
 
-        const isFokus = sav.statusDokumen === "PERLU_KLARIFIKASI" || cur.statusDokumen === "PERLU_KLARIFIKASI";
-        const butuhRtl = isian?.klasifikasi && BUTUH_RTL.includes(isian.klasifikasi);
-        const dirty = isDirtyMode(ind.id);
-        const isVerifiedDokumen = Boolean(verifiedMap[ind.id]);
-        const isVerifiedLapangan = Boolean(verifiedLapanganMap[ind.id]);
-        const isVerifiedRtl = Boolean(verifiedRtlMap[ind.id]) || cur.rtlStatus === "TERVERIFIKASI";
+      {visibleGroups.map((group) => {
+        const groupItems =
+          mode === "rtl"
+            ? group.items.filter(
+                (entry) =>
+                  entry.item.isian?.klasifikasi &&
+                  BUTUH_RTL.includes(entry.item.isian.klasifikasi)
+              )
+            : group.items;
 
-        if (mode === "rtl" && !butuhRtl) {
-          return null;
-        }
+        if (groupItems.length === 0) return null;
 
         return (
-          <div
-            key={ind.id}
-            className={`card space-y-3 transition ${
-              mode === "lapangan" && isFokus ? "border-amber-400 bg-amber-50/30" : ""
-            } ${dirty ? "ring-2 ring-amber-300" : ""}`}
-          >
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/15 pb-3">
+          <div key={group.standar} className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border-2 border-black bg-[#FEF08A] px-4 py-2.5 shadow-[3px_3px_0px_#000]">
               <div className="flex flex-wrap items-center gap-2">
-                <code className="rounded-xl border border-black/30 bg-[#BAE6FD] px-2.5 py-0.5 text-xs font-black text-black">
-                  {ind.kode}
-                </code>
-                <span className="text-sm font-black text-black">{ind.standar}</span>
+                <span className="text-sm font-black text-black">📂 {group.standar}</span>
+                <span className="rounded-lg border border-black bg-white px-2 py-0.5 text-xs font-black text-black">
+                  Indikator {group.startIndex} – {group.endIndex}
+                </span>
+              </div>
+              <span className="text-xs font-bold text-slate-800">
+                {groupItems.length} indikator
+              </span>
+            </div>
+
+            {groupItems.map(({ item: ind, noUrut }) => {
+              const isian = ind.isian;
+              const cur = values[ind.id];
+              const sav = savedValues[ind.id];
+              if (!cur || !sav) return null;
+
+              const isFokus =
+                sav.statusDokumen === "PERLU_KLARIFIKASI" ||
+                cur.statusDokumen === "PERLU_KLARIFIKASI";
+              const dirty = isDirtyMode(ind.id);
+              const isVerifiedDokumen = Boolean(verifiedMap[ind.id]);
+              const isVerifiedLapangan = Boolean(verifiedLapanganMap[ind.id]);
+              const isVerifiedRtl =
+                Boolean(verifiedRtlMap[ind.id]) || cur.rtlStatus === "TERVERIFIKASI";
+
+              return (
+                <div
+                  key={ind.id}
+                  className={`card space-y-3 transition ${
+                    mode === "lapangan" && isFokus ? "border-amber-400 bg-amber-50/30" : ""
+                  } ${dirty ? "ring-2 ring-amber-300" : ""}`}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/15 pb-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-lg border border-black bg-black px-2 py-0.5 text-[11px] font-black text-white">
+                        #{noUrut}
+                      </span>
+                      <code className="rounded-xl border border-black/30 bg-[#BAE6FD] px-2.5 py-0.5 text-xs font-black text-black">
+                        {ind.kode}
+                      </code>
+                      <span className="text-sm font-black text-black">{ind.standar}</span>
                 {(sav.buktiDiminta || ind.buktiDiminta) && (
                   <Badge tone="slate">📋 Bukti: {sav.buktiDiminta || ind.buktiDiminta}</Badge>
                 )}
@@ -1031,6 +1097,9 @@ export default function AuditorClient({
                 </form>
               </div>
             )}
+          </div>
+              );
+            })}
           </div>
         );
       })}

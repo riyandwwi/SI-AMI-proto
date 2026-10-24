@@ -54,23 +54,44 @@ export function ImportIndikatorExcel({
   const handleDownloadTemplate = () => {
     const templateData = [
       {
-        KODE: "STD-PEND-04",
-        STANDAR: "Standar Penilaian Pembelajaran",
+        STANDAR: "Standar Isi Pembelajaran",
+        KODE: "STD-ISI-01",
         PERNYATAAN:
-          "Ketersediaan rubrik penilaian dan transparansi nilai akhir mahasiswa pada seluruh mata kuliah.",
-        DOKUMEN_BUKTI: "Rubrik Penilaian, Rekap Nilai SIAKAD, Berita Acara Nilai",
+          "Ketersediaan dokumen Kurikulum Berbasis OBE dan pemetaan CPL pada seluruh mata kuliah.",
+        DOKUMEN_BUKTI: "SK Kurikulum OBE, Dokumen Pemetaan CPL",
       },
       {
-        KODE: "STD-PENEL-02",
-        STANDAR: "Standar Luaran Penelitian",
+        STANDAR: "Standar Isi Pembelajaran",
+        KODE: "STD-ISI-02",
         PERNYATAAN:
-          "Publikasi hasil penelitian dosen tetap pada jurnal nasional terakreditasi (SINTA) atau internasional.",
-        DOKUMEN_BUKTI: "Link Artikel Jurnal SINTA, Sertifikat / LOA",
+          "Ketersediaan RPS lengkap untuk seluruh mata kuliah aktif pada semester berjalan.",
+        DOKUMEN_BUKTI: "Folder RPS Mata Kuliah Semester Berjalan",
+      },
+      {
+        STANDAR: "Standar Proses Pembelajaran",
+        KODE: "STD-PROSES-01",
+        PERNYATAAN:
+          "Pelaksanaan perkuliahan minimal 14-16 pertemuan per semester disertai berita acara dan presensi.",
+        DOKUMEN_BUKTI: "Rekap Presensi Dosen & Mahasiswa, Jurnal Perkuliahan",
+      },
+      {
+        STANDAR: "Standar Proses Pembelajaran",
+        KODE: "STD-PROSES-02",
+        PERNYATAAN:
+          "Pelaksanaan monitoring dan evaluasi (monev) proses pembelajaran tengah dan akhir semester.",
+        DOKUMEN_BUKTI: "Laporan Monev Pembelajaran",
+      },
+      {
+        STANDAR: "Standar Penilaian Pembelajaran",
+        KODE: "STD-NILAI-01",
+        PERNYATAAN:
+          "Ketersediaan rubrik penilaian dan transparansi nilai akhir mahasiswa pada seluruh mata kuliah.",
+        DOKUMEN_BUKTI: "Rubrik Penilaian, Rekap Nilai SIAKAD",
       },
     ];
 
     const ws = XLSX.utils.json_to_sheet(templateData);
-    ws["!cols"] = [{ wch: 18 }, { wch: 32 }, { wch: 65 }, { wch: 45 }];
+    ws["!cols"] = [{ wch: 32 }, { wch: 18 }, { wch: 65 }, { wch: 45 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Template_Indikator_AMI");
     XLSX.writeFile(wb, "Template_Indikator_AMI_ITBMP.xlsx");
@@ -177,6 +198,7 @@ export function ImportIndikatorExcel({
       }
 
       const parsed: PreviewRow[] = [];
+      let lastStandar = "";
       for (let r = headerRowIndex + 1; r < matrix.length; r++) {
         const row = matrix[r];
         if (!Array.isArray(row)) continue;
@@ -185,12 +207,16 @@ export function ImportIndikatorExcel({
           .trim()
           .toUpperCase()
           .replace(/\s+/g, "-");
-        const standar = String(row[colStandar] ?? "").trim();
+        const rawStandar = String(row[colStandar] ?? "").trim();
         const pernyataan = String(row[colPernyataan] ?? "").trim();
         const buktiDiminta = colBukti !== -1 ? String(row[colBukti] ?? "").trim() : "";
 
         // Lewati baris yang benar-benar kosong seluruhnya
-        if (!kode && !standar && !pernyataan && !buktiDiminta) continue;
+        if (!kode && !rawStandar && !pernyataan && !buktiDiminta) continue;
+
+        // Jika kolom STANDAR di-merge ke bawah di Excel (kosong pada baris lanjutan), otomatis warisi Standar di atasnya!
+        const standar = rawStandar || lastStandar;
+        if (rawStandar) lastStandar = rawStandar;
 
         parsed.push({
           rowNum: r + 1,

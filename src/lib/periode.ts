@@ -54,6 +54,57 @@ export const RTL_LABEL: Record<StatusRtl, string> = {
 /** Klasifikasi yang wajib ditindaklanjuti dengan RTL. */
 export const BUTUH_RTL: Klasifikasi[] = ["OBSERVASI", "KTS_MINOR", "KTS_MAYOR"];
 
+/** Daftar Standar SPMI bawaan (LPM tetap bebas menambah/mengubah/menghapus standar sendiri). */
+export const DEFAULT_STANDAR_SPMI = [
+  "Standar Kompetensi Lulusan",
+  "Standar Isi Pembelajaran",
+  "Standar Proses Pembelajaran",
+  "Standar Penilaian Pembelajaran",
+  "Standar Dosen dan Tenaga Kependidikan",
+  "Standar Sarana dan Prasarana",
+  "Standar Pengelolaan Pembelajaran",
+  "Standar Pembiayaan Pembelajaran",
+  "Standar Penelitian & PKM",
+] as const;
+
+export interface StandarGroup<T> {
+  standar: string;
+  startIndex: number; // Nomor urut indikator awal (1-based, misal 1)
+  endIndex: number;   // Nomor urut indikator akhir (1-based, misal 6)
+  items: Array<{ item: T; noUrut: number }>;
+}
+
+/**
+ * Mengelompokkan daftar indikator berdasarkan nama Standar secara berurutan,
+ * sehingga tampil: Standar A (Indikator 1-6), lanjut Standar B (Indikator 7-10), dst.
+ */
+export function groupIndikatorByStandar<T extends { standar: string }>(
+  list: T[]
+): StandarGroup<T>[] {
+  const map = new Map<string, T[]>();
+  for (const item of list) {
+    const key = (item.standar || "Standar Lainnya").trim();
+    const arr = map.get(key) ?? [];
+    arr.push(item);
+    map.set(key, arr);
+  }
+
+  const groups: StandarGroup<T>[] = [];
+  let counter = 1;
+  for (const [standar, arr] of map.entries()) {
+    const startIndex = counter;
+    const numbered = arr.map((item) => ({ item, noUrut: counter++ }));
+    const endIndex = counter - 1;
+    groups.push({
+      standar,
+      startIndex,
+      endIndex,
+      items: numbered,
+    });
+  }
+  return groups;
+}
+
 export function tahapIndex(t: Tahap) {
   return TAHAP_URUT.indexOf(t);
 }

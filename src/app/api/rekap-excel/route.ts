@@ -5,6 +5,7 @@ import {
   KLASIFIKASI_LABEL,
   RTL_LABEL,
   STATUS_DOK_LABEL,
+  groupIndikatorByStandar,
   sortPeriodesChronological,
 } from "@/lib/periode";
 import { fmtWaktu } from "@/lib/format";
@@ -42,40 +43,50 @@ export async function GET(req: NextRequest) {
   let no = 1;
 
   for (const p of periodes) {
-    for (const ind of p.indikator) {
-      const isian = ind.isian.find((i) => !p.unitId || i.unitId === p.unitId) ?? ind.isian[0];
-      const statusSah = p.disahkanAt
-        ? `Disahkan oleh ${p.disahkanOleh ?? "LPM"} (${fmtWaktu(p.disahkanAt)})`
-        : "Belum Disahkan";
-
+    const groups = groupIndikatorByStandar(p.indikator);
+    for (const grp of groups) {
       rowsHtml += `
-        <tr>
-          <td style="text-align:center;">${no++}</td>
-          <td>${esc(p.nama)}</td>
-          <td>${esc(p.tahun)}</td>
-          <td>${esc(p.semester)}</td>
-          <td>${esc(p.unit?.nama ?? "-")}</td>
-          <td><b>${esc(ind.kode)}</b></td>
-          <td>${esc(ind.standar)}</td>
-          <td>${esc(ind.pernyataan)}</td>
-          <td>${esc(ind.buktiDiminta ?? "-")}</td>
-          <td>${esc(isian?.klaim ?? "-")}</td>
-          <td>${esc(isian?.linkDrive ?? "-")}</td>
-          <td><b>${esc(isian?.diisiOleh ?? "-")}</b></td>
-          <td>${esc(isian ? STATUS_DOK_LABEL[isian.statusDokumen] : "Belum Diperiksa")}</td>
-          <td>${esc(isian?.catatanDokumen ?? "-")}</td>
-          <td><b>${esc(isian?.klasifikasi ? KLASIFIKASI_LABEL[isian.klasifikasi] : "-")}</b></td>
-          <td>${esc(isian?.catatanLapangan ?? "-")}</td>
-          <td>${esc(isian?.rekomendasi ?? "-")}</td>
-          <td><b>${esc(isian?.diperiksaOleh ?? "-")}</b></td>
-          <td>${isian?.terverifikasiAuditor ? "Terverifikasi & Terkunci" : "Belum Dikunci"}</td>
-          <td>${esc(isian?.rtlRencana ?? "-")}</td>
-          <td>${esc(isian?.rtlLinkBukti ?? "-")}</td>
-          <td>${esc(isian ? RTL_LABEL[isian.rtlStatus] : "-")}</td>
-          <td>${esc(isian?.rtlCatatanAuditor ?? "-")}</td>
-          <td>${esc(statusSah)}</td>
+        <tr style="background-color:#E0F2FE; font-weight:bold;">
+          <td colspan="24" style="padding:6px 8px; border:1px solid #000000;">
+            📂 STANDAR SPMI: ${esc(grp.standar)} — Indikator ${grp.startIndex} s/d ${grp.endIndex} (${grp.items.length} Indikator) | ${esc(p.nama)} (${esc(p.unit?.nama ?? "-")})
+          </td>
         </tr>
       `;
+      for (const { item: ind } of grp.items) {
+        const isian = ind.isian.find((i) => !p.unitId || i.unitId === p.unitId) ?? ind.isian[0];
+        const statusSah = p.disahkanAt
+          ? `Disahkan oleh ${p.disahkanOleh ?? "LPM"} (${fmtWaktu(p.disahkanAt)})`
+          : "Belum Disahkan";
+
+        rowsHtml += `
+          <tr>
+            <td style="text-align:center;">${no++}</td>
+            <td>${esc(p.nama)}</td>
+            <td>${esc(p.tahun)}</td>
+            <td>${esc(p.semester)}</td>
+            <td>${esc(p.unit?.nama ?? "-")}</td>
+            <td><b>${esc(ind.kode)}</b></td>
+            <td>${esc(ind.standar)}</td>
+            <td>${esc(ind.pernyataan)}</td>
+            <td>${esc(ind.buktiDiminta ?? "-")}</td>
+            <td>${esc(isian?.klaim ?? "-")}</td>
+            <td>${esc(isian?.linkDrive ?? "-")}</td>
+            <td><b>${esc(isian?.diisiOleh ?? "-")}</b></td>
+            <td>${esc(isian ? STATUS_DOK_LABEL[isian.statusDokumen] : "Belum Diperiksa")}</td>
+            <td>${esc(isian?.catatanDokumen ?? "-")}</td>
+            <td><b>${esc(isian?.klasifikasi ? KLASIFIKASI_LABEL[isian.klasifikasi] : "-")}</b></td>
+            <td>${esc(isian?.catatanLapangan ?? "-")}</td>
+            <td>${esc(isian?.rekomendasi ?? "-")}</td>
+            <td><b>${esc(isian?.diperiksaOleh ?? "-")}</b></td>
+            <td>${isian?.terverifikasiAuditor ? "Terverifikasi & Terkunci" : "Belum Dikunci"}</td>
+            <td>${esc(isian?.rtlRencana ?? "-")}</td>
+            <td>${esc(isian?.rtlLinkBukti ?? "-")}</td>
+            <td>${esc(isian ? RTL_LABEL[isian.rtlStatus] : "-")}</td>
+            <td>${esc(isian?.rtlCatatanAuditor ?? "-")}</td>
+            <td>${esc(statusSah)}</td>
+          </tr>
+        `;
+      }
     }
   }
 

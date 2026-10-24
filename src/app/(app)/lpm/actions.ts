@@ -395,7 +395,9 @@ export async function tambahIndikator(fd: FormData) {
   const returnTo = str(fd, "returnTo", 200) || "/lpm/indikator";
   const targetPeriodeId = str(fd, "periodeId", 64) || "ALL";
   const kode = str(fd, "kode", 32).toUpperCase().replace(/\s+/g, "-");
-  const standar = str(fd, "standar", 120);
+  const standarPilihan = str(fd, "standar", 120);
+  const standarBaru = str(fd, "standarBaru", 120);
+  const standar = standarBaru || standarPilihan;
   const pernyataan = str(fd, "pernyataan", 1000);
   const buktiDiminta = str(fd, "buktiDiminta", 500) || null;
 
@@ -490,6 +492,68 @@ export async function hapusIndikator(fd: FormData) {
   revalidatePath("/auditee");
   revalidatePath("/auditor");
   ok(returnTo, `Indikator "${ind.kode}" dihapus.`);
+}
+
+/**
+ * Ubah nama Standar sekaligus untuk semua indikator yang berada di bawah Standar tersebut
+ */
+export async function ubahNamaStandar(fd: FormData) {
+  const user = await requireUser("LPM");
+  const returnTo = str(fd, "returnTo", 200) || "/lpm/indikator";
+  const periodeId = str(fd, "periodeId", 64) || "ALL";
+  const standarLama = str(fd, "standarLama", 120);
+  const standarBaru = str(fd, "standarBaru", 120);
+
+  if (!standarLama || !standarBaru) {
+    fail(returnTo, "Nama standar lama dan baru wajib diisi.");
+  }
+
+  await prisma.indikator.updateMany({
+    where: {
+      standar: standarLama,
+      ...(periodeId !== "ALL" ? { periodeId } : {}),
+    },
+    data: { standar: standarBaru },
+  });
+
+  await catat(user.id, "UBAH_NAMA_STANDAR", `"${standarLama}" -> "${standarBaru}"`);
+  revalidatePath("/lpm/indikator");
+  revalidatePath("/lpm");
+  revalidatePath("/auditee");
+  revalidatePath("/auditor");
+  ok(returnTo, `Standar "${standarLama}" berhasil diubah menjadi "${standarBaru}".`);
+}
+
+/**
+ * Emergency LPM: Hapus 1 kelompok Standar beserta seluruh indikator di dalamnya
+ */
+export async function hapusStandarEmergency(fd: FormData) {
+  const user = await requireUser("LPM");
+  const returnTo = str(fd, "returnTo", 200) || "/lpm/indikator";
+  const periodeId = str(fd, "periodeId", 64);
+  const standar = str(fd, "standar", 120);
+
+  if (!standar) {
+    fail(returnTo, "Nama standar tidak valid.");
+  }
+
+  const deleted = await prisma.indikator.deleteMany({
+    where: {
+      standar,
+      ...(periodeId && periodeId !== "ALL" ? { periodeId } : {}),
+    },
+  });
+
+  await catat(
+    user.id,
+    "HAPUS_STANDAR_EMERGENCY",
+    `Hapus Standar "${standar}" (${deleted.count} indikator)`
+  );
+  revalidatePath("/lpm/indikator");
+  revalidatePath("/lpm");
+  revalidatePath("/auditee");
+  revalidatePath("/auditor");
+  ok(returnTo, `Standar "${standar}" (${deleted.count} indikator) berhasil dihapus.`);
 }
 
 export interface ExcelIndikatorRowInput {
