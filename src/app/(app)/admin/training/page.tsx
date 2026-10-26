@@ -112,11 +112,11 @@ export default async function AdminTrainingPage({ searchParams }: { searchParams
           </div>
         </form>
 
-        {/* Form Generate Cepat 25 Akun Dummy */}
+        {/* Form Generate Cepat 25-100 Akun Dummy */}
         <form action={generateDummyTrainingAccounts} className="card space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/15 pb-2">
             <h2 className="text-sm font-black text-black">
-              2️⃣ Generate Instan Akun Dummy (Misal 25 Akun)
+              2️⃣ Generate Instan Akun Dummy (25 s/d 100+ Akun)
             </h2>
             <Badge tone="amber">🔑 Password: 123</Badge>
           </div>
@@ -138,8 +138,8 @@ export default async function AdminTrainingPage({ searchParams }: { searchParams
                   name="jumlahAkun"
                   type="number"
                   min={1}
-                  max={100}
-                  defaultValue={25}
+                  max={150}
+                  defaultValue={50}
                   required
                   className="w-full text-xs font-black"
                 />

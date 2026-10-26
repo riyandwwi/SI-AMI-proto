@@ -112,10 +112,9 @@ export async function buatKelompokTraining(fd: FormData) {
       },
     });
 
-    for (let idx = 0; idx < masterIndikator.length; idx++) {
-      const m = masterIndikator[idx];
-      await prisma.indikator.create({
-        data: {
+    if (masterIndikator.length > 0) {
+      await prisma.indikator.createMany({
+        data: masterIndikator.map((m, idx) => ({
           periodeId: newPeriode.id,
           kode: m.kode,
           standar: m.standar,
@@ -123,7 +122,7 @@ export async function buatKelompokTraining(fd: FormData) {
           pernyataan: m.pernyataan,
           buktiDiminta: m.buktiDiminta,
           urutan: idx + 1,
-        },
+        })),
       });
     }
 
@@ -170,35 +169,54 @@ export async function sinkronkanIndikatorTraining() {
       tp.indikator.map((ind) => [`${ind.standar.toUpperCase()}|||${ind.kode.toUpperCase()}`, ind])
     );
 
+    const toCreate: {
+      periodeId: string;
+      kode: string;
+      standar: string;
+      pernyataanStandar: string | null;
+      pernyataan: string;
+      buktiDiminta: string | null;
+      urutan: number;
+    }[] = [];
+
+    const updatePromises: Promise<unknown>[] = [];
+
     for (let idx = 0; idx < masterIndikator.length; idx++) {
       const m = masterIndikator[idx];
       const key = `${m.standar.toUpperCase()}|||${m.kode.toUpperCase()}`;
       const found = existingMap.get(key);
       if (found) {
-        await prisma.indikator.update({
-          where: { id: found.id },
-          data: {
-            standar: m.standar,
-            pernyataanStandar: m.pernyataanStandar,
-            pernyataan: m.pernyataan,
-            buktiDiminta: m.buktiDiminta,
-            urutan: idx + 1,
-          },
-        });
+        updatePromises.push(
+          prisma.indikator.update({
+            where: { id: found.id },
+            data: {
+              standar: m.standar,
+              pernyataanStandar: m.pernyataanStandar,
+              pernyataan: m.pernyataan,
+              buktiDiminta: m.buktiDiminta,
+              urutan: idx + 1,
+            },
+          })
+        );
       } else {
-        await prisma.indikator.create({
-          data: {
-            periodeId: tp.id,
-            kode: m.kode,
-            standar: m.standar,
-            pernyataanStandar: m.pernyataanStandar,
-            pernyataan: m.pernyataan,
-            buktiDiminta: m.buktiDiminta,
-            urutan: idx + 1,
-          },
+        toCreate.push({
+          periodeId: tp.id,
+          kode: m.kode,
+          standar: m.standar,
+          pernyataanStandar: m.pernyataanStandar,
+          pernyataan: m.pernyataan,
+          buktiDiminta: m.buktiDiminta,
+          urutan: idx + 1,
         });
       }
       synced++;
+    }
+
+    if (toCreate.length > 0) {
+      await prisma.indikator.createMany({ data: toCreate });
+    }
+    if (updatePromises.length > 0) {
+      await Promise.all(updatePromises);
     }
   }
 
@@ -217,43 +235,60 @@ export async function sinkronkanIndikatorTraining() {
 export async function generateDummyTrainingAccounts(fd: FormData) {
   const admin = await requireUser("SUPER_ADMIN", "LPM");
   const rawCount = Number(str(fd, "jumlahAkun", 10) || "25");
-  const count = Math.max(1, Math.min(100, Number.isFinite(rawCount) ? rawCount : 25));
+  const count = Math.max(1, Math.min(150, Number.isFinite(rawCount) ? rawCount : 25));
   const prefix = (str(fd, "prefixUsername", 24) || "peserta")
     .toLowerCase()
     .replace(/[^a-z0-9]/g, "") || "peserta";
 
-  const passwordHash = await bcrypt.hash(DEFAULT_PASSWORD, 10);
+  const [passwordHash, existingUsers] = await Promise.all([
+    bcrypt.hash(DEFAULT_PASSWORD, 10),
+    prisma.user.findMany({ select: { username: true } }),
+  ]);
   const passwordEnc = encryptPassword(DEFAULT_PASSWORD);
+  const existingSet = new Set(existingUsers.map((u) => u.username.toLowerCase()));
 
-  let created = 0;
+  const batchToCreate: {
+    nama: string;
+    nimNuptk: string;
+    username: string;
+    passwordHash: string;
+    passwordEnc: string;
+    role: "AUDITEE";
+    isTraining: boolean;
+    aktif: boolean;
+  }[] = [];
+
   let seq = 1;
-
-  while (created < count && seq <= 500) {
+  while (batchToCreate.length < count && seq <= 1000) {
     const uname = `${prefix}${seq}`;
-    const exists = await prisma.user.findUnique({ where: { username: uname } });
-    if (!exists) {
-      await prisma.user.create({
-        data: {
-          nama: `Peserta Pelatihan ${seq}`,
-          nimNuptk: `TRN-${String(seq).padStart(3, "0")}`,
-          username: uname,
-          passwordHash,
-          passwordEnc,
-          role: "AUDITEE",
-          isTraining: true,
-          aktif: true,
-        },
+    if (!existingSet.has(uname)) {
+      existingSet.add(uname);
+      batchToCreate.push({
+        nama: `Peserta Pelatihan ${seq}`,
+        nimNuptk: `TRN-${String(seq).padStart(3, "0")}`,
+        username: uname,
+        passwordHash,
+        passwordEnc,
+        role: "AUDITEE",
+        isTraining: true,
+        aktif: true,
       });
-      created++;
     }
     seq++;
   }
 
-  await catat(admin.id, "GENERATE_AKUN_TRAINING", `${created} akun dummy training dibuat`);
+  if (batchToCreate.length > 0) {
+    await prisma.user.createMany({
+      data: batchToCreate,
+      skipDuplicates: true,
+    });
+  }
+
+  await catat(admin.id, "GENERATE_AKUN_TRAINING", `${batchToCreate.length} akun dummy training dibuat`);
   revalidatePath("/admin/training");
   ok(
     "/admin/training",
-    `Berhasil membuat ${created} akun peserta training (Password default: 123).`
+    `Berhasil membuat ${batchToCreate.length} akun peserta training (Password default: 123).`
   );
 }
 
@@ -273,11 +308,24 @@ export async function importAkunTrainingBatch(rows: BulkTrainingUserRow[]): Prom
     return { ok: false, error: "Daftar akun kosong." };
   }
 
-  const passwordHash = await bcrypt.hash(DEFAULT_PASSWORD, 10);
+  const [passwordHash, existingUsers] = await Promise.all([
+    bcrypt.hash(DEFAULT_PASSWORD, 10),
+    prisma.user.findMany({ select: { id: true, username: true, isTraining: true } }),
+  ]);
   const passwordEnc = encryptPassword(DEFAULT_PASSWORD);
+  const existingMap = new Map(existingUsers.map((u) => [u.username.toLowerCase(), u]));
 
-  let created = 0;
-  let updated = 0;
+  const toCreate: {
+    nama: string;
+    nimNuptk: string;
+    username: string;
+    passwordHash: string;
+    passwordEnc: string;
+    role: "AUDITEE";
+    isTraining: boolean;
+    aktif: boolean;
+  }[] = [];
+  const updatePromises: Promise<unknown>[] = [];
 
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
@@ -298,50 +346,58 @@ export async function importAkunTrainingBatch(rows: BulkTrainingUserRow[]): Prom
       baseUname = slug ? `${slug}${i + 1}` : `peserta${i + 1}`;
     }
 
-    const existing = await prisma.user.findUnique({ where: { username: baseUname } });
+    const existing = existingMap.get(baseUname);
     if (existing) {
       if (existing.isTraining) {
-        await prisma.user.update({
-          where: { id: existing.id },
-          data: { nama, nimNuptk, aktif: true },
-        });
-        updated++;
+        updatePromises.push(
+          prisma.user.update({
+            where: { id: existing.id },
+            data: { nama, nimNuptk, aktif: true },
+          })
+        );
       } else {
-        // Jangan timpa akun asli kampus, tambahkan akhiran angka
         const altUname = `${baseUname}_trn${i + 1}`;
-        const altExists = await prisma.user.findUnique({ where: { username: altUname } });
-        if (!altExists) {
-          await prisma.user.create({
-            data: {
-              nama,
-              nimNuptk,
-              username: altUname,
-              passwordHash,
-              passwordEnc,
-              role: "AUDITEE",
-              isTraining: true,
-              aktif: true,
-            },
+        if (!existingMap.has(altUname)) {
+          existingMap.set(altUname, { id: "", username: altUname, isTraining: true });
+          toCreate.push({
+            nama,
+            nimNuptk,
+            username: altUname,
+            passwordHash,
+            passwordEnc,
+            role: "AUDITEE",
+            isTraining: true,
+            aktif: true,
           });
-          created++;
         }
       }
     } else {
-      await prisma.user.create({
-        data: {
-          nama,
-          nimNuptk,
-          username: baseUname,
-          passwordHash,
-          passwordEnc,
-          role: "AUDITEE",
-          isTraining: true,
-          aktif: true,
-        },
+      existingMap.set(baseUname, { id: "", username: baseUname, isTraining: true });
+      toCreate.push({
+        nama,
+        nimNuptk,
+        username: baseUname,
+        passwordHash,
+        passwordEnc,
+        role: "AUDITEE",
+        isTraining: true,
+        aktif: true,
       });
-      created++;
     }
   }
+
+  if (toCreate.length > 0) {
+    await prisma.user.createMany({
+      data: toCreate,
+      skipDuplicates: true,
+    });
+  }
+  if (updatePromises.length > 0) {
+    await Promise.all(updatePromises);
+  }
+
+  const created = toCreate.length;
+  const updated = updatePromises.length;
 
   await catat(admin.id, "IMPORT_AKUN_TRAINING", `${created} baru, ${updated} diperbarui`);
   revalidatePath("/admin/training");

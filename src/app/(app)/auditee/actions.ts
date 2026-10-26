@@ -102,21 +102,33 @@ export async function simpanBatchIsianAuditee(
     // Lewati indikator yang sudah diverifikasi/dikunci oleh Auditor
     if (ind.isian[0]?.terverifikasiAuditor || ind.isian[0]?.terverifikasiLapangan) continue;
 
-    await prisma.isian.upsert({
-      where: { indikatorId_unitId: { indikatorId: item.indikatorId, unitId: user.unitId } },
-      create: {
-        indikatorId: item.indikatorId,
-        unitId: user.unitId,
-        klaim: item.klaim,
-        linkDrive: item.linkDrive,
-        diisiOleh: user.nama,
-      },
-      update: {
-        klaim: item.klaim,
-        linkDrive: item.linkDrive,
-        diisiOleh: user.nama,
-      },
-    });
+    try {
+      await prisma.isian.upsert({
+        where: { indikatorId_unitId: { indikatorId: item.indikatorId, unitId: user.unitId } },
+        create: {
+          indikatorId: item.indikatorId,
+          unitId: user.unitId,
+          klaim: item.klaim,
+          linkDrive: item.linkDrive,
+          diisiOleh: user.nama,
+        },
+        update: {
+          klaim: item.klaim,
+          linkDrive: item.linkDrive,
+          diisiOleh: user.nama,
+        },
+      });
+    } catch {
+      // Fallback aman jika 2 anggota kelompok klik Simpan di milidetik yang sama persis
+      await prisma.isian.update({
+        where: { indikatorId_unitId: { indikatorId: item.indikatorId, unitId: user.unitId } },
+        data: {
+          klaim: item.klaim,
+          linkDrive: item.linkDrive,
+          diisiOleh: user.nama,
+        },
+      });
+    }
 
     savedCodes.push(ind.kode);
     savedIds.push(ind.id);
