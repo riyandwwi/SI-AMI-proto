@@ -8,6 +8,7 @@ import { simpanTtdSesi } from "@/app/(app)/lpm/actions";
 export interface SignatureSessionInfo {
   periodeId: string;
   periodeNama: string;
+  isTraining?: boolean;
   ketuaAuditeeId: string | null;
   ketuaAuditeeNama: string | null;
   ketuaAuditeeNip: string | null;
@@ -100,12 +101,17 @@ export function SignaturePadCard({
   const [notice, setNotice] = useState<{ ok?: string; err?: string } | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  const isTrainingMode =
+    Boolean(session.isTraining) ||
+    session.periodeNama.toLowerCase().includes("training") ||
+    session.periodeNama.toLowerCase().includes("kelompok");
+
   const canSignAsAuditee =
     currentRole === "AUDITEE" &&
-    (!session.ketuaAuditeeId || session.ketuaAuditeeId === currentUserId);
+    (isTrainingMode || !session.ketuaAuditeeId || session.ketuaAuditeeId === currentUserId);
   const canSignAsAuditor =
     currentRole === "AUDITOR" &&
-    (!session.ketuaAuditorId || session.ketuaAuditorId === currentUserId);
+    (isTrainingMode || !session.ketuaAuditorId || session.ketuaAuditorId === currentUserId);
   const canSignAsLpm = currentRole === "LPM";
 
   const canSign = canSignAsAuditee || canSignAsAuditor || canSignAsLpm;
@@ -223,6 +229,7 @@ export function SignaturePadCard({
           <h3 className="text-sm font-black text-black">
             ✍️ Status Tanda Tangan Laporan ({session.periodeNama})
           </h3>
+          <Badge tone="amber">⏱️ Batas Simpan TTD: Maks. 3 Menit</Badge>
         </div>
         <a
           href={`/api/rekap-excel?periodeId=${session.periodeId}&print=1`}

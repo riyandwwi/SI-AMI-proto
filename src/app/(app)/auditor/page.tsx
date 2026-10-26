@@ -1,8 +1,10 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { PRODI_LIST } from "@/lib/roles";
 import { sortPeriodesChronological } from "@/lib/periode";
+import { cleanupExpiredSignatures } from "@/lib/ttd-cleanup";
 import { Badge, Empty, Flash, PageHeader, one, type SP } from "@/components/ui";
 
 export default async function AuditorListPage({ searchParams }: { searchParams: SP }) {
@@ -10,10 +12,21 @@ export default async function AuditorListPage({ searchParams }: { searchParams: 
   const sp = await searchParams;
   const prodiFilter = one(sp.prodi) ?? "ALL";
 
-  // Ambil semua Sesi AMI yang BUKAN dari prodi asal Auditor (Independensi AMI: tidak boleh satu prodi)
+  await cleanupExpiredSignatures();
+
+  // Jika Akun Training, langsung masuk ke Kelompok Sesi Training yang dipilihnya (tidak bisa lihat sesi asli)
+  if (user.isTraining) {
+    if (!user.trainingPeriodeId) redirect("/training");
+    redirect(`/auditor/${user.trainingPeriodeId}`);
+  }
+
+  // Ambil semua Sesi AMI asli yang BUKAN dari prodi asal Auditor (Independensi AMI: tidak boleh satu prodi)
   const [allPeriodes, auditees] = await Promise.all([
     prisma.periode.findMany({
-      where: user.unitId ? { NOT: { unitId: user.unitId } } : undefined,
+      where: {
+        isTraining: false,
+        ...(user.unitId ? { NOT: { unitId: user.unitId } } : {}),
+      },
       include: {
         unit: true,
         penugasan: { include: { tim: true } },
@@ -21,7 +34,7 @@ export default async function AuditorListPage({ searchParams }: { searchParams: 
       },
     }),
     prisma.user.findMany({
-      where: { role: "AUDITEE", aktif: true },
+      where: { role: "AUDITEE", isTraining: false, aktif: true },
       orderBy: { nama: "asc" },
     }),
   ]);

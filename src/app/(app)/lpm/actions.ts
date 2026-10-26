@@ -7,6 +7,7 @@ import { requireUser } from "@/lib/auth";
 import { encryptPassword } from "@/lib/crypto";
 import { HOMEBASE_LIST, PRODI_LIST } from "@/lib/roles";
 import { catat, fail, ok, str } from "@/lib/actions";
+import { cleanupExpiredSignatures } from "@/lib/ttd-cleanup";
 
 const DEFAULT_PASSWORD = "123";
 
@@ -109,6 +110,7 @@ export async function buatSesiAmi(fd: FormData) {
     where: {
       role: "AUDITOR",
       aktif: true,
+      isTraining: false,
       NOT: { unitId: unit.id },
     },
     orderBy: { nama: "asc" },
@@ -926,8 +928,17 @@ export async function simpanTtdSesi(
   const user = await requireUser("LPM", "AUDITOR", "AUDITEE");
   if (!periodeId) return { ok: false, error: "Sesi AMI tidak ditemukan." };
 
+  await cleanupExpiredSignatures();
+
   const periode = await prisma.periode.findUnique({ where: { id: periodeId } });
   if (!periode) return { ok: false, error: "Sesi AMI tidak ditemukan." };
+
+  if (user.isTraining && (!periode.isTraining || user.trainingPeriodeId !== periode.id)) {
+    return {
+      ok: false,
+      error: "Akun pelatihan hanya dapat menandatangani kelompok pelatihannya sendiri.",
+    };
+  }
 
   if (ttdDataUrl && ttdDataUrl.length > 250_000) {
     return { ok: false, error: "Ukuran tanda tangan terlalu besar." };
@@ -936,47 +947,73 @@ export async function simpanTtdSesi(
   const now = ttdDataUrl ? new Date() : null;
 
   if (tipe === "AUDITEE") {
-    if (user.role !== "AUDITEE" && user.role !== "LPM") {
-      return { ok: false, error: "Hanya Ketua Auditee yang dapat menempel TTD Auditee." };
-    }
-    if (user.role === "AUDITEE" && periode.ketuaAuditeeId && periode.ketuaAuditeeId !== user.id) {
-      return {
-        ok: false,
-        error: `Hanya Ketua Auditee (${periode.ketuaAuditeeNama}) yang ditunjuk LPM yang dapat menempel TTD pada sesi ini.`,
-      };
-    }
+    if (periode.isTraining && user.isTraining) {
+      await prisma.periode.update({
+        where: { id: periodeId },
+        data: {
+          ketuaAuditeeId: user.id,
+          ketuaAuditeeNama: user.nama,
+          ketuaAuditeeNip: user.nimNuptk || null,
+          ttdAuditee: ttdDataUrl,
+          ttdAuditeeAt: now,
+        },
+      });
+    } else {
+      if (user.role !== "AUDITEE" && user.role !== "LPM") {
+        return { ok: false, error: "Hanya Ketua Auditee yang dapat menempel TTD Auditee." };
+      }
+      if (user.role === "AUDITEE" && periode.ketuaAuditeeId && periode.ketuaAuditeeId !== user.id) {
+        return {
+          ok: false,
+          error: `Hanya Ketua Auditee (${periode.ketuaAuditeeNama}) yang ditunjuk LPM yang dapat menempel TTD pada sesi ini.`,
+        };
+      }
 
-    await prisma.periode.update({
-      where: { id: periodeId },
-      data: {
-        ketuaAuditeeId: periode.ketuaAuditeeId ?? user.id,
-        ketuaAuditeeNama: periode.ketuaAuditeeNama ?? user.nama,
-        ketuaAuditeeNip: periode.ketuaAuditeeNip ?? (user.nimNuptk || null),
-        ttdAuditee: ttdDataUrl,
-        ttdAuditeeAt: now,
-      },
-    });
+      await prisma.periode.update({
+        where: { id: periodeId },
+        data: {
+          ketuaAuditeeId: periode.ketuaAuditeeId ?? user.id,
+          ketuaAuditeeNama: periode.ketuaAuditeeNama ?? user.nama,
+          ketuaAuditeeNip: periode.ketuaAuditeeNip ?? (user.nimNuptk || null),
+          ttdAuditee: ttdDataUrl,
+          ttdAuditeeAt: now,
+        },
+      });
+    }
   } else if (tipe === "AUDITOR") {
-    if (user.role !== "AUDITOR" && user.role !== "LPM") {
-      return { ok: false, error: "Hanya Ketua Auditor yang dapat menempel TTD Auditor." };
-    }
-    if (user.role === "AUDITOR" && periode.ketuaAuditorId && periode.ketuaAuditorId !== user.id) {
-      return {
-        ok: false,
-        error: `Hanya Ketua Auditor (${periode.ketuaAuditorNama}) yang ditunjuk LPM yang dapat menempel TTD pada sesi ini.`,
-      };
-    }
+    if (periode.isTraining && user.isTraining) {
+      await prisma.periode.update({
+        where: { id: periodeId },
+        data: {
+          ketuaAuditorId: user.id,
+          ketuaAuditorNama: user.nama,
+          ketuaAuditorNip: user.nimNuptk || null,
+          ttdAuditor: ttdDataUrl,
+          ttdAuditorAt: now,
+        },
+      });
+    } else {
+      if (user.role !== "AUDITOR" && user.role !== "LPM") {
+        return { ok: false, error: "Hanya Ketua Auditor yang dapat menempel TTD Auditor." };
+      }
+      if (user.role === "AUDITOR" && periode.ketuaAuditorId && periode.ketuaAuditorId !== user.id) {
+        return {
+          ok: false,
+          error: `Hanya Ketua Auditor (${periode.ketuaAuditorNama}) yang ditunjuk LPM yang dapat menempel TTD pada sesi ini.`,
+        };
+      }
 
-    await prisma.periode.update({
-      where: { id: periodeId },
-      data: {
-        ketuaAuditorId: periode.ketuaAuditorId ?? user.id,
-        ketuaAuditorNama: periode.ketuaAuditorNama ?? user.nama,
-        ketuaAuditorNip: periode.ketuaAuditorNip ?? (user.nimNuptk || null),
-        ttdAuditor: ttdDataUrl,
-        ttdAuditorAt: now,
-      },
-    });
+      await prisma.periode.update({
+        where: { id: periodeId },
+        data: {
+          ketuaAuditorId: periode.ketuaAuditorId ?? user.id,
+          ketuaAuditorNama: periode.ketuaAuditorNama ?? user.nama,
+          ketuaAuditorNip: periode.ketuaAuditorNip ?? (user.nimNuptk || null),
+          ttdAuditor: ttdDataUrl,
+          ttdAuditorAt: now,
+        },
+      });
+    }
   } else if (tipe === "LPM") {
     if (user.role !== "LPM") {
       return { ok: false, error: "Hanya Kepala LPM yang dapat menempel TTD LPM." };
@@ -1006,11 +1043,12 @@ export async function simpanTtdSesi(
   revalidatePath("/auditor");
   revalidatePath(`/auditor/${periodeId}`);
   revalidatePath("/auditee");
+  revalidatePath("/auditee/detail");
 
   return {
     ok: true,
     message: ttdDataUrl
-      ? `Tanda tangan ${tipe} berhasil ditempel oleh ${user.nama}.`
+      ? `Tanda tangan ${tipe} berhasil ditempel oleh ${user.nama} (otomatis tersimpan maks. 3 menit).`
       : `Tanda tangan ${tipe} dihapus.`,
   };
 }

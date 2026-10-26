@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { cleanupExpiredSignatures } from "@/lib/ttd-cleanup";
 import { Badge, Empty, Flash, PageHeader, one, type SP } from "@/components/ui";
 import { SignaturePadCard } from "@/components/SignaturePadCard";
 import { TabelInstrumenDanRekap } from "@/components/TabelInstrumenDanRekap";
@@ -18,6 +20,15 @@ export default async function AuditorUnitWorkspacePage({
   const sp = await searchParams;
   const mode = one(sp.mode) ?? "dokumen";
 
+  await cleanupExpiredSignatures();
+
+  if (user.isTraining) {
+    if (!user.trainingPeriodeId) redirect("/training");
+    if (paramId !== user.trainingPeriodeId) {
+      redirect(`/auditor/${user.trainingPeriodeId}`);
+    }
+  }
+
   const periode =
     (await prisma.periode.findUnique({
       where: { id: paramId },
@@ -29,10 +40,21 @@ export default async function AuditorUnitWorkspacePage({
       orderBy: { createdAt: "desc" },
     }));
 
-  if (!periode) return <Empty>Sesi AMI tidak ditemukan.</Empty>;
+  if (!periode) {
+    if (user.isTraining) redirect("/training");
+    return <Empty>Sesi AMI tidak ditemukan.</Empty>;
+  }
 
-  // ATURAN INDEPENDENSI: Auditor TIDAK BOLEH mengaudit prodinya sendiri
-  if (user.unitId && periode.unitId && user.unitId === periode.unitId) {
+  // Isolasi ketat: Akun Training hanya boleh membuka Sesi Training miliknya, dan Akun Asli tidak membuka Sesi Training
+  if (user.isTraining && (!periode.isTraining || periode.id !== user.trainingPeriodeId)) {
+    redirect("/training");
+  }
+  if (!user.isTraining && periode.isTraining) {
+    redirect("/auditor");
+  }
+
+  // ATURAN INDEPENDENSI (Khusus Sesi AMI Asli Kampus): Auditor TIDAK BOLEH mengaudit prodinya sendiri
+  if (!periode.isTraining && user.unitId && periode.unitId && user.unitId === periode.unitId) {
     return (
       <Empty>
         Independensi AMI: Anda berasal dari Prodi {user.unit?.nama} sehingga tidak diperbolehkan mengaudit Prodi sendiri.
@@ -92,10 +114,23 @@ export default async function AuditorUnitWorkspacePage({
 
   return (
     <>
-      <PageHeader title={periode.nama}>
-        <Link href="/auditor" className="btn-secondary text-xs">
-          ← Kembali
-        </Link>
+      <PageHeader title={user.isTraining ? `${periode.nama} — Mode Auditor` : periode.nama}>
+        <div className="flex flex-wrap items-center gap-2">
+          {user.isTraining ? (
+            <>
+              <Link href="/auditee" className="btn text-xs">
+                📝 Pindah Jadi Auditee Kelompok Ini
+              </Link>
+              <Link href="/training" className="btn-secondary text-xs">
+                🔄 Ganti Kelompok
+              </Link>
+            </>
+          ) : (
+            <Link href="/auditor" className="btn-secondary text-xs">
+              ← Kembali
+            </Link>
+          )}
+        </div>
       </PageHeader>
       <Flash ok={one(sp.ok)} err={one(sp.err)} />
 
@@ -174,9 +209,9 @@ export default async function AuditorUnitWorkspacePage({
           ketuaAuditeeNip: periode.ketuaAuditeeNip,
           hasTtdAuditee: Boolean(periode.ttdAuditee),
           ttdAuditeePreview: periode.ttdAuditee,
-          ketuaAuditorId: periode.ketuaAuditorId,
-          ketuaAuditorNama: periode.ketuaAuditorNama,
-          ketuaAuditorNip: periode.ketuaAuditorNip,
+          ketuaAuditorId: periode.isTraining ? user.id : periode.ketuaAuditorId,
+          ketuaAuditorNama: periode.ketuaAuditorNama ?? (periode.isTraining ? user.nama : null),
+          ketuaAuditorNip: periode.ketuaAuditorNip ?? (periode.isTraining ? user.nimNuptk : null),
           hasTtdAuditor: Boolean(periode.ttdAuditor),
           ttdAuditorPreview: periode.ttdAuditor,
           kepalaLpmNama: periode.kepalaLpmNama ?? periode.disahkanOleh,

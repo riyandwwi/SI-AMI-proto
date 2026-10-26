@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { sortPeriodesChronological } from "@/lib/periode";
+import { cleanupExpiredSignatures } from "@/lib/ttd-cleanup";
 import { Badge, Empty, Flash, PageHeader, one, type SP } from "@/components/ui";
 import AuditeeClient, { type AuditeeIndikatorItem } from "./AuditeeClient";
 
@@ -10,13 +12,22 @@ export default async function AuditeePage({ searchParams }: { searchParams: SP }
   const sp = await searchParams;
   const arsipId = one(sp.arsipId);
 
+  await cleanupExpiredSignatures();
+
+  if (user.isTraining && !user.trainingPeriodeId) {
+    redirect("/training");
+  }
+
   if (!user.unitId || !user.unit) {
+    if (user.isTraining) redirect("/training");
     return <Empty>Akun Auditee belum dihubungkan ke Program Studi.</Empty>;
   }
 
-  // Ambil semua Sesi AMI milik Prodi Auditee ini, lalu urutkan berdasarkan Tahun Akademik & Semester (Ganjil -> Genap)
+  // Isolasi ketat: Akun Training HANYA bisa mengakses Kelompok Sesi Training yang dipilihnya
   const rawPeriodes = await prisma.periode.findMany({
-    where: { unitId: user.unitId },
+    where: user.isTraining
+      ? { id: user.trainingPeriodeId ?? "__NONE__", isTraining: true }
+      : { unitId: user.unitId, isTraining: false },
     include: {
       penugasan: {
         include: {
@@ -31,6 +42,7 @@ export default async function AuditeePage({ searchParams }: { searchParams: SP }
   });
 
   if (rawPeriodes.length === 0) {
+    if (user.isTraining) redirect("/training");
     return <Empty>Belum ada Sesi AMI untuk Program Studi {user.unit.nama}.</Empty>;
   }
 
@@ -115,12 +127,28 @@ export default async function AuditeePage({ searchParams }: { searchParams: SP }
 
   return (
     <>
-      <PageHeader title={`Prodi ${user.unit.nama} — ${periode.tahun} (${periode.semester})`}>
+      <PageHeader
+        title={
+          user.isTraining
+            ? `${periode.nama} — Mode Auditee`
+            : `Prodi ${user.unit.nama} — ${periode.tahun} (${periode.semester})`
+        }
+      >
         <div className="flex flex-wrap items-center gap-2">
-          {periode.ketuaAuditeeNama && (
+          {user.isTraining && (
+            <>
+              <Link href={`/auditor/${periode.id}`} className="btn-purple text-xs">
+                🕵️ Pindah Jadi Auditor Kelompok Ini
+              </Link>
+              <Link href="/training" className="btn-secondary text-xs">
+                🔄 Ganti Kelompok
+              </Link>
+            </>
+          )}
+          {periode.ketuaAuditeeNama && !user.isTraining && (
             <Badge tone="blue">⭐ Ketua Auditee: {periode.ketuaAuditeeNama}</Badge>
           )}
-          {displayAuditors.length > 0 && (
+          {!user.isTraining && displayAuditors.length > 0 && (
             <Badge tone="purple">
               🕵️ Auditor:{" "}
               {displayAuditors

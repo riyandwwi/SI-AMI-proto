@@ -11,6 +11,7 @@ export default async function AdminPage({ searchParams }: { searchParams: SP }) 
   const sp = await searchParams;
 
   const users = await prisma.user.findMany({
+    where: { isTraining: false },
     include: { unit: true },
     orderBy: [{ role: "asc" }, { nama: "asc" }],
   });

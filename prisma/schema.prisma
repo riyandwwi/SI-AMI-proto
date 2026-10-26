@@ -69,21 +69,24 @@ model Unit {
 }
 
 model User {
-  id           String             @id @default(cuid())
-  nama         String
-  nimNuptk     String             @default("")
-  username     String             @unique
-  passwordHash String
+  id                String             @id @default(cuid())
+  nama              String
+  nimNuptk          String             @default("")
+  username          String             @unique
+  passwordHash      String
   /// Salinan password terenkripsi AES-256-GCM agar Super Admin bisa melihatnya.
-  passwordEnc  String
-  role         Role
-  unitId       String?
-  unit         Unit?              @relation(fields: [unitId], references: [id], onDelete: SetNull)
-  aktif        Boolean            @default(true)
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
-  tim          PenugasanAuditor[]
-  logs         AuditLog[]
+  passwordEnc       String
+  role              Role
+  unitId            String?
+  unit              Unit?              @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  isTraining        Boolean            @default(false)
+  trainingPeriodeId String?
+  trainingPeriode   Periode?           @relation("TrainingUsers", fields: [trainingPeriodeId], references: [id], onDelete: SetNull)
+  aktif             Boolean            @default(true)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  tim               PenugasanAuditor[]
+  logs              AuditLog[]
 }
 
 model Periode {
@@ -91,6 +94,7 @@ model Periode {
   nama              String
   tahun             String
   semester          String      @default("Ganjil")
+  isTraining        Boolean     @default(false)
   unitId            String?
   unit              Unit?       @relation(fields: [unitId], references: [id], onDelete: Cascade)
   tahap             Tahap       @default(PENGISIAN)
@@ -119,6 +123,7 @@ model Periode {
   createdAt         DateTime    @default(now())
   indikator         Indikator[]
   penugasan         Penugasan[]
+  trainingUsers     User[]      @relation("TrainingUsers")
 }
 
 model Indikator {

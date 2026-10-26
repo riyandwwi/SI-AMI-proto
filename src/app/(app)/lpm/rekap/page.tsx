@@ -11,10 +11,12 @@ import {
 import { Badge, Empty, Flash, PageHeader, Stat, one, type SP } from "@/components/ui";
 import { SignaturePadCard } from "@/components/SignaturePadCard";
 import { TabelInstrumenDanRekap } from "@/components/TabelInstrumenDanRekap";
+import { cleanupExpiredSignatures } from "@/lib/ttd-cleanup";
 import { sahkanLaporanAkhir } from "../actions";
 
 export default async function LpmRekapPage({ searchParams }: { searchParams: SP }) {
   const user = await requireUser("LPM");
+  await cleanupExpiredSignatures();
   const sp = await searchParams;
   const prodiFilter = one(sp.prodi) ?? "ALL";
 
@@ -41,7 +43,9 @@ export default async function LpmRekapPage({ searchParams }: { searchParams: SP 
   const periodes =
     prodiFilter === "ALL"
       ? allSortedPeriodes
-      : allSortedPeriodes.filter((p) => p.unit?.kode === prodiFilter);
+      : prodiFilter === "TRAINING"
+        ? allSortedPeriodes.filter((p) => p.isTraining)
+        : allSortedPeriodes.filter((p) => !p.isTraining && p.unit?.kode === prodiFilter);
 
   let totalSlot = 0;
   let totalDrive = 0;
@@ -107,6 +111,12 @@ export default async function LpmRekapPage({ searchParams }: { searchParams: SP 
               {pr.nama}
             </Link>
           ))}
+          <Link
+            href="/lpm/rekap?prodi=TRAINING"
+            className={prodiFilter === "TRAINING" ? "btn text-xs" : "btn-secondary text-xs"}
+          >
+            🎓 Sesi Training ({allSortedPeriodes.filter((p) => p.isTraining).length})
+          </Link>
         </div>
         <Badge tone="slate">📅 Urutan: Tahun Akademik &amp; Semester (Ganjil ➔ Genap)</Badge>
       </div>
@@ -172,7 +182,8 @@ export default async function LpmRekapPage({ searchParams }: { searchParams: SP 
                 <tr key={p.id}>
                   <td>
                     <div className="font-bold text-black">{p.nama}</div>
-                    <div className="mt-1 flex gap-1">
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {p.isTraining && <Badge tone="amber">🎓 Sesi Training</Badge>}
                       <Badge tone="blue">{p.tahun}</Badge>
                       <Badge tone="purple">{p.semester}</Badge>
                     </div>

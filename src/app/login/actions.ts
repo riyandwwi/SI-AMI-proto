@@ -28,6 +28,9 @@ export async function login(_: LoginState, fd: FormData): Promise<LoginState> {
     maxAge: SESSION_MAX_AGE,
   });
   await catat(user.id, "LOGIN");
+  if (user.isTraining) {
+    redirect(user.trainingPeriodeId ? "/auditee" : "/training");
+  }
   redirect(ROLE_HOME[user.role]);
 }
 

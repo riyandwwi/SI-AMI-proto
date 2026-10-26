@@ -9,6 +9,7 @@ import {
   sortPeriodesChronological,
 } from "@/lib/periode";
 import { fmtWaktu } from "@/lib/format";
+import { cleanupExpiredSignatures } from "@/lib/ttd-cleanup";
 
 function esc(val: unknown): string {
   if (val === null || val === undefined) return "";
@@ -20,13 +21,18 @@ function esc(val: unknown): string {
 }
 
 export async function GET(req: NextRequest) {
-  await requireUser("LPM", "SUPER_ADMIN", "AUDITOR", "AUDITEE");
+  const user = await requireUser("LPM", "SUPER_ADMIN", "AUDITOR", "AUDITEE");
+  await cleanupExpiredSignatures();
 
   const periodeId = req.nextUrl.searchParams.get("periodeId");
   const isPrint = req.nextUrl.searchParams.get("print") === "1";
 
   const rawPeriodes = await prisma.periode.findMany({
-    where: periodeId ? { id: periodeId } : undefined,
+    where: user.isTraining
+      ? { id: user.trainingPeriodeId ?? "__NONE__", isTraining: true }
+      : periodeId
+        ? { id: periodeId }
+        : undefined,
     include: {
       unit: true,
       indikator: {

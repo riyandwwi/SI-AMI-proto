@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { sortPeriodesChronological } from "@/lib/periode";
+import { cleanupExpiredSignatures } from "@/lib/ttd-cleanup";
 import { Badge, Empty, Flash, PageHeader, one, type SP } from "@/components/ui";
 import { SignaturePadCard } from "@/components/SignaturePadCard";
 import { TabelInstrumenDanRekap } from "@/components/TabelInstrumenDanRekap";
@@ -13,15 +15,25 @@ export default async function AuditeeDetailIndikatorPage({ searchParams }: { sea
   const arsipId = one(sp.arsipId);
   const tabParam = one(sp.tab);
 
+  await cleanupExpiredSignatures();
+
+  if (user.isTraining && !user.trainingPeriodeId) {
+    redirect("/training");
+  }
+
   if (!user.unitId || !user.unit) {
+    if (user.isTraining) redirect("/training");
     return <Empty>Akun Auditee belum dihubungkan ke Program Studi.</Empty>;
   }
 
   const rawPeriodes = await prisma.periode.findMany({
-    where: { unitId: user.unitId },
+    where: user.isTraining
+      ? { id: user.trainingPeriodeId ?? "__NONE__", isTraining: true }
+      : { unitId: user.unitId, isTraining: false },
   });
 
   if (rawPeriodes.length === 0) {
+    if (user.isTraining) redirect("/training");
     return <Empty>Belum ada Sesi AMI untuk Program Studi {user.unit.nama}.</Empty>;
   }
 
@@ -160,9 +172,9 @@ export default async function AuditeeDetailIndikatorPage({ searchParams }: { sea
         session={{
           periodeId: periode.id,
           periodeNama: periode.nama,
-          ketuaAuditeeId: periode.ketuaAuditeeId,
-          ketuaAuditeeNama: periode.ketuaAuditeeNama,
-          ketuaAuditeeNip: periode.ketuaAuditeeNip,
+          ketuaAuditeeId: periode.isTraining ? user.id : periode.ketuaAuditeeId,
+          ketuaAuditeeNama: periode.ketuaAuditeeNama ?? (periode.isTraining ? user.nama : null),
+          ketuaAuditeeNip: periode.ketuaAuditeeNip ?? (periode.isTraining ? user.nimNuptk : null),
           hasTtdAuditee: Boolean(periode.ttdAuditee),
           ttdAuditeePreview: periode.ttdAuditee,
           ketuaAuditorId: periode.ketuaAuditorId,

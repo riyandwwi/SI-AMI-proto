@@ -7,7 +7,10 @@ import { Badge } from "@/components/ui";
 import { logout } from "@/app/login/actions";
 
 const NAV = {
-  SUPER_ADMIN: [{ href: "/admin", label: "Kelola Akun" }],
+  SUPER_ADMIN: [
+    { href: "/admin", label: "Kelola Akun" },
+    { href: "/admin/training", label: "🎓 Sesi Training" },
+  ],
   LPM: [
     { href: "/lpm", label: "Sesi AMI" },
     { href: "/lpm/indikator", label: "Indikator" },
@@ -22,8 +25,22 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const user = await requireUser();
   const firstName = user.nama.split(" ")[0] || user.nama;
 
-  const shortcuts =
-    user.role === "LPM"
+  const navItems = user.isTraining
+    ? [
+        { href: "/training", label: "🎓 Pilih Kelompok Training" },
+        { href: "/auditee", label: "📝 Sebagai Auditee (Isi Evaluasi)" },
+        { href: "/auditor", label: "🕵️ Sebagai Auditor (Periksa)" },
+      ]
+    : [...NAV[user.role]];
+
+  const shortcuts = user.isTraining
+    ? [
+        { href: "/training", label: "Kelompok", icon: "🎓", bg: "bg-[#E9D5FF]" },
+        { href: "/auditee", label: "Jadi Auditee", icon: "📝", bg: "bg-[#FEF08A]" },
+        { href: "/auditor", label: "Jadi Auditor", icon: "🕵️", bg: "bg-[#D9F99D]" },
+        { href: "/auditee/detail", label: "Rekap & TTD", icon: "📊", bg: "bg-[#BAE6FD]" },
+      ]
+    : user.role === "LPM"
       ? [
           { href: "/lpm", label: "Sesi AMI", icon: "📋", bg: "bg-[#E9D5FF]" },
           { href: "/lpm/indikator", label: "Indikator", icon: "📑", bg: "bg-[#FEF08A]" },
@@ -46,8 +63,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             ]
           : [
               { href: "/admin", label: "Akun", icon: "👥", bg: "bg-[#E9D5FF]" },
-              { href: "/admin", label: "Password", icon: "🔑", bg: "bg-[#FEF08A]" },
-              { href: "/admin", label: "Prodi", icon: "🎓", bg: "bg-[#D9F99D]" },
+              { href: "/admin/training", label: "Training", icon: "🎓", bg: "bg-[#FEF08A]" },
+              { href: "/admin", label: "Prodi", icon: "🏫", bg: "bg-[#D9F99D]" },
               { href: "/admin", label: "Role", icon: "🛡️", bg: "bg-[#BAE6FD]" },
             ];
 
@@ -69,8 +86,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 {user.nama}
               </div>
               <div className="flex items-center justify-end gap-1.5 pt-0.5 text-xs">
-                <Badge tone="purple">{ROLE_LABEL[user.role]}</Badge>
-                {user.unit && (
+                {user.isTraining ? (
+                  <Badge tone="amber">🎓 Peserta Training (Auditee &amp; Auditor)</Badge>
+                ) : (
+                  <Badge tone="purple">{ROLE_LABEL[user.role]}</Badge>
+                )}
+                {user.unit && !user.isTraining && (
                   <span className="rounded-full border border-black bg-white px-2 py-0.2 font-bold text-[11px]">
                     {user.unit.nama}
                   </span>
@@ -88,7 +109,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </div>
 
         <div className="mx-auto max-w-7xl px-4 pb-2.5">
-          <NavLinks items={[...NAV[user.role]]} />
+          <NavLinks items={navItems} />
         </div>
       </header>
 

@@ -13,6 +13,7 @@ import { Badge, Empty, Flash, PageHeader, one, type SP } from "@/components/ui";
 import { ImportIndikatorExcel } from "./ImportIndikatorExcel";
 import { FormStandarBertahap, type ExistingStandarInfo } from "./FormStandarBertahap";
 import { LpmStandarFilterBar } from "./LpmStandarFilterBar";
+import { cleanupExpiredSignatures } from "@/lib/ttd-cleanup";
 import {
   buatSesiAmi,
   hapusIndikator,
@@ -30,6 +31,7 @@ import {
 
 export default async function LpmPage({ searchParams }: { searchParams: SP }) {
   await requireUser("LPM");
+  await cleanupExpiredSignatures();
   const sp = await searchParams;
   const tab = one(sp.tab) ?? "sesi";
   const prodiFilter = one(sp.prodi) ?? "ALL";
@@ -40,6 +42,9 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
     prisma.periode.findMany({
       include: {
         unit: true,
+        trainingUsers: {
+          orderBy: { nama: "asc" },
+        },
         penugasan: {
           include: {
             tim: {
@@ -56,7 +61,7 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
       },
     }),
     prisma.user.findMany({
-      where: { role: { in: ["AUDITOR", "AUDITEE"] }, aktif: true },
+      where: { role: { in: ["AUDITOR", "AUDITEE"] }, aktif: true, isTraining: false },
       include: { unit: true },
       orderBy: { nama: "asc" },
     }),
@@ -67,7 +72,9 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
   const filteredPeriodes =
     prodiFilter === "ALL"
       ? periodes
-      : periodes.filter((p) => p.unit?.kode === prodiFilter);
+      : prodiFilter === "TRAINING"
+        ? periodes.filter((p) => p.isTraining)
+        : periodes.filter((p) => !p.isTraining && p.unit?.kode === prodiFilter);
 
   const activePeriodeForPantau =
     periodes.find((p) => p.id === selectedPeriodeId) ?? periodes[0] ?? null;
@@ -187,9 +194,15 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                   href={`/lpm?tab=sesi&prodi=${pr.kode}`}
                   className={prodiFilter === pr.kode ? "btn text-xs" : "btn-secondary text-xs"}
                 >
-                  {pr.nama} ({periodes.filter((p) => p.unit?.kode === pr.kode).length})
+                  {pr.nama} ({periodes.filter((p) => !p.isTraining && p.unit?.kode === pr.kode).length})
                 </Link>
               ))}
+              <Link
+                href="/lpm?tab=sesi&prodi=TRAINING"
+                className={prodiFilter === "TRAINING" ? "btn text-xs" : "btn-secondary text-xs"}
+              >
+                🎓 Sesi Training ({periodes.filter((p) => p.isTraining).length})
+              </Link>
             </div>
             <Badge tone="slate">📅 Urutan: Tahun Akademik &amp; Semester (Ganjil ➔ Genap)</Badge>
           </div>
@@ -229,6 +242,7 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/15 pb-3">
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="text-base font-black text-black">{p.nama}</h3>
+                        {p.isTraining && <Badge tone="amber">🎓 Sesi Training (Dual Role)</Badge>}
                         <Badge tone="blue">{p.tahun}</Badge>
                         <Badge tone="purple">{p.semester}</Badge>
                         <Badge tone={p.aktif ? "green" : "amber"}>
@@ -265,6 +279,35 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                       </div>
                     </div>
 
+                    {p.isTraining ? (
+                      <div className="rounded-2xl border border-black/15 bg-[#FAF7EE] p-4 space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="text-xs font-black uppercase text-black">
+                            🎓 Anggota Kelompok Pelatihan AMI (Dual Role: Auditee &amp; Auditor)
+                          </span>
+                          <Badge tone="amber">{p.trainingUsers.length} Peserta Bergabung</Badge>
+                        </div>
+                        {p.trainingUsers.length === 0 ? (
+                          <p className="text-xs font-semibold text-slate-500">
+                            Belum ada peserta training yang memilih kelompok ini. Peserta dapat memilih kelompok saat login menggunakan akun training.
+                          </p>
+                        ) : (
+                          <div className="flex flex-wrap gap-2">
+                            {p.trainingUsers.map((tu) => (
+                              <span
+                                key={tu.id}
+                                className="inline-flex items-center gap-1.5 rounded-xl border border-black/20 bg-white px-3 py-1.5 text-xs font-bold text-black"
+                              >
+                                👤 {tu.nama}{" "}
+                                <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] text-slate-700">
+                                  {tu.username}
+                                </code>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                       {/* KOTAK KIRI: AUDITEE (SATU PRODI) + EMERGENCY TAMBAH/HAPUS */}
                       <div className="rounded-2xl border border-black/15 bg-[#FAF7EE] p-4 space-y-3">
@@ -443,6 +486,7 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                         )}
                       </div>
                     </div>
+                    )}
                   </div>
                 );
               })}
