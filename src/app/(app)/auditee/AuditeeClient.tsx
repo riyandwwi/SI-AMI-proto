@@ -96,6 +96,8 @@ export default function AuditeeClient({
   const [notice, setNotice] = useState<{ ok?: string; err?: string } | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [standarFilter, setStandarFilter] = useState<string>("ALL");
+  const [statusFilter, setStatusFilter] = useState<"ALL" | "BELUM" | "SUDAH" | "RTL">("ALL");
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
@@ -231,6 +233,47 @@ export default function AuditeeClient({
     setExpandedIds({});
   };
 
+  // Cari indikator berikutnya yang belum diisi link Drive-nya
+  const findNextUnfinishedId = (
+    afterId?: string,
+    justSavedSet?: Set<string>
+  ): string | null => {
+    const isUnfinished = (ind: AuditeeIndikatorItem) => {
+      if (justSavedSet?.has(ind.id)) return false;
+      if (ind.isian?.terverifikasiAuditor || ind.isian?.terverifikasiLapangan) return false;
+      const savDrive = (savedValues[ind.id]?.linkDrive ?? ind.isian?.linkDrive ?? "").trim();
+      return !savDrive;
+    };
+
+    if (afterId) {
+      const idx = indikator.findIndex((i) => i.id === afterId);
+      if (idx >= 0) {
+        for (let i = idx + 1; i < indikator.length; i++) {
+          if (isUnfinished(indikator[i])) return indikator[i].id;
+        }
+      }
+    }
+    const first = indikator.find(isUnfinished);
+    return first ? first.id : null;
+  };
+
+  const scrollToAndExpandIndikator = (indId: string) => {
+    setExpandedIds((prev) => {
+      const next: Record<string, boolean> = {};
+      for (const id of Object.keys(prev)) {
+        if (prev[id] && isDirty(id)) next[id] = true;
+      }
+      next[indId] = true;
+      return next;
+    });
+    setTimeout(() => {
+      const el = document.getElementById(`auditee-ind-${indId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }, 80);
+  };
+
   const handleSaveIndikator = (targetIndikatorId?: string) => {
     setNotice(null);
     setSavingId(targetIndikatorId ?? "ALL");
@@ -253,6 +296,7 @@ export default function AuditeeClient({
       }
 
       if (res.savedIds && res.savedIds.length > 0) {
+        const justSavedSet = new Set(res.savedIds);
         setSavedValues((prev) => {
           const next = { ...prev };
           for (const id of res.savedIds!) {
@@ -265,14 +309,30 @@ export default function AuditeeClient({
           return next;
         });
 
-        // Otomatis minimize indikator yang baru saja berhasil disimpan
+        // Otomatis minimize indikator yang baru disimpan & langsung buka indikator belum diisi berikutnya!
+        const nextUnfinishedId = targetIndikatorId
+          ? findNextUnfinishedId(targetIndikatorId, justSavedSet)
+          : null;
+
         setExpandedIds((prev) => {
           const next = { ...prev };
           for (const id of res.savedIds!) {
             delete next[id];
           }
+          if (nextUnfinishedId) {
+            next[nextUnfinishedId] = true;
+          }
           return next;
         });
+
+        if (nextUnfinishedId) {
+          setTimeout(() => {
+            const el = document.getElementById(`auditee-ind-${nextUnfinishedId}`);
+            if (el) {
+              el.scrollIntoView({ behavior: "smooth", block: "center" });
+            }
+          }, 100);
+        }
 
         try {
           const raw = localStorage.getItem(storageKey);
@@ -326,9 +386,13 @@ export default function AuditeeClient({
   // Kelompokkan indikator berdasarkan siapa Auditee yang sudah menyimpan
   const kontribusiMap = new Map<string, string[]>();
   let totalTersimpan = 0;
+  let totalWajibRtl = 0;
+  let totalLockedAuditor = 0;
   for (const ind of indikator) {
     const savDrive = (savedValues[ind.id]?.linkDrive ?? ind.isian?.linkDrive ?? "").trim();
     if (savDrive) totalTersimpan++;
+    if (ind.isian?.klasifikasi && BUTUH_RTL.includes(ind.isian.klasifikasi)) totalWajibRtl++;
+    if (ind.isian?.terverifikasiAuditor || ind.isian?.terverifikasiLapangan) totalLockedAuditor++;
     const namaPengisi = savedValues[ind.id]?.diisiOleh ?? ind.isian?.diisiOleh;
     if (namaPengisi) {
       const list = kontribusiMap.get(namaPengisi) ?? [];
@@ -336,15 +400,42 @@ export default function AuditeeClient({
       kontribusiMap.set(namaPengisi, list);
     }
   }
+  const totalBelumDiisi = Math.max(0, indikator.length - totalTersimpan);
+  const persenTerisi = indikator.length > 0 ? Math.round((totalTersimpan / indikator.length) * 100) : 0;
+  const persenAuditor = indikator.length > 0 ? Math.round((totalLockedAuditor / indikator.length) * 100) : 0;
+
+  const qNorm = searchQuery.trim().toLowerCase();
+  const matchesFilterAndSearch = (ind: AuditeeIndikatorItem, noUrut: number) => {
+    const savDrive = Boolean((savedValues[ind.id]?.linkDrive ?? ind.isian?.linkDrive ?? "").trim());
+    const perluRtl = Boolean(ind.isian?.klasifikasi && BUTUH_RTL.includes(ind.isian.klasifikasi));
+
+    if (statusFilter === "BELUM" && savDrive) return false;
+    if (statusFilter === "SUDAH" && !savDrive) return false;
+    if (statusFilter === "RTL" && !perluRtl) return false;
+
+    if (qNorm) {
+      const hay = `#${noUrut} ${ind.kode} ${ind.standar} ${ind.pernyataanStandar ?? ""} ${ind.pernyataan} ${ind.buktiDiminta ?? ""}`.toLowerCase();
+      if (!hay.includes(qNorm)) return false;
+    }
+    return true;
+  };
 
   const allGroups = groupIndikatorByStandar(indikator);
-  const visibleGroups =
+  const visibleGroups = (
     standarFilter === "ALL"
       ? allGroups
-      : allGroups.filter((g) => g.standar === standarFilter);
-  const visibleFlatItems = visibleGroups.flatMap((g) => g.items.map((x) => x.item));
+      : allGroups.filter((g) => g.standar === standarFilter)
+  )
+    .map((g) => ({
+      ...g,
+      filteredItems: g.items.filter(({ item, noUrut }) => matchesFilterAndSearch(item, noUrut)),
+    }))
+    .filter((g) => g.filteredItems.length > 0);
+
+  const visibleFlatItems = visibleGroups.flatMap((g) => g.filteredItems.map((x) => x.item));
   const allVisibleExpanded =
     visibleFlatItems.length > 0 && visibleFlatItems.every((item) => Boolean(expandedIds[item.id]));
+  const nextUnfinishedCandidateId = findNextUnfinishedId();
 
   return (
     <div className="space-y-4">
@@ -359,8 +450,42 @@ export default function AuditeeClient({
         </div>
       )}
 
-      {/* Bar Filter Standar SPMI (1 Baris Minimalis via Dropdown) + 1 Tombol Toggle Buka/Minimize */}
-      <div className="card space-y-2.5 py-3 text-xs">
+      {/* Bar Progres Visual + Filter Standar SPMI + Filter Status + Search Cepat */}
+      <div className="card space-y-3 py-3.5 text-xs">
+        {/* 1. Progress Bar Visual Kesiapan Auditee & Verifikasi Auditor */}
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+          <div className="rounded-xl border-2 border-black bg-[#FAF7EE] p-2.5 space-y-1.5">
+            <div className="flex items-center justify-between font-black text-black">
+              <span>📊 Progres Bukti Auditee</span>
+              <span>
+                {totalTersimpan} / {indikator.length} Indikator ({persenTerisi}%)
+              </span>
+            </div>
+            <div className="h-3 w-full overflow-hidden rounded-full border border-black bg-white">
+              <div
+                className="h-full bg-[#4ADE80] transition-all duration-300"
+                style={{ width: `${persenTerisi}%` }}
+              />
+            </div>
+          </div>
+
+          <div className="rounded-xl border-2 border-black bg-[#FAF7EE] p-2.5 space-y-1.5">
+            <div className="flex items-center justify-between font-black text-black">
+              <span>🕵️ Diverifikasi Auditor</span>
+              <span>
+                {totalLockedAuditor} / {indikator.length} Indikator ({persenAuditor}%)
+              </span>
+            </div>
+            <div className="h-3 w-full overflow-hidden rounded-full border border-black bg-white">
+              <div
+                className="h-full bg-[#38BDF8] transition-all duration-300"
+                style={{ width: `${persenAuditor}%` }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* 2. Dropdown Standar SPMI + Tombol Lompat ke Belum Diisi + Toggle Buka/Minimize */}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
             <label htmlFor="select-standar-spmi" className="shrink-0 font-black uppercase text-black">
@@ -399,9 +524,21 @@ export default function AuditeeClient({
           </div>
 
           <div className="flex flex-wrap items-center gap-1.5">
-            <Badge tone={totalTersimpan === indikator.length ? "green" : "blue"}>
-              ✅ Tersimpan: {totalTersimpan}/{indikator.length}
-            </Badge>
+            {nextUnfinishedCandidateId && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (standarFilter !== "ALL" || statusFilter === "SUDAH") {
+                    setStandarFilter("ALL");
+                    setStatusFilter("ALL");
+                  }
+                  scrollToAndExpandIndikator(nextUnfinishedCandidateId);
+                }}
+                className="btn px-3 py-1 text-xs"
+              >
+                ⏭️ Buka Belum Diisi Berikutnya
+              </button>
+            )}
             <button
               type="button"
               onClick={() => {
@@ -415,6 +552,62 @@ export default function AuditeeClient({
             >
               {allVisibleExpanded ? "🔼 Minimize Semua" : "🔽 Buka Semua"}
             </button>
+          </div>
+        </div>
+
+        {/* 3. Filter Status Cepat + Kotak Cari Kata Kunci */}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-black/15 pt-2.5">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="font-black uppercase text-black">Filter Status:</span>
+            <button
+              type="button"
+              onClick={() => setStatusFilter("ALL")}
+              className={statusFilter === "ALL" ? "btn px-2.5 py-1 text-xs" : "btn-secondary px-2.5 py-1 text-xs"}
+            >
+              Semua ({indikator.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter("BELUM")}
+              className={statusFilter === "BELUM" ? "btn px-2.5 py-1 text-xs" : "btn-secondary px-2.5 py-1 text-xs"}
+            >
+              ⏳ Belum Diisi ({totalBelumDiisi})
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter("SUDAH")}
+              className={statusFilter === "SUDAH" ? "btn px-2.5 py-1 text-xs" : "btn-secondary px-2.5 py-1 text-xs"}
+            >
+              ✅ Sudah Diisi ({totalTersimpan})
+            </button>
+            {totalWajibRtl > 0 && (
+              <button
+                type="button"
+                onClick={() => setStatusFilter("RTL")}
+                className={statusFilter === "RTL" ? "btn px-2.5 py-1 text-xs" : "btn-secondary px-2.5 py-1 text-xs"}
+              >
+                🛠️ Wajib RTL ({totalWajibRtl})
+              </button>
+            )}
+          </div>
+
+          <div className="flex min-w-[220px] flex-1 items-center gap-1.5 sm:max-w-xs">
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="🔍 Cari kode / indikator / bukti..."
+              className="w-full rounded-xl border-2 border-black bg-white px-3 py-1 text-xs font-bold text-black"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="btn-secondary px-2 py-1 text-xs"
+              >
+                ✕
+              </button>
+            )}
           </div>
         </div>
 
@@ -469,7 +662,7 @@ export default function AuditeeClient({
               </div>
             </div>
 
-            {group.items.map(({ item: ind, noUrut }) => {
+            {group.filteredItems.map(({ item: ind, noUrut }) => {
               const isian = ind.isian;
               const cur = values[ind.id] ?? { klaim: "", linkDrive: "", rtlRencana: "", rtlLinkBukti: "" };
               const sav = savedValues[ind.id] ?? { klaim: "", linkDrive: "", diisiOleh: null };
@@ -492,6 +685,7 @@ export default function AuditeeClient({
               return (
                 <div
                   key={ind.id}
+                  id={`auditee-ind-${ind.id}`}
                   className={`rounded-2xl border-2 border-black px-5 shadow-[4px_4px_0px_#000000] transition ${cardStyle} ${
                     isExpanded ? "space-y-3 py-4" : "py-2.5"
                   }`}

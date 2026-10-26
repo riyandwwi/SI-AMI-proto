@@ -123,13 +123,11 @@ export default function AuditorClient({
   const [notice, setNotice] = useState<{ ok?: string; err?: string } | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [filterStandar, setFilterStandar] = useState<string>("SEMUA");
+  const [statusFilter, setStatusFilter] = useState<"ALL" | "ADA_BUKTI" | "BELUM_VERIF" | "SUDAH_VERIF">("ALL");
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const [isPending, startTransition] = useTransition();
 
   const standarGroups = groupIndikatorByStandar(indikator);
-  const visibleGroups =
-    filterStandar === "SEMUA"
-      ? standarGroups
-      : standarGroups.filter((g) => g.standar === filterStandar);
 
   useEffect(() => {
     try {
@@ -341,6 +339,15 @@ export default function AuditorClient({
             return next;
           });
         }
+        if (targetIndikatorId) {
+          const idx = indikator.findIndex((i) => i.id === targetIndikatorId);
+          const nextItem = indikator.slice(idx + 1).find((i) => !verifiedMap[i.id] && i.id !== targetIndikatorId);
+          if (nextItem) {
+            setTimeout(() => {
+              document.getElementById(`auditor-ind-${nextItem.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+            }, 100);
+          }
+        }
       }
       setNotice({ ok: res.message ?? "Tersimpan." });
       router.refresh();
@@ -383,6 +390,15 @@ export default function AuditorClient({
               for (const id of res.savedIds!) next[id] = true;
               return next;
             });
+          }
+        }
+        if (targetIndikatorId) {
+          const idx = indikator.findIndex((i) => i.id === targetIndikatorId);
+          const nextItem = indikator.slice(idx + 1).find((i) => !verifiedLapanganMap[i.id] && i.id !== targetIndikatorId);
+          if (nextItem) {
+            setTimeout(() => {
+              document.getElementById(`auditor-ind-${nextItem.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+            }, 100);
           }
         }
       }
@@ -522,10 +538,22 @@ export default function AuditorClient({
     return k && BUTUH_RTL.includes(k);
   }).length;
 
-  // Ringkasan siapa Auditee dan siapa Auditor yang sudah mengerjakan
+  // Ringkasan siapa Auditee dan siapa Auditor yang sudah mengerjakan + Statistik Progres
   const auditeeKontrib = new Map<string, string[]>();
   const auditorKontrib = new Map<string, string[]>();
+  let totalAdaBuktiAuditee = 0;
+  let totalSudahVerifMode = 0;
+
+  const isItemVerifiedInMode = (indId: string) => {
+    if (mode === "dokumen") return Boolean(verifiedMap[indId]);
+    if (mode === "lapangan") return Boolean(verifiedLapanganMap[indId]);
+    return Boolean(verifiedRtlMap[indId]);
+  };
+
   for (const ind of indikator) {
+    if (ind.isian?.linkDrive?.trim()) totalAdaBuktiAuditee++;
+    if (isItemVerifiedInMode(ind.id)) totalSudahVerifMode++;
+
     if (ind.isian?.diisiOleh) {
       const list = auditeeKontrib.get(ind.isian.diisiOleh) ?? [];
       list.push(ind.kode);
@@ -537,6 +565,42 @@ export default function AuditorClient({
       auditorKontrib.set(ind.isian.diperiksaOleh, list);
     }
   }
+
+  const totalTargetMode = mode === "rtl" ? rtlCount : indikator.length;
+  const totalBelumVerifMode = Math.max(0, totalTargetMode - totalSudahVerifMode);
+  const persenBuktiAuditee =
+    indikator.length > 0 ? Math.round((totalAdaBuktiAuditee / indikator.length) * 100) : 0;
+  const persenVerifAuditor =
+    totalTargetMode > 0 ? Math.round((totalSudahVerifMode / totalTargetMode) * 100) : 0;
+
+  const qNorm = searchQuery.trim().toLowerCase();
+  const matchesAuditorFilter = (ind: AuditorIndikatorItem, noUrut: number) => {
+    const hasBukti = Boolean(ind.isian?.linkDrive?.trim());
+    const verif = isItemVerifiedInMode(ind.id);
+
+    if (statusFilter === "ADA_BUKTI" && !hasBukti) return false;
+    if (statusFilter === "BELUM_VERIF" && verif) return false;
+    if (statusFilter === "SUDAH_VERIF" && !verif) return false;
+
+    if (qNorm) {
+      const hay = `#${noUrut} ${ind.kode} ${ind.standar} ${ind.pernyataanStandar ?? ""} ${ind.pernyataan} ${ind.buktiDiminta ?? ""} ${ind.isian?.klaim ?? ""}`.toLowerCase();
+      if (!hay.includes(qNorm)) return false;
+    }
+    return true;
+  };
+
+  const visibleGroups =
+    filterStandar === "SEMUA"
+      ? standarGroups
+      : standarGroups.filter((g) => g.standar === filterStandar);
+
+  const nextUnverifiedItem = indikator.find((ind) => {
+    if (mode === "rtl") {
+      const k = savedValues[ind.id]?.klasifikasi ?? ind.isian?.klasifikasi;
+      if (!k || !BUTUH_RTL.includes(k)) return false;
+    }
+    return !isItemVerifiedInMode(ind.id);
+  });
 
   return (
     <div className="space-y-4">
@@ -677,42 +741,156 @@ export default function AuditorClient({
       )}
 
       {standarGroups.length > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border-2 border-black bg-[#FAF7EE] px-4 py-2.5 text-xs shadow-[2px_2px_0px_#000]">
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-            <label htmlFor="auditor-select-standar" className="shrink-0 font-black uppercase text-black">
-              📂 Filter Standar SPMI:
-            </label>
-            <select
-              id="auditor-select-standar"
-              value={filterStandar}
-              onChange={(e) => setFilterStandar(e.target.value)}
-              className="min-w-[240px] max-w-full flex-1 rounded-xl border-2 border-black bg-white px-3 py-1.5 text-xs font-black text-black sm:max-w-md"
-            >
-              <option value="SEMUA">
-                Semua Standar ({standarGroups.length} Standar — {indikator.length} Indikator)
-              </option>
-              {standarGroups.map((g, idx) => (
-                <option key={g.standar} value={g.standar}>
-                  {idx + 1}. {g.standar} (Indikator #{g.startIndex}–#{g.endIndex})
+        <div className="card space-y-3 py-3.5 text-xs">
+          {/* 1. Progress Bar Visual Kesiapan Bukti Auditee & Pemeriksaan Auditor */}
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+            <div className="rounded-xl border-2 border-black bg-[#FAF7EE] p-2.5 space-y-1.5">
+              <div className="flex items-center justify-between font-black text-black">
+                <span>📥 Bukti Drive Auditee Masuk</span>
+                <span>
+                  {totalAdaBuktiAuditee} / {indikator.length} Indikator ({persenBuktiAuditee}%)
+                </span>
+              </div>
+              <div className="h-3 w-full overflow-hidden rounded-full border border-black bg-white">
+                <div
+                  className="h-full bg-[#4ADE80] transition-all duration-300"
+                  style={{ width: `${persenBuktiAuditee}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="rounded-xl border-2 border-black bg-[#FAF7EE] p-2.5 space-y-1.5">
+              <div className="flex items-center justify-between font-black text-black">
+                <span>
+                  🕵️ Progres Verifikasi Auditor ({mode === "dokumen" ? "Dokumen" : mode === "lapangan" ? "Lapangan" : "RTL"})
+                </span>
+                <span>
+                  {totalSudahVerifMode} / {totalTargetMode} Indikator ({persenVerifAuditor}%)
+                </span>
+              </div>
+              <div className="h-3 w-full overflow-hidden rounded-full border border-black bg-white">
+                <div
+                  className="h-full bg-[#38BDF8] transition-all duration-300"
+                  style={{ width: `${persenVerifAuditor}%` }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* 2. Dropdown Filter Standar SPMI + Tombol Lompat ke Belum Diperiksa */}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+              <label htmlFor="auditor-select-standar" className="shrink-0 font-black uppercase text-black">
+                📂 Filter Standar SPMI:
+              </label>
+              <select
+                id="auditor-select-standar"
+                value={filterStandar}
+                onChange={(e) => setFilterStandar(e.target.value)}
+                className="min-w-[240px] max-w-full flex-1 rounded-xl border-2 border-black bg-white px-3 py-1.5 text-xs font-black text-black sm:max-w-md"
+              >
+                <option value="SEMUA">
+                  Semua Standar ({standarGroups.length} Standar — {indikator.length} Indikator)
                 </option>
-              ))}
-            </select>
-            {filterStandar !== "SEMUA" && (
+                {standarGroups.map((g, idx) => (
+                  <option key={g.standar} value={g.standar}>
+                    {idx + 1}. {g.standar} (Indikator #{g.startIndex}–#{g.endIndex})
+                  </option>
+                ))}
+              </select>
+              {filterStandar !== "SEMUA" && (
+                <button
+                  type="button"
+                  onClick={() => setFilterStandar("SEMUA")}
+                  className="btn-secondary px-2.5 py-1 text-xs"
+                >
+                  ✕ Semua
+                </button>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5">
+              {nextUnverifiedItem && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (filterStandar !== "SEMUA" || statusFilter === "SUDAH_VERIF") {
+                      setFilterStandar("SEMUA");
+                      setStatusFilter("ALL");
+                    }
+                    setTimeout(() => {
+                      document
+                        .getElementById(`auditor-ind-${nextUnverifiedItem.id}`)
+                        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+                    }, 80);
+                  }}
+                  className="btn px-3 py-1 text-xs"
+                >
+                  ⏭️ Lompat ke Belum Diverifikasi
+                </button>
+              )}
+              <Badge tone="blue">{standarGroups.length} Standar SPMI</Badge>
+            </div>
+          </div>
+
+          {/* 3. Filter Status Cepat + Kotak Cari Kata Kunci */}
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-black/15 pt-2.5">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="font-black uppercase text-black">Filter Status:</span>
               <button
                 type="button"
-                onClick={() => setFilterStandar("SEMUA")}
-                className="btn-secondary px-2.5 py-1 text-xs"
+                onClick={() => setStatusFilter("ALL")}
+                className={statusFilter === "ALL" ? "btn px-2.5 py-1 text-xs" : "btn-secondary px-2.5 py-1 text-xs"}
               >
-                ✕ Semua
+                Semua ({totalTargetMode})
               </button>
-            )}
+              <button
+                type="button"
+                onClick={() => setStatusFilter("ADA_BUKTI")}
+                className={statusFilter === "ADA_BUKTI" ? "btn px-2.5 py-1 text-xs" : "btn-secondary px-2.5 py-1 text-xs"}
+              >
+                📥 Ada Bukti Auditee ({totalAdaBuktiAuditee})
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter("BELUM_VERIF")}
+                className={statusFilter === "BELUM_VERIF" ? "btn px-2.5 py-1 text-xs" : "btn-secondary px-2.5 py-1 text-xs"}
+              >
+                ⏳ Belum Diverifikasi ({totalBelumVerifMode})
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter("SUDAH_VERIF")}
+                className={statusFilter === "SUDAH_VERIF" ? "btn px-2.5 py-1 text-xs" : "btn-secondary px-2.5 py-1 text-xs"}
+              >
+                🔒 Sudah Diverifikasi ({totalSudahVerifMode})
+              </button>
+            </div>
+
+            <div className="flex min-w-[220px] flex-1 items-center gap-1.5 sm:max-w-xs">
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="🔍 Cari kode / indikator / klaim..."
+                className="w-full rounded-xl border-2 border-black bg-white px-3 py-1 text-xs font-bold text-black"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="btn-secondary px-2 py-1 text-xs"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
           </div>
-          <Badge tone="blue">{standarGroups.length} Standar SPMI</Badge>
         </div>
       )}
 
       {visibleGroups.map((group) => {
-        const groupItems =
+        const baseItems =
           mode === "rtl"
             ? group.items.filter(
                 (entry) =>
@@ -720,6 +898,7 @@ export default function AuditorClient({
                   BUTUH_RTL.includes(entry.item.isian.klasifikasi)
               )
             : group.items;
+        const groupItems = baseItems.filter(({ item, noUrut }) => matchesAuditorFilter(item, noUrut));
 
         if (groupItems.length === 0) return null;
 
@@ -755,6 +934,7 @@ export default function AuditorClient({
               return (
                 <div
                   key={ind.id}
+                  id={`auditor-ind-${ind.id}`}
                   className={`card space-y-3 transition ${
                     mode === "lapangan" && isFokus ? "border-amber-400 bg-amber-50/30" : ""
                   } ${dirty ? "ring-2 ring-amber-300" : ""}`}
