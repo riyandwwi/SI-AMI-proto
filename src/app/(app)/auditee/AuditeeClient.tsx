@@ -38,6 +38,7 @@ export interface AuditeeIndikatorItem {
     rtlLinkBukti: string | null;
     rtlStatus: StatusRtl;
     rtlCatatanAuditor: string | null;
+    updatedAt?: string;
   } | null;
 }
 
@@ -98,6 +99,7 @@ export default function AuditeeClient({
   const [standarFilter, setStandarFilter] = useState<string>("ALL");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "BELUM" | "SUDAH" | "RTL">("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [lastSavedManual, setLastSavedManual] = useState<{ nama: string; kode: string } | null>(null);
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
@@ -297,6 +299,11 @@ export default function AuditeeClient({
 
       if (res.savedIds && res.savedIds.length > 0) {
         const justSavedSet = new Set(res.savedIds);
+        const lastSavedId = res.savedIds[res.savedIds.length - 1];
+        const lastSavedInd = indikator.find((i) => i.id === lastSavedId);
+        if (lastSavedInd && res.diisiOleh) {
+          setLastSavedManual({ nama: res.diisiOleh, kode: lastSavedInd.kode });
+        }
         setSavedValues((prev) => {
           const next = { ...prev };
           for (const id of res.savedIds!) {
@@ -383,11 +390,12 @@ export default function AuditeeClient({
     });
   };
 
-  // Kelompokkan indikator berdasarkan siapa Auditee yang sudah menyimpan
-  const kontribusiMap = new Map<string, string[]>();
+  // Cari hanya 1 Save Terakhir (bukan daftar panjang semua indikator per orang)
   let totalTersimpan = 0;
   let totalWajibRtl = 0;
   let totalLockedAuditor = 0;
+  let latestDbEntry: { nama: string; kode: string; ts: number } | null = null;
+
   for (const ind of indikator) {
     const savDrive = (savedValues[ind.id]?.linkDrive ?? ind.isian?.linkDrive ?? "").trim();
     if (savDrive) totalTersimpan++;
@@ -395,11 +403,13 @@ export default function AuditeeClient({
     if (ind.isian?.terverifikasiAuditor || ind.isian?.terverifikasiLapangan) totalLockedAuditor++;
     const namaPengisi = savedValues[ind.id]?.diisiOleh ?? ind.isian?.diisiOleh;
     if (namaPengisi) {
-      const list = kontribusiMap.get(namaPengisi) ?? [];
-      list.push(ind.kode);
-      kontribusiMap.set(namaPengisi, list);
+      const ts = ind.isian?.updatedAt ? new Date(ind.isian.updatedAt).getTime() : 1;
+      if (!latestDbEntry || ts >= latestDbEntry.ts) {
+        latestDbEntry = { nama: namaPengisi, kode: ind.kode, ts };
+      }
     }
   }
+  const latestSavedDisplay = lastSavedManual ?? (latestDbEntry ? { nama: latestDbEntry.nama, kode: latestDbEntry.kode } : null);
   const totalBelumDiisi = Math.max(0, indikator.length - totalTersimpan);
   const persenTerisi = indikator.length > 0 ? Math.round((totalTersimpan / indikator.length) * 100) : 0;
   const persenAuditor = indikator.length > 0 ? Math.round((totalLockedAuditor / indikator.length) * 100) : 0;
@@ -454,29 +464,29 @@ export default function AuditeeClient({
       <div className="card space-y-3 py-3.5 text-xs">
         {/* 1. Progress Bar Visual Kesiapan Auditee & Verifikasi Auditor */}
         <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-          <div className="rounded-xl border-2 border-black bg-[#FAF7EE] p-2.5 space-y-1.5">
-            <div className="flex items-center justify-between font-black text-black">
+          <div className="rounded-xl border-2 border-black bg-[#EDF2F7] p-2.5 space-y-1.5">
+            <div className="flex items-center justify-between font-black text-[#0F172A]">
               <span>📊 Progres Bukti Auditee</span>
               <span>
                 {totalTersimpan} / {indikator.length} Indikator ({persenTerisi}%)
               </span>
             </div>
-            <div className="h-3 w-full overflow-hidden rounded-full border border-black bg-white">
+            <div className="h-3 w-full overflow-hidden rounded-full border border-black bg-[#CBD5E1]">
               <div
-                className="h-full bg-[#4ADE80] transition-all duration-300"
+                className="h-full bg-[#22C55E] transition-all duration-300"
                 style={{ width: `${persenTerisi}%` }}
               />
             </div>
           </div>
 
-          <div className="rounded-xl border-2 border-black bg-[#FAF7EE] p-2.5 space-y-1.5">
-            <div className="flex items-center justify-between font-black text-black">
+          <div className="rounded-xl border-2 border-black bg-[#EDF2F7] p-2.5 space-y-1.5">
+            <div className="flex items-center justify-between font-black text-[#0F172A]">
               <span>🕵️ Diverifikasi Auditor</span>
               <span>
                 {totalLockedAuditor} / {indikator.length} Indikator ({persenAuditor}%)
               </span>
             </div>
-            <div className="h-3 w-full overflow-hidden rounded-full border border-black bg-white">
+            <div className="h-3 w-full overflow-hidden rounded-full border border-black bg-[#CBD5E1]">
               <div
                 className="h-full bg-[#38BDF8] transition-all duration-300"
                 style={{ width: `${persenAuditor}%` }}
@@ -611,22 +621,20 @@ export default function AuditeeClient({
           </div>
         </div>
 
-        {/* Ringkasan Siapa yang Sudah Menyimpan Indikator (Kolaborasi Tim Auditee) */}
-        {kontribusiMap.size > 0 && (
+        {/* Tampilkan Hanya 1 Save Terakhir agar Ringkas & Tidak Merusak Tampilan */}
+        {latestSavedDisplay && (
           <div className="flex flex-wrap items-center gap-2 border-t border-black/15 pt-2">
-            <span className="text-xs font-black uppercase text-black">Sudah Disimpan Oleh:</span>
-            {Array.from(kontribusiMap.entries()).map(([nama, kodes]) => (
-              <Badge key={nama} tone="blue">
-                👤 {nama}: {kodes.join(", ")}
-              </Badge>
-            ))}
+            <span className="text-xs font-black uppercase text-[#0F172A]">🕒 Save Terakhir:</span>
+            <Badge tone="blue">
+              👤 {latestSavedDisplay.nama} — Indikator {latestSavedDisplay.kode}
+            </Badge>
           </div>
         )}
       </div>
 
       {buka && dirtyIds.length > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-black bg-[#FEF08A] px-4 py-3 text-xs shadow-[4px_4px_0px_#000]">
-          <div className="font-black text-black">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-black bg-[#CBD5E1] px-4 py-3 text-xs shadow-[4px_4px_0px_#000]">
+          <div className="font-black text-[#0F172A]">
             📝 {dirtyIds.length} indikator sedang diketik &amp; belum disimpan
           </div>
           <button
@@ -647,10 +655,10 @@ export default function AuditeeClient({
 
         return (
           <div key={group.standar} className="space-y-2.5 pt-1">
-            {/* Kepala Kelompok Standar */}
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border-2 border-black bg-[#FEF08A] px-4 py-2.5 shadow-[3px_3px_0px_#000]">
+            {/* Kepala Kelompok Standar (Opsi 1: Soft Cool Slate) */}
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border-2 border-black bg-[#CBD5E1] px-4 py-2.5 shadow-[3px_3px_0px_#000]">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-sm font-black text-black">📂 {group.standar}</span>
+                <span className="text-sm font-black text-[#0F172A]">📂 {group.standar}</span>
                 <Badge tone="slate">
                   Indikator #{group.startIndex} – #{group.endIndex}
                 </Badge>
@@ -675,12 +683,12 @@ export default function AuditeeClient({
               const namaPengisi = sav.diisiOleh ?? isian?.diisiOleh;
               const isExpanded = Boolean(expandedIds[ind.id]);
 
-              // Tema Terang Kontras Tinggi (Ramah Mata Ibu-Ibu & Ramah Buta Warna: Ikon + Border Tegas + Huruf 16px Hitam Pekat)
+              // Opsi 1: Soft Cool Slate (#EDF2F7 / #E2E8F0) — Sejuk di mata, 0% silau putih/kuning, tulisan hitam arang 16px tajam
               const cardStyle = dirty
-                ? "border-l-8 border-l-black bg-[#FEF9C3] text-black ring-2 ring-black"
+                ? "border-l-8 border-l-[#0F172A] bg-[#E2E8F0] text-[#0F172A] ring-2 ring-[#0F172A]"
                 : hasSavedDrive
-                  ? "border-l-8 border-l-black bg-white text-black"
-                  : "border-l-8 border-l-slate-400 bg-[#FAF7EE] text-black";
+                  ? "border-l-8 border-l-[#0F172A] bg-[#EDF2F7] text-[#0F172A]"
+                  : "border-l-8 border-l-slate-500 bg-[#E6ECF2] text-[#0F172A]";
 
               return (
                 <div
@@ -706,19 +714,19 @@ export default function AuditeeClient({
                     }`}
                   >
                     <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                      <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border-2 border-black bg-[#FEF08A] text-xs font-black text-black">
+                      <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border-2 border-black bg-[#CBD5E1] text-xs font-black text-[#0F172A]">
                         {isExpanded ? "▼" : "▶"}
                       </span>
                       <Badge tone="purple">Indikator #{noUrut}</Badge>
-                      <code className="rounded-xl border border-black bg-[#BAE6FD] px-2.5 py-0.5 text-sm font-black text-black">
+                      <code className="rounded-xl border border-black bg-[#BAE6FD] px-2.5 py-0.5 text-sm font-black text-[#0F172A]">
                         {ind.kode}
                       </code>
                       {!isExpanded ? (
-                        <span className="line-clamp-1 max-w-2xl text-base font-bold text-black">
+                        <span className="line-clamp-1 max-w-2xl text-base font-bold text-[#0F172A]">
                           {ind.pernyataan}
                         </span>
                       ) : (
-                        <span className="text-base font-black text-black">{ind.standar}</span>
+                        <span className="text-base font-black text-[#0F172A]">{ind.standar}</span>
                       )}
                     </div>
 
@@ -783,20 +791,20 @@ export default function AuditeeClient({
                   {isExpanded && (
                     <div className="space-y-3.5 pt-1">
                       {ind.pernyataanStandar && (
-                        <div className="rounded-xl border-2 border-black/20 bg-[#FAF7EE] px-4 py-3 text-base font-semibold leading-relaxed text-black">
-                          <strong className="font-black text-black">📜 Isi Pernyataan Standar:</strong>{" "}
+                        <div className="rounded-xl border border-black/25 bg-[#E2E8F0] px-4 py-3 text-base font-semibold leading-relaxed text-[#0F172A]">
+                          <strong className="font-black text-[#0F172A]">📜 Isi Pernyataan Standar:</strong>{" "}
                           {ind.pernyataanStandar}
                         </div>
                       )}
 
-                      <div className="rounded-xl border-2 border-black bg-[#FEF9C3]/60 px-4 py-3 text-base font-bold leading-relaxed text-black">
-                        <strong className="font-black text-black">🎯 Indikator Kinerja ({ind.kode}):</strong>{" "}
+                      <div className="rounded-xl border border-black/30 bg-[#DCE5EF] px-4 py-3 text-base font-bold leading-relaxed text-[#0F172A]">
+                        <strong className="font-black text-[#0F172A]">🎯 Indikator Kinerja ({ind.kode}):</strong>{" "}
                         {ind.pernyataan}
                       </div>
 
                       {ind.buktiDiminta && (
-                        <div className="rounded-xl border-2 border-black/20 bg-[#E0F2FE] px-4 py-2.5 text-[15px] font-semibold leading-relaxed text-black">
-                          <strong className="font-black text-black">📋 Dokumen Bukti yang Diminta:</strong>{" "}
+                        <div className="rounded-xl border border-black/25 bg-[#E2E8F0] px-4 py-2.5 text-[15px] font-semibold leading-relaxed text-[#0F172A]">
+                          <strong className="font-black text-[#0F172A]">📋 Dokumen Bukti yang Diminta:</strong>{" "}
                           {ind.buktiDiminta}
                         </div>
                       )}
@@ -810,7 +818,7 @@ export default function AuditeeClient({
                         className="grid grid-cols-1 gap-3.5 pt-1 md:grid-cols-2"
                       >
                         <div className="space-y-1.5">
-                          <label className="!text-sm !font-black !text-black">Evaluasi Diri Auditee</label>
+                          <label className="!text-sm !font-black !text-[#0F172A]">Evaluasi Diri Auditee</label>
                           <textarea
                             name="klaim"
                             rows={3}
@@ -819,11 +827,11 @@ export default function AuditeeClient({
                             value={cur.klaim}
                             onChange={(e) => updateField(ind.id, "klaim", e.target.value)}
                             placeholder="Ketik evaluasi diri di sini..."
-                            className="w-full text-base font-semibold !border-2 !border-black !bg-white !text-black disabled:!bg-slate-100"
+                            className="w-full text-base font-semibold !border-2 !border-black !bg-[#F8FAFC] !text-[#0F172A] focus:!bg-white disabled:!bg-slate-200"
                           />
                         </div>
                         <div className="space-y-1.5">
-                          <label className="!text-sm !font-black !text-black">Link Google Drive Bukti</label>
+                          <label className="!text-sm !font-black !text-[#0F172A]">Link Google Drive Bukti</label>
                           <div className="flex gap-2">
                             <input
                               name="linkDrive"
@@ -833,7 +841,7 @@ export default function AuditeeClient({
                               value={cur.linkDrive}
                               onChange={(e) => updateField(ind.id, "linkDrive", e.target.value)}
                               placeholder="https://drive.google.com/..."
-                              className="w-full font-mono text-sm font-bold !border-2 !border-black !bg-white !text-black disabled:!bg-slate-100"
+                              className="w-full font-mono text-sm font-bold !border-2 !border-black !bg-[#F8FAFC] !text-[#0F172A] focus:!bg-white disabled:!bg-slate-200"
                             />
                             {canEdit && (
                               <button

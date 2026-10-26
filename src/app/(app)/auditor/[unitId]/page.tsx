@@ -106,6 +106,7 @@ export default async function AuditorUnitWorkspacePage({
             rtlLinkBukti: isian.rtlLinkBukti,
             rtlStatus: isian.rtlStatus,
             rtlCatatanAuditor: isian.rtlCatatanAuditor,
+            updatedAt: isian.updatedAt.toISOString(),
           }
         : null,
     };

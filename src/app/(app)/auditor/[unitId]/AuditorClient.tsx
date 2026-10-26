@@ -45,6 +45,7 @@ export interface AuditorIndikatorItem {
     rtlLinkBukti: string | null;
     rtlStatus: StatusRtl;
     rtlCatatanAuditor: string | null;
+    updatedAt?: string;
   } | null;
 }
 
@@ -538,9 +539,9 @@ export default function AuditorClient({
     return k && BUTUH_RTL.includes(k);
   }).length;
 
-  // Ringkasan siapa Auditee dan siapa Auditor yang sudah mengerjakan + Statistik Progres
-  const auditeeKontrib = new Map<string, string[]>();
-  const auditorKontrib = new Map<string, string[]>();
+  // Cari hanya 1 Save Terakhir Auditee & 1 Save Terakhir Auditor + Statistik Progres
+  let latestAuditeeSave: { nama: string; kode: string; ts: number } | null = null;
+  let latestAuditorSave: { nama: string; kode: string; ts: number } | null = null;
   let totalAdaBuktiAuditee = 0;
   let totalSudahVerifMode = 0;
 
@@ -554,15 +555,16 @@ export default function AuditorClient({
     if (ind.isian?.linkDrive?.trim()) totalAdaBuktiAuditee++;
     if (isItemVerifiedInMode(ind.id)) totalSudahVerifMode++;
 
+    const ts = ind.isian?.updatedAt ? new Date(ind.isian.updatedAt).getTime() : 1;
     if (ind.isian?.diisiOleh) {
-      const list = auditeeKontrib.get(ind.isian.diisiOleh) ?? [];
-      list.push(ind.kode);
-      auditeeKontrib.set(ind.isian.diisiOleh, list);
+      if (!latestAuditeeSave || ts >= latestAuditeeSave.ts) {
+        latestAuditeeSave = { nama: ind.isian.diisiOleh, kode: ind.kode, ts };
+      }
     }
     if (ind.isian?.diperiksaOleh) {
-      const list = auditorKontrib.get(ind.isian.diperiksaOleh) ?? [];
-      list.push(ind.kode);
-      auditorKontrib.set(ind.isian.diperiksaOleh, list);
+      if (!latestAuditorSave || ts >= latestAuditorSave.ts) {
+        latestAuditorSave = { nama: ind.isian.diperiksaOleh, kode: ind.kode, ts };
+      }
     }
   }
 
@@ -615,27 +617,23 @@ export default function AuditorClient({
         </div>
       )}
 
-      {/* Bar Verifikasi & Kunci Semua + Ringkasan Siapa yang Menyimpan */}
+      {/* Bar Verifikasi & Kunci Semua + Ringkasan 1 Save Terakhir */}
       <div className="card flex flex-wrap items-center justify-between gap-3 py-3">
         <div className="flex flex-wrap items-center gap-2 text-xs">
-          {auditeeKontrib.size > 0 && (
+          {latestAuditeeSave && (
             <>
-              <span className="font-black uppercase text-black">Auditee:</span>
-              {Array.from(auditeeKontrib.entries()).map(([nama, kodes]) => (
-                <Badge key={nama} tone="blue">
-                  👤 {nama}: {kodes.join(", ")}
-                </Badge>
-              ))}
+              <span className="font-black uppercase text-[#0F172A]">🕒 Save Terakhir Auditee:</span>
+              <Badge tone="blue">
+                👤 {latestAuditeeSave.nama} — {latestAuditeeSave.kode}
+              </Badge>
             </>
           )}
-          {auditorKontrib.size > 0 && (
+          {latestAuditorSave && (
             <>
-              <span className="ml-2 font-black uppercase text-black">Auditor:</span>
-              {Array.from(auditorKontrib.entries()).map(([nama, kodes]) => (
-                <Badge key={nama} tone="purple">
-                  🕵️ {nama}: {kodes.join(", ")}
-                </Badge>
-              ))}
+              <span className="ml-2 font-black uppercase text-[#0F172A]">🕒 Save Terakhir Auditor:</span>
+              <Badge tone="purple">
+                🕵️ {latestAuditorSave.nama} — {latestAuditorSave.kode}
+              </Badge>
             </>
           )}
         </div>
@@ -904,10 +902,10 @@ export default function AuditorClient({
 
         return (
           <div key={group.standar} className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border-2 border-black bg-[#FEF08A] px-4 py-2.5 shadow-[3px_3px_0px_#000]">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border-2 border-black bg-[#CBD5E1] px-4 py-2.5 shadow-[3px_3px_0px_#000]">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-sm font-black text-black">📂 {group.standar}</span>
-                <span className="rounded-lg border border-black bg-white px-2 py-0.5 text-xs font-black text-black">
+                <span className="text-sm font-black text-[#0F172A]">📂 {group.standar}</span>
+                <span className="rounded-lg border border-black bg-[#EDF2F7] px-2 py-0.5 text-xs font-black text-[#0F172A]">
                   Indikator {group.startIndex} – {group.endIndex}
                 </span>
               </div>
@@ -970,26 +968,26 @@ export default function AuditorClient({
             </div>
 
             {ind.pernyataanStandar && (
-              <div className="rounded-xl border border-black/15 bg-white px-4 py-3 text-base font-semibold leading-relaxed text-black">
-                <strong className="font-black text-black">📜 Isi Pernyataan Standar:</strong>{" "}
+              <div className="rounded-xl border border-black/25 bg-[#EDF2F7] px-4 py-3 text-base font-semibold leading-relaxed text-[#0F172A]">
+                <strong className="font-black text-[#0F172A]">📜 Isi Pernyataan Standar:</strong>{" "}
                 {ind.pernyataanStandar}
               </div>
             )}
 
-            <div className="rounded-xl border border-black bg-[#FEF9C3]/65 px-4 py-3 text-base font-bold leading-relaxed text-black">
-              <strong className="font-black text-black">🎯 Indikator Kinerja ({ind.kode}):</strong>{" "}
+            <div className="rounded-xl border border-black/30 bg-[#DCE5EF] px-4 py-3 text-base font-bold leading-relaxed text-[#0F172A]">
+              <strong className="font-black text-[#0F172A]">🎯 Indikator Kinerja ({ind.kode}):</strong>{" "}
               {ind.pernyataan}
             </div>
 
             {(sav.buktiDiminta || ind.buktiDiminta) && (
-              <div className="rounded-xl border border-black/15 bg-[#E0F2FE] px-4 py-2.5 text-[15px] font-semibold leading-relaxed text-black">
-                <strong className="font-black text-black">📋 Dokumen Bukti yang Diminta:</strong>{" "}
+              <div className="rounded-xl border border-black/25 bg-[#EDF2F7] px-4 py-2.5 text-[15px] font-semibold leading-relaxed text-[#0F172A]">
+                <strong className="font-black text-[#0F172A]">📋 Dokumen Bukti yang Diminta:</strong>{" "}
                 {sav.buktiDiminta || ind.buktiDiminta}
               </div>
             )}
 
             {/* Kotak Klaim & Link Drive Auditee */}
-            <div className="rounded-2xl border border-black/20 bg-white p-3.5 text-sm font-semibold space-y-1 text-black">
+            <div className="rounded-2xl border border-black/25 bg-[#EDF2F7] p-3.5 text-sm font-semibold space-y-1 text-[#0F172A]">
               <div>
                 <strong>Evaluasi Diri Auditee{isian?.diisiOleh ? ` (${isian.diisiOleh})` : ""}:</strong>{" "}
                 {isian?.klaim ? (

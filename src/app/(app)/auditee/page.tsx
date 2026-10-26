@@ -124,6 +124,7 @@ export default async function AuditeePage({ searchParams }: { searchParams: SP }
             rtlLinkBukti: isian.rtlLinkBukti,
             rtlStatus: isian.rtlStatus,
             rtlCatatanAuditor: isian.rtlCatatanAuditor,
+            updatedAt: isian.updatedAt.toISOString(),
           }
         : null,
     };

@@ -57,8 +57,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             ];
 
   return (
-    <div className="min-h-screen bg-[#FAF7EE] text-[#121212]">
-      <header className="sticky top-0 z-30 border-b-2 border-black bg-[#FAF7EE]/95 backdrop-blur-sm">
+    <div className="min-h-screen bg-[#DCE3EC] text-[#0F172A]">
+      <header className="sticky top-0 z-30 border-b-2 border-black bg-[#DCE3EC]/95 backdrop-blur-sm">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-2xl border-2 border-black bg-[#FF5C38] text-sm font-black text-white shadow-[2.5px_2.5px_0px_#000000]">
