@@ -797,78 +797,81 @@ export default function AuditeeClient({
                         </div>
                       )}
 
-                      <div className="rounded-xl border border-black/30 bg-[#DCE5EF] px-4 py-3 text-base font-bold leading-relaxed text-[#0F172A]">
-                        <strong className="font-black text-[#0F172A]">🎯 Indikator Kinerja ({ind.kode}):</strong>{" "}
-                        {ind.pernyataan}
-                      </div>
-
-                      {ind.buktiDiminta && (
-                        <div className="rounded-xl border border-black/25 bg-[#E2E8F0] px-4 py-2.5 text-[15px] font-semibold leading-relaxed text-[#0F172A]">
-                          <strong className="font-black text-[#0F172A]">📋 Dokumen Bukti yang Diminta:</strong>{" "}
-                          {ind.buktiDiminta}
+                      {/* Kotak Gabungan Ter-Highlight: Indikator Kinerja + Dokumen Bukti + Form Evaluasi Diri & Link Drive */}
+                      <div className="rounded-2xl border-2 border-[#1E3A8A] border-l-8 border-l-[#1D4ED8] bg-[#DCE5EF] p-4 space-y-3 text-[#0F172A] shadow-sm">
+                        <div className="text-base font-bold leading-relaxed">
+                          <strong className="font-black text-[#0F172A]">🎯 Indikator Kinerja ({ind.kode}):</strong>{" "}
+                          {ind.pernyataan}
                         </div>
-                      )}
 
-                      {/* Form Evaluasi Diri & Link Google Drive */}
-                      <form
-                        onSubmit={(e) => {
-                          e.preventDefault();
-                          handleSaveIndikator(ind.id);
-                        }}
-                        className="grid grid-cols-1 gap-3.5 pt-1 md:grid-cols-2"
-                      >
-                        <div className="space-y-1.5">
-                          <label className="!text-sm !font-black !text-[#0F172A]">Evaluasi Diri Auditee</label>
-                          <textarea
-                            name="klaim"
-                            rows={3}
-                            required
-                            disabled={!canEdit}
-                            value={cur.klaim}
-                            onChange={(e) => updateField(ind.id, "klaim", e.target.value)}
-                            placeholder="Ketik evaluasi diri di sini..."
-                            className="w-full text-base font-semibold !border-2 !border-black !bg-[#F8FAFC] !text-[#0F172A] focus:!bg-white disabled:!bg-slate-200"
-                          />
-                        </div>
-                        <div className="space-y-1.5">
-                          <label className="!text-sm !font-black !text-[#0F172A]">Link Google Drive Bukti</label>
-                          <div className="flex gap-2">
-                            <input
-                              name="linkDrive"
-                              type="url"
+                        {ind.buktiDiminta && (
+                          <div className="text-[15px] font-semibold leading-relaxed text-[#1E293B]">
+                            <strong className="font-black text-[#0F172A]">📋 Dokumen Bukti yang Diminta:</strong>{" "}
+                            {ind.buktiDiminta}
+                          </div>
+                        )}
+
+                        {/* Form Evaluasi Diri & Link Google Drive */}
+                        <form
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            handleSaveIndikator(ind.id);
+                          }}
+                          className="grid grid-cols-1 gap-3.5 border-t-2 border-[#94A3B8] pt-3 md:grid-cols-2"
+                        >
+                          <div className="space-y-1.5">
+                            <label className="!text-sm !font-black !text-[#1E3A8A]">✍️ Evaluasi Diri Auditee</label>
+                            <textarea
+                              name="klaim"
+                              rows={3}
                               required
                               disabled={!canEdit}
-                              value={cur.linkDrive}
-                              onChange={(e) => updateField(ind.id, "linkDrive", e.target.value)}
-                              placeholder="https://drive.google.com/..."
-                              className="w-full font-mono text-sm font-bold !border-2 !border-black !bg-[#F8FAFC] !text-[#0F172A] focus:!bg-white disabled:!bg-slate-200"
+                              value={cur.klaim}
+                              onChange={(e) => updateField(ind.id, "klaim", e.target.value)}
+                              placeholder="Ketik evaluasi diri di sini..."
+                              className="w-full text-base font-semibold !border-2 !border-black !bg-[#F8FAFC] !text-[#0F172A] focus:!bg-white disabled:!bg-slate-200"
                             />
-                            {canEdit && (
-                              <button
-                                type="submit"
-                                disabled={isPending}
-                                className="btn shrink-0 text-sm"
-                              >
-                                {isPending && (savingId === ind.id || savingId === "ALL")
-                                  ? "..."
-                                  : "💾 Simpan"}
-                              </button>
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="!text-sm !font-black !text-[#1E3A8A]">📂 Link Google Drive Bukti</label>
+                            <div className="flex gap-2">
+                              <input
+                                name="linkDrive"
+                                type="url"
+                                required
+                                disabled={!canEdit}
+                                value={cur.linkDrive}
+                                onChange={(e) => updateField(ind.id, "linkDrive", e.target.value)}
+                                placeholder="https://drive.google.com/..."
+                                className="w-full font-mono text-sm font-bold !border-2 !border-black !bg-[#F8FAFC] !text-[#0F172A] focus:!bg-white disabled:!bg-slate-200"
+                              />
+                              {canEdit && (
+                                <button
+                                  type="submit"
+                                  disabled={isPending}
+                                  className="btn shrink-0 text-sm"
+                                >
+                                  {isPending && (savingId === ind.id || savingId === "ALL")
+                                    ? "..."
+                                    : "💾 Simpan"}
+                                </button>
+                              )}
+                            </div>
+                            {(sav.linkDrive || cur.linkDrive) && (
+                              <div className="pt-1 text-right text-sm">
+                                <a
+                                  href={cur.linkDrive || sav.linkDrive}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="font-black text-blue-700 underline hover:text-black"
+                                >
+                                  ↗ Buka Dokumen di Google Drive
+                                </a>
+                              </div>
                             )}
                           </div>
-                          {(sav.linkDrive || cur.linkDrive) && (
-                            <div className="pt-1 text-right text-sm">
-                              <a
-                                href={cur.linkDrive || sav.linkDrive}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="font-black text-blue-700 underline hover:text-black"
-                              >
-                                ↗ Buka Dokumen di Google Drive
-                              </a>
-                            </div>
-                          )}
-                        </div>
-                      </form>
+                        </form>
+                      </div>
 
                       {/* Catatan Auditor (Jika sudah diperiksa) */}
                       {(isian?.catatanDokumen || isian?.catatanLapangan || isian?.rekomendasi) && (

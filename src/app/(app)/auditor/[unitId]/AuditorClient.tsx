@@ -974,41 +974,51 @@ export default function AuditorClient({
               </div>
             )}
 
-            <div className="rounded-xl border border-black/30 bg-[#DCE5EF] px-4 py-3 text-base font-bold leading-relaxed text-[#0F172A]">
-              <strong className="font-black text-[#0F172A]">🎯 Indikator Kinerja ({ind.kode}):</strong>{" "}
-              {ind.pernyataan}
-            </div>
-
-            {(sav.buktiDiminta || ind.buktiDiminta) && (
-              <div className="rounded-xl border border-black/25 bg-[#EDF2F7] px-4 py-2.5 text-[15px] font-semibold leading-relaxed text-[#0F172A]">
-                <strong className="font-black text-[#0F172A]">📋 Dokumen Bukti yang Diminta:</strong>{" "}
-                {sav.buktiDiminta || ind.buktiDiminta}
+            {/* Kotak Gabungan Ter-Highlight: Indikator Kinerja + Dokumen Diminta + Evaluasi Diri Auditee & Link Drive */}
+            <div className="rounded-2xl border-2 border-[#1E3A8A] border-l-8 border-l-[#1D4ED8] bg-[#DCE5EF] p-4 space-y-2.5 text-[#0F172A] shadow-sm">
+              <div className="text-base font-bold leading-relaxed">
+                <strong className="font-black text-[#0F172A]">
+                  🎯 Indikator Kinerja ({ind.kode}):
+                </strong>{" "}
+                {ind.pernyataan}
               </div>
-            )}
 
-            {/* Kotak Klaim & Link Drive Auditee */}
-            <div className="rounded-2xl border border-black/25 bg-[#EDF2F7] p-3.5 text-sm font-semibold space-y-1 text-[#0F172A]">
-              <div>
-                <strong>Evaluasi Diri Auditee{isian?.diisiOleh ? ` (${isian.diisiOleh})` : ""}:</strong>{" "}
-                {isian?.klaim ? (
-                  isian.klaim
-                ) : (
-                  <em className="text-slate-400">Belum diisi</em>
-                )}
-              </div>
-              {isian?.linkDrive && (
-                <div className="truncate">
-                  <strong>Drive:</strong>{" "}
-                  <a
-                    href={isian.linkDrive}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-mono text-blue-700 underline"
-                  >
-                    {isian.linkDrive}
-                  </a>
+              {(sav.buktiDiminta || ind.buktiDiminta) && (
+                <div className="text-[15px] font-semibold leading-relaxed text-[#1E293B]">
+                  <strong className="font-black text-[#0F172A]">
+                    📋 Dokumen Bukti yang Diminta:
+                  </strong>{" "}
+                  {sav.buktiDiminta || ind.buktiDiminta}
                 </div>
               )}
+
+              <div className="border-t-2 border-[#94A3B8] pt-2.5 space-y-1.5">
+                <div className="rounded-xl border border-[#1E3A8A]/40 bg-[#DBEAFE] px-3.5 py-2.5 text-base font-semibold leading-relaxed text-[#0F172A]">
+                  <div>
+                    <strong className="font-black text-[#1E3A8A]">
+                      ✍️ Evaluasi Diri Auditee{isian?.diisiOleh ? ` (${isian.diisiOleh})` : ""}:
+                    </strong>{" "}
+                    {isian?.klaim ? (
+                      <span className="font-bold text-[#0F172A]">{isian.klaim}</span>
+                    ) : (
+                      <em className="font-semibold text-[#64748B]">Belum diisi oleh Auditee</em>
+                    )}
+                  </div>
+                  {isian?.linkDrive && (
+                    <div className="mt-1 truncate text-sm">
+                      <strong className="font-black text-[#1E3A8A]">📂 Link Bukti Drive:</strong>{" "}
+                      <a
+                        href={isian.linkDrive}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-mono font-bold text-[#1D4ED8] underline hover:text-[#1E3A8A]"
+                      >
+                        {isian.linkDrive}
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
 
             {/* MODE 1: AUDIT DOKUMEN (DESK AUDIT) */}
@@ -1022,17 +1032,6 @@ export default function AuditorClient({
               >
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                   <div className="space-y-2">
-                    <div className="space-y-1">
-                      <label>Dokumen Bukti yang Diminta</label>
-                      <input
-                        name="buktiDiminta"
-                        disabled={!buka}
-                        value={cur.buktiDiminta}
-                        onChange={(e) => updateField(ind.id, "buktiDiminta", e.target.value)}
-                        placeholder="SK, RPS, Laporan..."
-                        className="w-full text-xs"
-                      />
-                    </div>
                     <div className="space-y-1">
                       <label>Status Dokumen</label>
                       <select
@@ -1058,7 +1057,7 @@ export default function AuditorClient({
                     </label>
                     <textarea
                       name="catatanDokumen"
-                      rows={4}
+                      rows={3}
                       disabled={!buka}
                       value={cur.catatanDokumen}
                       onChange={(e) => updateField(ind.id, "catatanDokumen", e.target.value)}
