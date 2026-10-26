@@ -675,19 +675,19 @@ export default function AuditeeClient({
               const namaPengisi = sav.diisiOleh ?? isian?.diisiOleh;
               const isExpanded = Boolean(expandedIds[ind.id]);
 
-              // Opsi 3: Dark Slate / Charcoal Hangat (#2C3038) — teduh di mata, kontras dengan Card Filter (#DED2BA), dan kotak input tetap putih bersih
+              // Tema Terang Kontras Tinggi (Ramah Mata Ibu-Ibu & Ramah Buta Warna: Ikon + Border Tegas + Huruf 16px Hitam Pekat)
               const cardStyle = dirty
-                ? "border-l-8 border-l-[#FACC15] bg-[#362F23] text-[#FAF7EE] ring-2 ring-[#FACC15]"
+                ? "border-l-8 border-l-black bg-[#FEF9C3] text-black ring-2 ring-black"
                 : hasSavedDrive
-                  ? "border-l-8 border-l-[#4ADE80] bg-[#1E332A] text-[#FAF7EE]"
-                  : "border-l-8 border-l-slate-400 bg-[#2C3038] text-[#FAF7EE]";
+                  ? "border-l-8 border-l-black bg-white text-black"
+                  : "border-l-8 border-l-slate-400 bg-[#FAF7EE] text-black";
 
               return (
                 <div
                   key={ind.id}
                   id={`auditee-ind-${ind.id}`}
                   className={`rounded-2xl border-2 border-black px-5 shadow-[4px_4px_0px_#000000] transition ${cardStyle} ${
-                    isExpanded ? "space-y-3 py-4" : "py-2.5"
+                    isExpanded ? "space-y-3.5 py-4" : "py-3"
                   }`}
                 >
                   {/* Baris Header Indikator (Klik untuk Buka / Minimize) */}
@@ -702,26 +702,23 @@ export default function AuditeeClient({
                       }
                     }}
                     className={`flex cursor-pointer select-none flex-wrap items-center justify-between gap-2 ${
-                      isExpanded ? "border-b border-white/15 pb-3" : ""
+                      isExpanded ? "border-b-2 border-black/15 pb-3" : ""
                     }`}
                   >
                     <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                      <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-black bg-[#FAF7EE] text-xs font-black text-black">
+                      <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border-2 border-black bg-[#FEF08A] text-xs font-black text-black">
                         {isExpanded ? "▼" : "▶"}
                       </span>
                       <Badge tone="purple">Indikator #{noUrut}</Badge>
-                      <code className="rounded-xl border border-black bg-[#BAE6FD] px-2.5 py-0.5 text-xs font-black text-black">
+                      <code className="rounded-xl border border-black bg-[#BAE6FD] px-2.5 py-0.5 text-sm font-black text-black">
                         {ind.kode}
                       </code>
                       {!isExpanded ? (
-                        <span className="line-clamp-1 max-w-xl text-sm font-semibold text-[#FAF7EE]">
+                        <span className="line-clamp-1 max-w-2xl text-base font-bold text-black">
                           {ind.pernyataan}
                         </span>
                       ) : (
-                        <span className="text-sm font-black text-[#FEF08A]">{ind.standar}</span>
-                      )}
-                      {isExpanded && ind.buktiDiminta && (
-                        <Badge tone="slate">📋 Bukti: {ind.buktiDiminta}</Badge>
+                        <span className="text-base font-black text-black">{ind.standar}</span>
                       )}
                     </div>
 
@@ -731,10 +728,10 @@ export default function AuditeeClient({
 
                       {hasSavedDrive ? (
                         <Badge tone="green">
-                          ✅ Sudah Disimpan{namaPengisi ? ` (${namaPengisi})` : ""}
+                          ✅ SUDAH DIISI{namaPengisi ? ` (${namaPengisi})` : ""}
                         </Badge>
                       ) : (
-                        <Badge tone="amber">⏳ Belum Diisi</Badge>
+                        <Badge tone="amber">⏳ BELUM DIISI</Badge>
                       )}
 
                       {lockedByAuditor && (
@@ -775,27 +772,34 @@ export default function AuditeeClient({
                           e.stopPropagation();
                           toggleExpand(ind.id);
                         }}
-                        className="rounded-xl border border-black bg-[#FAF7EE] px-2.5 py-1 text-[11px] font-black text-black hover:bg-[#FEF08A]"
+                        className="rounded-xl border-2 border-black bg-white px-3 py-1 text-xs font-black text-black hover:bg-[#FEF08A]"
                       >
-                        {isExpanded ? "▲ Minimize" : canEdit ? "▼ Isi" : "▼ Lihat"}
+                        {isExpanded ? "▲ Minimize" : canEdit ? "▼ Buka & Isi" : "▼ Lihat"}
                       </button>
                     </div>
                   </div>
 
                   {/* Isi Lengkap Indikator & Form Pengisian (Hanya tampil saat Expanded) */}
                   {isExpanded && (
-                    <div className="space-y-3 pt-1">
+                    <div className="space-y-3.5 pt-1">
                       {ind.pernyataanStandar && (
-                        <div className="rounded-xl border border-white/15 bg-[#1E2229] px-4 py-3 text-sm font-semibold leading-relaxed text-[#FAF7EE]">
-                          <strong className="font-black text-[#FEF08A]">📜 Isi Pernyataan Standar:</strong>{" "}
+                        <div className="rounded-xl border-2 border-black/20 bg-[#FAF7EE] px-4 py-3 text-base font-semibold leading-relaxed text-black">
+                          <strong className="font-black text-black">📜 Isi Pernyataan Standar:</strong>{" "}
                           {ind.pernyataanStandar}
                         </div>
                       )}
 
-                      <p className="text-sm font-semibold leading-relaxed text-[#FAF7EE]">
-                        <strong className="font-black text-[#FEF08A]">🎯 Indikator Kinerja ({ind.kode}):</strong>{" "}
+                      <div className="rounded-xl border-2 border-black bg-[#FEF9C3]/60 px-4 py-3 text-base font-bold leading-relaxed text-black">
+                        <strong className="font-black text-black">🎯 Indikator Kinerja ({ind.kode}):</strong>{" "}
                         {ind.pernyataan}
-                      </p>
+                      </div>
+
+                      {ind.buktiDiminta && (
+                        <div className="rounded-xl border-2 border-black/20 bg-[#E0F2FE] px-4 py-2.5 text-[15px] font-semibold leading-relaxed text-black">
+                          <strong className="font-black text-black">📋 Dokumen Bukti yang Diminta:</strong>{" "}
+                          {ind.buktiDiminta}
+                        </div>
+                      )}
 
                       {/* Form Evaluasi Diri & Link Google Drive */}
                       <form
@@ -803,23 +807,23 @@ export default function AuditeeClient({
                           e.preventDefault();
                           handleSaveIndikator(ind.id);
                         }}
-                        className="grid grid-cols-1 gap-3 pt-1 md:grid-cols-2"
+                        className="grid grid-cols-1 gap-3.5 pt-1 md:grid-cols-2"
                       >
-                        <div className="space-y-1">
-                          <label className="!text-[#FEF08A]">Evaluasi Diri</label>
+                        <div className="space-y-1.5">
+                          <label className="!text-sm !font-black !text-black">Evaluasi Diri Auditee</label>
                           <textarea
                             name="klaim"
-                            rows={2}
+                            rows={3}
                             required
                             disabled={!canEdit}
                             value={cur.klaim}
                             onChange={(e) => updateField(ind.id, "klaim", e.target.value)}
-                            placeholder="Isi evaluasi diri..."
-                            className="w-full !border-black !bg-white !text-black disabled:!bg-white/80 disabled:!text-slate-800"
+                            placeholder="Ketik evaluasi diri di sini..."
+                            className="w-full text-base font-semibold !border-2 !border-black !bg-white !text-black disabled:!bg-slate-100"
                           />
                         </div>
-                        <div className="space-y-1">
-                          <label className="!text-[#FEF08A]">Link Google Drive</label>
+                        <div className="space-y-1.5">
+                          <label className="!text-sm !font-black !text-black">Link Google Drive Bukti</label>
                           <div className="flex gap-2">
                             <input
                               name="linkDrive"
@@ -829,13 +833,13 @@ export default function AuditeeClient({
                               value={cur.linkDrive}
                               onChange={(e) => updateField(ind.id, "linkDrive", e.target.value)}
                               placeholder="https://drive.google.com/..."
-                              className="w-full font-mono text-xs !border-black !bg-white !text-black disabled:!bg-white/80 disabled:!text-slate-800"
+                              className="w-full font-mono text-sm font-bold !border-2 !border-black !bg-white !text-black disabled:!bg-slate-100"
                             />
                             {canEdit && (
                               <button
                                 type="submit"
                                 disabled={isPending}
-                                className="btn shrink-0"
+                                className="btn shrink-0 text-sm"
                               >
                                 {isPending && (savingId === ind.id || savingId === "ALL")
                                   ? "..."
@@ -844,14 +848,14 @@ export default function AuditeeClient({
                             )}
                           </div>
                           {(sav.linkDrive || cur.linkDrive) && (
-                            <div className="pt-1 text-right text-xs">
+                            <div className="pt-1 text-right text-sm">
                               <a
                                 href={cur.linkDrive || sav.linkDrive}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="font-black text-[#7DD3FC] hover:text-white hover:underline"
+                                className="font-black text-blue-700 underline hover:text-black"
                               >
-                                ↗ Buka Drive
+                                ↗ Buka Dokumen di Google Drive
                               </a>
                             </div>
                           )}
@@ -860,13 +864,13 @@ export default function AuditeeClient({
 
                       {/* Catatan Auditor (Jika sudah diperiksa) */}
                       {(isian?.catatanDokumen || isian?.catatanLapangan || isian?.rekomendasi) && (
-                        <div className="space-y-1 rounded-2xl border border-white/15 bg-[#1E2229] p-3.5 text-xs text-[#EAE3D2]">
+                        <div className="space-y-1.5 rounded-2xl border-2 border-black bg-[#FAF7EE] p-4 text-sm font-semibold text-black">
                           {isian.diperiksaOleh && (
-                            <div className="font-black text-[#7DD3FC]">🕵️ Auditor: {isian.diperiksaOleh}</div>
+                            <div className="font-black text-black">🕵️ Diperiksa Auditor: {isian.diperiksaOleh}</div>
                           )}
                           {isian.catatanDokumen && (
                             <div>
-                              <strong className="font-black text-[#FEF08A]">
+                              <strong className="font-black text-black">
                                 Catatan Dokumen ({STATUS_DOK_LABEL[isian.statusDokumen]}):
                               </strong>{" "}
                               {isian.catatanDokumen}
@@ -874,13 +878,13 @@ export default function AuditeeClient({
                           )}
                           {isian.catatanLapangan && (
                             <div>
-                              <strong className="font-black text-[#FEF08A]">Temuan Lapangan:</strong>{" "}
+                              <strong className="font-black text-black">Temuan Lapangan:</strong>{" "}
                               {isian.catatanLapangan}
                             </div>
                           )}
                           {isian.rekomendasi && (
                             <div>
-                              <strong className="font-black text-[#FEF08A]">Rekomendasi:</strong>{" "}
+                              <strong className="font-black text-black">Rekomendasi:</strong>{" "}
                               {isian.rekomendasi}
                             </div>
                           )}
@@ -894,10 +898,10 @@ export default function AuditeeClient({
                             e.preventDefault();
                             handleSaveRtl(ind.id, isian.id);
                           }}
-                          className="space-y-2.5 rounded-2xl border border-[#FACC15]/40 bg-[#1E2229] p-3.5"
+                          className="space-y-3 rounded-2xl border-2 border-black bg-[#FEF9C3] p-4"
                         >
                           <div className="flex flex-wrap items-center justify-between gap-2">
-                            <span className="text-xs font-black text-[#FEF08A]">
+                            <span className="text-sm font-black text-black">
                               🛠️ Tindak Lanjut (RTL) — {KLASIFIKASI_LABEL[isian.klasifikasi!]}
                             </span>
                             <Badge tone={isian.rtlStatus === "TERVERIFIKASI" ? "green" : "amber"}>
@@ -906,7 +910,7 @@ export default function AuditeeClient({
                           </div>
                           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                             <div className="space-y-1">
-                              <label className="!text-[#FEF08A]">Tindakan Perbaikan</label>
+                              <label className="!text-sm !font-black !text-black">Tindakan Perbaikan</label>
                               <input
                                 name="rtlRencana"
                                 required
@@ -914,11 +918,11 @@ export default function AuditeeClient({
                                 value={cur.rtlRencana}
                                 onChange={(e) => updateField(ind.id, "rtlRencana", e.target.value)}
                                 placeholder="Tindakan perbaikan..."
-                                className="w-full !border-black !bg-white !text-black disabled:!bg-white/80"
+                                className="w-full text-base !border-2 !border-black !bg-white !text-black"
                               />
                             </div>
                             <div className="space-y-1">
-                              <label className="!text-[#FEF08A]">Link Drive Bukti RTL</label>
+                              <label className="!text-sm !font-black !text-black">Link Drive Bukti RTL</label>
                               <div className="flex gap-2">
                                 <input
                                   name="rtlLinkBukti"
@@ -927,7 +931,7 @@ export default function AuditeeClient({
                                   value={cur.rtlLinkBukti}
                                   onChange={(e) => updateField(ind.id, "rtlLinkBukti", e.target.value)}
                                   placeholder="https://drive.google.com/..."
-                                  className="w-full font-mono text-xs !border-black !bg-white !text-black disabled:!bg-white/80"
+                                  className="w-full font-mono text-sm !border-2 !border-black !bg-white !text-black"
                                 />
                                 {buka && isian.rtlStatus !== "TERVERIFIKASI" && (
                                   <button
@@ -942,8 +946,8 @@ export default function AuditeeClient({
                             </div>
                           </div>
                           {isian.rtlCatatanAuditor && (
-                            <div className="text-xs text-[#EAE3D2]">
-                              <strong className="text-[#FEF08A]">Catatan RTL Auditor:</strong>{" "}
+                            <div className="text-sm font-semibold text-black">
+                              <strong className="font-black text-black">Catatan RTL Auditor:</strong>{" "}
                               {isian.rtlCatatanAuditor}
                             </div>
                           )}

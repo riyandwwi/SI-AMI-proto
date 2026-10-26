@@ -294,6 +294,81 @@ export async function simpanKelompokTrainingLengkap(payload: {
   };
 }
 
+export async function pindahkanAkunTrainingClient(payload: {
+  userId: string;
+  targetPeriodeId: string | null;
+  targetRole: "AUDITOR" | "AUDITEE";
+}): Promise<{ ok: boolean; message?: string; error?: string }> {
+  const admin = await requireUser("SUPER_ADMIN", "LPM");
+  const { userId, targetPeriodeId, targetRole } = payload;
+
+  const targetUser = await prisma.user.findUnique({ where: { id: userId } });
+  if (!targetUser || !targetUser.isTraining) {
+    return { ok: false, error: "Akun training tidak ditemukan." };
+  }
+
+  if (!targetPeriodeId) {
+    await prisma.user.update({
+      where: { id: targetUser.id },
+      data: {
+        trainingPeriodeId: null,
+        unitId: null,
+      },
+    });
+    revalidatePath("/admin/training");
+    revalidatePath("/lpm");
+    return { ok: true, message: `${targetUser.nama} dikeluarkan dari kelompok.` };
+  }
+
+  const periode = await prisma.periode.findUnique({ where: { id: targetPeriodeId } });
+  if (!periode || !periode.isTraining) {
+    return { ok: false, error: "Kelompok tujuan tidak ditemukan." };
+  }
+
+  const role = targetRole === "AUDITOR" ? "AUDITOR" : "AUDITEE";
+
+  await prisma.user.update({
+    where: { id: targetUser.id },
+    data: {
+      role,
+      trainingPeriodeId: periode.id,
+      unitId: periode.unitId,
+    },
+  });
+
+  if (role === "AUDITOR" && !periode.ketuaAuditorId) {
+    await prisma.periode.update({
+      where: { id: periode.id },
+      data: {
+        ketuaAuditorId: targetUser.id,
+        ketuaAuditorNama: targetUser.nama,
+        ketuaAuditorNip: targetUser.nimNuptk || null,
+      },
+    });
+  } else if (role === "AUDITEE" && !periode.ketuaAuditeeId) {
+    await prisma.periode.update({
+      where: { id: periode.id },
+      data: {
+        ketuaAuditeeId: targetUser.id,
+        ketuaAuditeeNama: targetUser.nama,
+        ketuaAuditeeNip: targetUser.nimNuptk || null,
+      },
+    });
+  }
+
+  await catat(
+    admin.id,
+    "PINDAH_ANGGOTA_TRAINING",
+    `${targetUser.nama} -> ${periode.semester} (${role})`
+  );
+  revalidatePath("/admin/training");
+  revalidatePath("/lpm");
+  return {
+    ok: true,
+    message: `${targetUser.nama} dipindahkan ke ${periode.semester} sebagai ${role === "AUDITOR" ? "🕵️ Auditor (Kiri)" : "📝 Auditee (Kanan)"}.`,
+  };
+}
+
 export async function masukkanAkunKeKelompokTraining(fd: FormData) {
   const admin = await requireUser("SUPER_ADMIN", "LPM");
   const periodeId = str(fd, "periodeId", 64);

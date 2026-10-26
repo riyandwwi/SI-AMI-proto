@@ -941,16 +941,13 @@ export default function AuditorClient({
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/15 pb-3">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-lg border border-black bg-black px-2 py-0.5 text-[11px] font-black text-white">
+                      <span className="rounded-lg border border-black bg-black px-2 py-0.5 text-xs font-black text-white">
                         #{noUrut}
                       </span>
-                      <code className="rounded-xl border border-black/30 bg-[#BAE6FD] px-2.5 py-0.5 text-xs font-black text-black">
+                      <code className="rounded-xl border border-black/30 bg-[#BAE6FD] px-2.5 py-0.5 text-sm font-black text-black">
                         {ind.kode}
                       </code>
-                      <span className="text-sm font-black text-black">{ind.standar}</span>
-                {(sav.buktiDiminta || ind.buktiDiminta) && (
-                  <Badge tone="slate">📋 Bukti: {sav.buktiDiminta || ind.buktiDiminta}</Badge>
-                )}
+                      <span className="text-base font-black text-black">{ind.standar}</span>
                 {isian?.diisiOleh && <Badge tone="blue">👤 {isian.diisiOleh}</Badge>}
                 {isian?.diperiksaOleh && <Badge tone="purple">🕵️ {isian.diperiksaOleh}</Badge>}
                 {dirty && <Badge tone="amber">📝 Belum Disimpan</Badge>}
@@ -973,19 +970,26 @@ export default function AuditorClient({
             </div>
 
             {ind.pernyataanStandar && (
-              <p className="text-sm font-semibold leading-relaxed text-black">
+              <div className="rounded-xl border border-black/15 bg-white px-4 py-3 text-base font-semibold leading-relaxed text-black">
                 <strong className="font-black text-black">📜 Isi Pernyataan Standar:</strong>{" "}
                 {ind.pernyataanStandar}
-              </p>
+              </div>
             )}
 
-            <p className="text-sm font-semibold leading-relaxed text-black">
+            <div className="rounded-xl border border-black bg-[#FEF9C3]/65 px-4 py-3 text-base font-bold leading-relaxed text-black">
               <strong className="font-black text-black">🎯 Indikator Kinerja ({ind.kode}):</strong>{" "}
               {ind.pernyataan}
-            </p>
+            </div>
+
+            {(sav.buktiDiminta || ind.buktiDiminta) && (
+              <div className="rounded-xl border border-black/15 bg-[#E0F2FE] px-4 py-2.5 text-[15px] font-semibold leading-relaxed text-black">
+                <strong className="font-black text-black">📋 Dokumen Bukti yang Diminta:</strong>{" "}
+                {sav.buktiDiminta || ind.buktiDiminta}
+              </div>
+            )}
 
             {/* Kotak Klaim & Link Drive Auditee */}
-            <div className="rounded-2xl border border-black/15 bg-[#FAF7EE] p-3.5 text-xs space-y-1">
+            <div className="rounded-2xl border border-black/20 bg-white p-3.5 text-sm font-semibold space-y-1 text-black">
               <div>
                 <strong>Evaluasi Diri Auditee{isian?.diisiOleh ? ` (${isian.diisiOleh})` : ""}:</strong>{" "}
                 {isian?.klaim ? (
