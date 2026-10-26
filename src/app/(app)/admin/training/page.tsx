@@ -13,7 +13,6 @@ import {
   lepasAkunDariKelompokTraining,
   masukkanAkunKeKelompokTraining,
   sinkronkanIndikatorTraining,
-  tambahAkunBaruKeKelompokTraining,
 } from "./actions";
 
 export default async function AdminTrainingPage({ searchParams }: { searchParams: SP }) {
@@ -170,42 +169,19 @@ export default async function AdminTrainingPage({ searchParams }: { searchParams
                         </ul>
                       )}
 
-                      {/* Tambah Cepat Akun Baru sebagai Auditor Kelompok Ini */}
-                      <form
-                        action={tambahAkunBaruKeKelompokTraining}
-                        className="grid grid-cols-1 gap-1.5 border-t border-black/10 pt-2.5 sm:grid-cols-2"
-                      >
-                        <input type="hidden" name="periodeId" value={tp.id} />
-                        <input type="hidden" name="role" value="AUDITOR" />
-                        <input
-                          name="nama"
-                          required
-                          placeholder="Ketik Nama Auditor baru..."
-                          className="bg-white text-xs"
-                        />
-                        <div className="flex gap-1">
-                          <input
-                            name="username"
-                            placeholder="Username (opsional)"
-                            className="w-full bg-white font-mono text-xs"
-                          />
-                          <button className="btn shrink-0 px-2.5 py-1 text-xs">+ Auditor</button>
-                        </div>
-                      </form>
-
-                      {/* Atau Masukkan dari Akun Hasil Import yang Belum Punya Kelompok */}
+                      {/* Pilih dari Dropdown Akun yang Belum Masuk Kelompok */}
                       {unassignedUsers.length > 0 && (
-                        <form action={masukkanAkunKeKelompokTraining} className="flex gap-1.5 pt-1">
+                        <form action={masukkanAkunKeKelompokTraining} className="flex gap-1.5 border-t border-black/10 pt-2.5">
                           <input type="hidden" name="periodeId" value={tp.id} />
                           <input type="hidden" name="role" value="AUDITOR" />
-                          <select name="userId" required className="w-full bg-white text-xs">
+                          <select name="userId" required className="w-full bg-white text-xs font-bold">
                             {unassignedUsers.map((u) => (
                               <option key={u.id} value={u.id}>
                                 {u.nama} ({u.username})
                               </option>
                             ))}
                           </select>
-                          <button className="btn-secondary shrink-0 px-2.5 py-1 text-xs">
+                          <button className="btn shrink-0 px-2.5 py-1 text-xs">
                             + Masukkan Auditor
                           </button>
                         </form>
@@ -258,42 +234,19 @@ export default async function AdminTrainingPage({ searchParams }: { searchParams
                         </ul>
                       )}
 
-                      {/* Tambah Cepat Akun Baru sebagai Auditee Kelompok Ini */}
-                      <form
-                        action={tambahAkunBaruKeKelompokTraining}
-                        className="grid grid-cols-1 gap-1.5 border-t border-black/10 pt-2.5 sm:grid-cols-2"
-                      >
-                        <input type="hidden" name="periodeId" value={tp.id} />
-                        <input type="hidden" name="role" value="AUDITEE" />
-                        <input
-                          name="nama"
-                          required
-                          placeholder="Ketik Nama Auditee baru..."
-                          className="bg-white text-xs"
-                        />
-                        <div className="flex gap-1">
-                          <input
-                            name="username"
-                            placeholder="Username (opsional)"
-                            className="w-full bg-white font-mono text-xs"
-                          />
-                          <button className="btn shrink-0 px-2.5 py-1 text-xs">+ Auditee</button>
-                        </div>
-                      </form>
-
-                      {/* Atau Masukkan dari Akun Hasil Import yang Belum Punya Kelompok */}
+                      {/* Pilih dari Dropdown Akun yang Belum Masuk Kelompok */}
                       {unassignedUsers.length > 0 && (
-                        <form action={masukkanAkunKeKelompokTraining} className="flex gap-1.5 pt-1">
+                        <form action={masukkanAkunKeKelompokTraining} className="flex gap-1.5 border-t border-black/10 pt-2.5">
                           <input type="hidden" name="periodeId" value={tp.id} />
                           <input type="hidden" name="role" value="AUDITEE" />
-                          <select name="userId" required className="w-full bg-white text-xs">
+                          <select name="userId" required className="w-full bg-white text-xs font-bold">
                             {unassignedUsers.map((u) => (
                               <option key={u.id} value={u.id}>
                                 {u.nama} ({u.username})
                               </option>
                             ))}
                           </select>
-                          <button className="btn-secondary shrink-0 px-2.5 py-1 text-xs">
+                          <button className="btn shrink-0 px-2.5 py-1 text-xs">
                             + Masukkan Auditee
                           </button>
                         </form>

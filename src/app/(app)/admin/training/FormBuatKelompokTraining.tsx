@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui";
-import { simpanKelompokTrainingLengkap, type NewGroupMemberInput } from "./actions";
+import { simpanKelompokTrainingLengkap } from "./actions";
 
 export interface UnassignedTrainingUser {
   id: string;
@@ -23,58 +23,47 @@ export function FormBuatKelompokTraining({
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(true);
   const [namaKelompok, setNamaKelompok] = useState(`Kelompok ${nextGroupNumber}`);
-  const [auditors, setAuditors] = useState<NewGroupMemberInput[]>([
-    { nama: "", username: "" },
-    { nama: "", username: "" },
-  ]);
-  const [auditees, setAuditees] = useState<NewGroupMemberInput[]>([
-    { nama: "", username: "" },
-    { nama: "", username: "" },
-  ]);
-  const [pickedAuditorIds, setPickedAuditorIds] = useState<string[]>([]);
-  const [pickedAuditeeIds, setPickedAuditeeIds] = useState<string[]>([]);
+
+  // Setiap baris di Sisi Kiri (Auditor) dan Sisi Kanan (Auditee) adalah Dropdown pilih akun
+  const [auditorSelects, setAuditorSelects] = useState<string[]>(["", ""]);
+  const [auditeeSelects, setAuditeeSelects] = useState<string[]>(["", ""]);
+
   const [notice, setNotice] = useState<{ ok?: string; err?: string } | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const updateAuditor = (idx: number, field: keyof NewGroupMemberInput, val: string) => {
-    setAuditors((prev) => prev.map((item, i) => (i === idx ? { ...item, [field]: val } : item)));
+  // Kumpulan userId yang sedang dipilih agar tidak dobel dipilih di dropdown lain
+  const allSelectedIds = new Set(
+    [...auditorSelects, ...auditeeSelects].filter((id) => id.trim().length > 0)
+  );
+
+  const updateAuditorSelect = (idx: number, val: string) => {
+    setAuditorSelects((prev) => prev.map((v, i) => (i === idx ? val : v)));
   };
 
-  const updateAuditee = (idx: number, field: keyof NewGroupMemberInput, val: string) => {
-    setAuditees((prev) => prev.map((item, i) => (i === idx ? { ...item, [field]: val } : item)));
+  const updateAuditeeSelect = (idx: number, val: string) => {
+    setAuditeeSelects((prev) => prev.map((v, i) => (i === idx ? val : v)));
   };
 
-  const addAuditorRow = () => setAuditors((prev) => [...prev, { nama: "", username: "" }]);
+  const addAuditorRow = () => setAuditorSelects((prev) => [...prev, ""]);
   const removeAuditorRow = (idx: number) =>
-    setAuditors((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== idx) : [{ nama: "", username: "" }]));
+    setAuditorSelects((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== idx) : [""]));
 
-  const addAuditeeRow = () => setAuditees((prev) => [...prev, { nama: "", username: "" }]);
+  const addAuditeeRow = () => setAuditeeSelects((prev) => [...prev, ""]);
   const removeAuditeeRow = (idx: number) =>
-    setAuditees((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== idx) : [{ nama: "", username: "" }]));
-
-  const togglePickAuditor = (userId: string) => {
-    setPickedAuditeeIds((prev) => prev.filter((id) => id !== userId));
-    setPickedAuditorIds((prev) =>
-      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
-    );
-  };
-
-  const togglePickAuditee = (userId: string) => {
-    setPickedAuditorIds((prev) => prev.filter((id) => id !== userId));
-    setPickedAuditeeIds((prev) =>
-      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
-    );
-  };
+    setAuditeeSelects((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== idx) : [""]));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setNotice(null);
 
+    const pickedAuditorIds = Array.from(new Set(auditorSelects.filter(Boolean)));
+    const pickedAuditeeIds = Array.from(new Set(auditeeSelects.filter(Boolean)));
+
     startTransition(async () => {
       const res = await simpanKelompokTrainingLengkap({
         namaKelompok,
-        auditors,
-        auditees,
+        auditors: [],
+        auditees: [],
         existingAuditorIds: pickedAuditorIds,
         existingAuditeeIds: pickedAuditeeIds,
       });
@@ -86,16 +75,8 @@ export function FormBuatKelompokTraining({
 
       setNotice({ ok: res.message ?? "Kelompok berhasil disimpan." });
       setNamaKelompok(`Kelompok ${nextGroupNumber + 1}`);
-      setAuditors([
-        { nama: "", username: "" },
-        { nama: "", username: "" },
-      ]);
-      setAuditees([
-        { nama: "", username: "" },
-        { nama: "", username: "" },
-      ]);
-      setPickedAuditorIds([]);
-      setPickedAuditeeIds([]);
+      setAuditorSelects(["", ""]);
+      setAuditeeSelects(["", ""]);
       router.refresh();
     });
   };
@@ -108,7 +89,7 @@ export function FormBuatKelompokTraining({
             ➕ Buat Grup / Kelompok Training Baru
           </h2>
           <Badge tone="green">Otomatis Masuk {masterIndikatorCount} Indikator LPM</Badge>
-          <Badge tone="amber">🔑 Password Akun: 123</Badge>
+          <Badge tone="blue">{unassignedUsers.length} Akun Tersedia di Dropdown</Badge>
         </div>
         <button
           type="button"
@@ -146,37 +127,45 @@ export function FormBuatKelompokTraining({
             />
           </div>
 
-          {/* 2 Kolom: SISI KIRI (AUDITOR) & SISI KANAN (AUDITEE) */}
+          {unassignedUsers.length === 0 && (
+            <div className="rounded-xl border-2 border-black bg-[#FEF08A] px-3.5 py-2.5 text-xs font-bold text-black">
+              ℹ️ Belum ada akun peserta yang tersedia di dropdown. Silakan Import Excel / Copy-Paste / Generate akun terlebih dahulu di bagian bawah.
+            </div>
+          )}
+
+          {/* 2 Kolom: SISI KIRI (DROPDOWN AUDITOR) & SISI KANAN (DROPDOWN AUDITEE) */}
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            {/* SISI KIRI: MASUKKAN AUDITOR */}
+            {/* SISI KIRI: PILIH AUDITOR VIA DROPDOWN */}
             <div className="rounded-2xl border-2 border-black bg-[#E9D5FF]/55 p-4 space-y-3 shadow-[3px_3px_0px_#000]">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/15 pb-2">
                 <span className="text-xs font-black uppercase text-black">
-                  👈 Sisi Kiri: 🕵️ Masukkan AUDITOR Kelompok Ini
+                  👈 Sisi Kiri: 🕵️ Pilih AUDITOR Kelompok Ini
                 </span>
                 <Badge tone="purple">Role: AUDITOR</Badge>
               </div>
 
               <div className="space-y-2">
-                {auditors.map((row, idx) => (
+                {auditorSelects.map((selectedId, idx) => (
                   <div key={idx} className="flex items-center gap-1.5">
                     <span className="w-5 shrink-0 text-xs font-black text-black">{idx + 1}.</span>
-                    <input
-                      value={row.nama}
-                      onChange={(e) => updateAuditor(idx, "nama", e.target.value)}
-                      placeholder="Nama Auditor..."
-                      className="w-full bg-white text-xs"
-                    />
-                    <input
-                      value={row.username ?? ""}
-                      onChange={(e) => updateAuditor(idx, "username", e.target.value)}
-                      placeholder="Username (opsional)"
-                      className="w-40 shrink-0 bg-white font-mono text-xs"
-                    />
+                    <select
+                      value={selectedId}
+                      onChange={(e) => updateAuditorSelect(idx, e.target.value)}
+                      className="w-full bg-white text-xs font-bold text-black"
+                    >
+                      <option value="">-- Pilih Akun Auditor --</option>
+                      {unassignedUsers
+                        .filter((u) => u.id === selectedId || !allSelectedIds.has(u.id))
+                        .map((u) => (
+                          <option key={u.id} value={u.id}>
+                            {u.nama} ({u.username})
+                          </option>
+                        ))}
+                    </select>
                     <button
                       type="button"
                       onClick={() => removeAuditorRow(idx)}
-                      className="btn-danger shrink-0 px-2 py-1 text-xs"
+                      className="btn-danger shrink-0 px-2.5 py-1 text-xs"
                       title="Hapus baris"
                     >
                       ✕
@@ -190,67 +179,41 @@ export function FormBuatKelompokTraining({
                 onClick={addAuditorRow}
                 className="btn-secondary w-full text-xs"
               >
-                + Tambah Baris Auditor
+                + Tambah Dropdown Auditor
               </button>
-
-              {unassignedUsers.length > 0 && (
-                <div className="space-y-1.5 border-t border-black/15 pt-2.5">
-                  <div className="text-[11px] font-black uppercase text-slate-800">
-                    Atau Pilih dari Akun Hasil Import yang Belum Punya Kelompok:
-                  </div>
-                  <div className="flex max-h-32 flex-wrap gap-1.5 overflow-y-auto">
-                    {unassignedUsers.map((u) => {
-                      const active = pickedAuditorIds.includes(u.id);
-                      return (
-                        <button
-                          key={u.id}
-                          type="button"
-                          onClick={() => togglePickAuditor(u.id)}
-                          className={`rounded-xl border border-black px-2.5 py-1 text-xs font-bold transition ${
-                            active
-                              ? "bg-black text-white"
-                              : "bg-white text-black hover:bg-[#FEF08A]"
-                          }`}
-                        >
-                          {active ? "✓ " : "+ "}
-                          {u.nama} ({u.username})
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
             </div>
 
-            {/* SISI KANAN: MASUKKAN AUDITEE */}
+            {/* SISI KANAN: PILIH AUDITEE VIA DROPDOWN */}
             <div className="rounded-2xl border-2 border-black bg-[#BAE6FD]/55 p-4 space-y-3 shadow-[3px_3px_0px_#000]">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/15 pb-2">
                 <span className="text-xs font-black uppercase text-black">
-                  👉 Sisi Kanan: 📝 Masukkan AUDITEE Kelompok Ini
+                  👉 Sisi Kanan: 📝 Pilih AUDITEE Kelompok Ini
                 </span>
                 <Badge tone="blue">Role: AUDITEE</Badge>
               </div>
 
               <div className="space-y-2">
-                {auditees.map((row, idx) => (
+                {auditeeSelects.map((selectedId, idx) => (
                   <div key={idx} className="flex items-center gap-1.5">
                     <span className="w-5 shrink-0 text-xs font-black text-black">{idx + 1}.</span>
-                    <input
-                      value={row.nama}
-                      onChange={(e) => updateAuditee(idx, "nama", e.target.value)}
-                      placeholder="Nama Auditee..."
-                      className="w-full bg-white text-xs"
-                    />
-                    <input
-                      value={row.username ?? ""}
-                      onChange={(e) => updateAuditee(idx, "username", e.target.value)}
-                      placeholder="Username (opsional)"
-                      className="w-40 shrink-0 bg-white font-mono text-xs"
-                    />
+                    <select
+                      value={selectedId}
+                      onChange={(e) => updateAuditeeSelect(idx, e.target.value)}
+                      className="w-full bg-white text-xs font-bold text-black"
+                    >
+                      <option value="">-- Pilih Akun Auditee --</option>
+                      {unassignedUsers
+                        .filter((u) => u.id === selectedId || !allSelectedIds.has(u.id))
+                        .map((u) => (
+                          <option key={u.id} value={u.id}>
+                            {u.nama} ({u.username})
+                          </option>
+                        ))}
+                    </select>
                     <button
                       type="button"
                       onClick={() => removeAuditeeRow(idx)}
-                      className="btn-danger shrink-0 px-2 py-1 text-xs"
+                      className="btn-danger shrink-0 px-2.5 py-1 text-xs"
                       title="Hapus baris"
                     >
                       ✕
@@ -264,36 +227,8 @@ export function FormBuatKelompokTraining({
                 onClick={addAuditeeRow}
                 className="btn-secondary w-full text-xs"
               >
-                + Tambah Baris Auditee
+                + Tambah Dropdown Auditee
               </button>
-
-              {unassignedUsers.length > 0 && (
-                <div className="space-y-1.5 border-t border-black/15 pt-2.5">
-                  <div className="text-[11px] font-black uppercase text-slate-800">
-                    Atau Pilih dari Akun Hasil Import yang Belum Punya Kelompok:
-                  </div>
-                  <div className="flex max-h-32 flex-wrap gap-1.5 overflow-y-auto">
-                    {unassignedUsers.map((u) => {
-                      const active = pickedAuditeeIds.includes(u.id);
-                      return (
-                        <button
-                          key={u.id}
-                          type="button"
-                          onClick={() => togglePickAuditee(u.id)}
-                          className={`rounded-xl border border-black px-2.5 py-1 text-xs font-bold transition ${
-                            active
-                              ? "bg-black text-white"
-                              : "bg-white text-black hover:bg-[#FEF08A]"
-                          }`}
-                        >
-                          {active ? "✓ " : "+ "}
-                          {u.nama} ({u.username})
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
             </div>
           </div>
 
