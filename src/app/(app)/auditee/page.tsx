@@ -16,12 +16,15 @@ export default async function AuditeePage({ searchParams }: { searchParams: SP }
   await cleanupExpiredSignatures();
 
   if (user.isTraining && !user.trainingPeriodeId) {
-    redirect("/training");
+    return (
+      <Empty>
+        ⏳ Akun pelatihan Anda belum dimasukkan ke dalam Kelompok Training oleh Super Admin. Silakan hubungi panitia pelatihan.
+      </Empty>
+    );
   }
 
   if (!user.unitId || !user.unit) {
-    if (user.isTraining) redirect("/training");
-    return <Empty>Akun Auditee belum dihubungkan ke Program Studi.</Empty>;
+    return <Empty>Akun Auditee belum dihubungkan ke Program Studi / Kelompok.</Empty>;
   }
 
   // Isolasi ketat: Akun Training HANYA bisa mengakses Kelompok Sesi Training yang dipilihnya
@@ -131,21 +134,11 @@ export default async function AuditeePage({ searchParams }: { searchParams: SP }
       <PageHeader
         title={
           user.isTraining
-            ? `${periode.nama} — Mode Auditee`
+            ? `${periode.nama} — Auditee`
             : `Prodi ${user.unit.nama} — ${periode.tahun} (${periode.semester})`
         }
       >
         <div className="flex flex-wrap items-center gap-2">
-          {user.isTraining && (
-            <>
-              <Link href={`/auditor/${periode.id}`} className="btn-purple text-xs">
-                🕵️ Pindah Jadi Auditor Kelompok Ini
-              </Link>
-              <Link href="/training" className="btn-secondary text-xs">
-                🔄 Ganti Kelompok
-              </Link>
-            </>
-          )}
           {periode.ketuaAuditeeNama && !user.isTraining && (
             <Badge tone="blue">⭐ Ketua Auditee: {periode.ketuaAuditeeNama}</Badge>
           )}

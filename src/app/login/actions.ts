@@ -29,7 +29,10 @@ export async function login(_: LoginState, fd: FormData): Promise<LoginState> {
   });
   await catat(user.id, "LOGIN");
   if (user.isTraining) {
-    redirect(user.trainingPeriodeId ? "/auditee" : "/training");
+    if (user.role === "AUDITOR") {
+      redirect(user.trainingPeriodeId ? `/auditor/${user.trainingPeriodeId}` : "/auditor");
+    }
+    redirect("/auditee");
   }
   redirect(ROLE_HOME[user.role]);
 }

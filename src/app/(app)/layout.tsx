@@ -25,22 +25,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const user = await requireUser();
   const firstName = user.nama.split(" ")[0] || user.nama;
 
-  const navItems = user.isTraining
-    ? [
-        { href: "/training", label: "🎓 Pilih Kelompok Training" },
-        { href: "/auditee", label: "📝 Sebagai Auditee (Isi Evaluasi)" },
-        { href: "/auditor", label: "🕵️ Sebagai Auditor (Periksa)" },
-      ]
-    : [...NAV[user.role]];
+  const navItems = [...NAV[user.role]];
 
-  const shortcuts = user.isTraining
-    ? [
-        { href: "/training", label: "Kelompok", icon: "🎓", bg: "bg-[#E9D5FF]" },
-        { href: "/auditee", label: "Jadi Auditee", icon: "📝", bg: "bg-[#FEF08A]" },
-        { href: "/auditor", label: "Jadi Auditor", icon: "🕵️", bg: "bg-[#D9F99D]" },
-        { href: "/auditee/detail", label: "Rekap & TTD", icon: "📊", bg: "bg-[#BAE6FD]" },
-      ]
-    : user.role === "LPM"
+  const shortcuts =
+    user.role === "LPM"
       ? [
           { href: "/lpm", label: "Sesi AMI", icon: "📋", bg: "bg-[#E9D5FF]" },
           { href: "/lpm/indikator", label: "Indikator", icon: "📑", bg: "bg-[#FEF08A]" },
@@ -87,11 +75,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               </div>
               <div className="flex items-center justify-end gap-1.5 pt-0.5 text-xs">
                 {user.isTraining ? (
-                  <Badge tone="amber">🎓 Peserta Training (Auditee &amp; Auditor)</Badge>
+                  <Badge tone="amber">🎓 {ROLE_LABEL[user.role]} (Training)</Badge>
                 ) : (
                   <Badge tone="purple">{ROLE_LABEL[user.role]}</Badge>
                 )}
-                {user.unit && !user.isTraining && (
+                {user.unit && (
                   <span className="rounded-full border border-black bg-white px-2 py-0.2 font-bold text-[11px]">
                     {user.unit.nama}
                   </span>

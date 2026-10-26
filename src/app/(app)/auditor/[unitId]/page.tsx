@@ -113,18 +113,9 @@ export default async function AuditorUnitWorkspacePage({
 
   return (
     <>
-      <PageHeader title={user.isTraining ? `${periode.nama} — Mode Auditor` : periode.nama}>
+      <PageHeader title={user.isTraining ? `${periode.nama} — Auditor` : periode.nama}>
         <div className="flex flex-wrap items-center gap-2">
-          {user.isTraining ? (
-            <>
-              <Link href="/auditee" className="btn text-xs">
-                📝 Pindah Jadi Auditee Kelompok Ini
-              </Link>
-              <Link href="/training" className="btn-secondary text-xs">
-                🔄 Ganti Kelompok
-              </Link>
-            </>
-          ) : (
+          {!user.isTraining && (
             <Link href="/auditor" className="btn-secondary text-xs">
               ← Kembali
             </Link>

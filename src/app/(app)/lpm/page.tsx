@@ -242,7 +242,7 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/15 pb-3">
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="text-base font-black text-black">{p.nama}</h3>
-                        {p.isTraining && <Badge tone="amber">🎓 Sesi Training (Dual Role)</Badge>}
+                        {p.isTraining && <Badge tone="amber">🎓 Sesi Training</Badge>}
                         <Badge tone="blue">{p.tahun}</Badge>
                         <Badge tone="purple">{p.semester}</Badge>
                         <Badge tone={p.aktif ? "green" : "amber"}>
@@ -280,32 +280,58 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                     </div>
 
                     {p.isTraining ? (
-                      <div className="rounded-2xl border border-black/15 bg-[#FAF7EE] p-4 space-y-3">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <span className="text-xs font-black uppercase text-black">
-                            🎓 Anggota Kelompok Pelatihan AMI (Dual Role: Auditee &amp; Auditor)
-                          </span>
-                          <Badge tone="amber">{p.trainingUsers.length} Peserta Bergabung</Badge>
-                        </div>
-                        {p.trainingUsers.length === 0 ? (
-                          <p className="text-xs font-semibold text-slate-500">
-                            Belum ada peserta training yang memilih kelompok ini. Peserta dapat memilih kelompok saat login menggunakan akun training.
-                          </p>
-                        ) : (
-                          <div className="flex flex-wrap gap-2">
-                            {p.trainingUsers.map((tu) => (
-                              <span
-                                key={tu.id}
-                                className="inline-flex items-center gap-1.5 rounded-xl border border-black/20 bg-white px-3 py-1.5 text-xs font-bold text-black"
-                              >
-                                👤 {tu.nama}{" "}
-                                <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] text-slate-700">
-                                  {tu.username}
-                                </code>
-                              </span>
-                            ))}
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <div className="rounded-2xl border border-black/15 bg-[#FAF7EE] p-4 space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-black uppercase text-black">
+                              👈 Sisi Kiri: 🕵️ Auditor Kelompok ({p.semester})
+                            </span>
+                            <Badge tone="purple">
+                              {p.trainingUsers.filter((tu) => tu.role === "AUDITOR").length} Auditor
+                            </Badge>
                           </div>
-                        )}
+                          <div className="flex flex-wrap gap-2">
+                            {p.trainingUsers
+                              .filter((tu) => tu.role === "AUDITOR")
+                              .map((tu) => (
+                                <span
+                                  key={tu.id}
+                                  className="inline-flex items-center gap-1.5 rounded-xl border border-black/20 bg-white px-3 py-1.5 text-xs font-bold text-black"
+                                >
+                                  🕵️ {tu.nama}{" "}
+                                  <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] text-slate-700">
+                                    {tu.username}
+                                  </code>
+                                </span>
+                              ))}
+                          </div>
+                        </div>
+
+                        <div className="rounded-2xl border border-black/15 bg-[#FAF7EE] p-4 space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-black uppercase text-black">
+                              👉 Sisi Kanan: 📝 Auditee Kelompok ({p.semester})
+                            </span>
+                            <Badge tone="blue">
+                              {p.trainingUsers.filter((tu) => tu.role === "AUDITEE").length} Auditee
+                            </Badge>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {p.trainingUsers
+                              .filter((tu) => tu.role === "AUDITEE")
+                              .map((tu) => (
+                                <span
+                                  key={tu.id}
+                                  className="inline-flex items-center gap-1.5 rounded-xl border border-black/20 bg-white px-3 py-1.5 text-xs font-bold text-black"
+                                >
+                                  📝 {tu.nama}{" "}
+                                  <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] text-slate-700">
+                                    {tu.username}
+                                  </code>
+                                </span>
+                              ))}
+                          </div>
+                        </div>
                       </div>
                     ) : (
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

@@ -16,10 +16,6 @@ export async function requireUser(...roles: RoleName[]) {
   if (!s) redirect("/login");
   const user = await prisma.user.findUnique({ where: { id: s.uid }, include: { unit: true } });
   if (!user || !user.aktif) redirect("/login?err=" + encodeURIComponent("Sesi tidak valid, silakan login ulang"));
-  // Akun Sesi Training boleh mengakses fitur AUDITEE sekaligus AUDITOR di dalam Kelompok Trainingnya
-  if (user.isTraining && (roles.includes("AUDITEE") || roles.includes("AUDITOR"))) {
-    return user;
-  }
   if (roles.length && !roles.includes(user.role)) redirect("/");
   return user;
 }

@@ -14,9 +14,15 @@ export default async function AuditorListPage({ searchParams }: { searchParams: 
 
   await cleanupExpiredSignatures();
 
-  // Jika Akun Training, langsung masuk ke Kelompok Sesi Training yang dipilihnya (tidak bisa lihat sesi asli)
+  // Jika Akun Training, langsung masuk ke Kelompok Sesi Training yang telah ditentukan Super Admin
   if (user.isTraining) {
-    if (!user.trainingPeriodeId) redirect("/training");
+    if (!user.trainingPeriodeId) {
+      return (
+        <Empty>
+          ⏳ Akun pelatihan Auditor Anda belum dimasukkan ke dalam Kelompok Training oleh Super Admin. Silakan hubungi panitia pelatihan.
+        </Empty>
+      );
+    }
     redirect(`/auditor/${user.trainingPeriodeId}`);
   }
 

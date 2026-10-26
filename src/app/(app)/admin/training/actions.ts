@@ -67,6 +67,371 @@ async function getMasterIndikatorFromLpm() {
   return Array.from(map.values()).sort((a, b) => a.urutan - b.urutan);
 }
 
+export interface NewGroupMemberInput {
+  nama: string;
+  username?: string;
+  nimNuptk?: string;
+}
+
+export async function simpanKelompokTrainingLengkap(payload: {
+  namaKelompok: string;
+  auditors: NewGroupMemberInput[];
+  auditees: NewGroupMemberInput[];
+  existingAuditorIds?: string[];
+  existingAuditeeIds?: string[];
+}): Promise<{ ok: boolean; message?: string; error?: string }> {
+  const admin = await requireUser("SUPER_ADMIN", "LPM");
+  const rawName = (payload.namaKelompok ?? "").trim().slice(0, 100);
+  if (!rawName) {
+    return { ok: false, error: "Nama Kelompok wajib diisi." };
+  }
+
+  const cleanAuditors = (payload.auditors ?? []).filter((a) => a.nama.trim().length > 0);
+  const cleanAuditees = (payload.auditees ?? []).filter((a) => a.nama.trim().length > 0);
+  const existingAuditorIds = (payload.existingAuditorIds ?? []).filter(Boolean);
+  const existingAuditeeIds = (payload.existingAuditeeIds ?? []).filter(Boolean);
+
+  if (
+    cleanAuditors.length === 0 &&
+    cleanAuditees.length === 0 &&
+    existingAuditorIds.length === 0 &&
+    existingAuditeeIds.length === 0
+  ) {
+    return {
+      ok: false,
+      error: "Masukkan minimal 1 peserta di sisi Auditor (Kiri) atau Auditee (Kanan).",
+    };
+  }
+
+  const units = await ensureTrainingUnits();
+  const defaultUnit = units[0];
+  const masterIndikator = await getMasterIndikatorFromLpm();
+
+  const existingTraining = await prisma.periode.findMany({
+    where: { isTraining: true },
+  });
+  const nomorKelompok = existingTraining.length + 1;
+  const namaLengkapPeriode = rawName.startsWith("🎓") ? rawName : `🎓 Pelatihan AMI — ${rawName}`;
+
+  const trainingUnitKode = `TRAINING-KELOMPOK-${nomorKelompok}-${Date.now().toString().slice(-4)}`;
+  const trainingUnit = await prisma.unit.create({
+    data: {
+      kode: trainingUnitKode,
+      nama: `${rawName} (Training)`,
+      jenis: "TRAINING",
+      diaudit: true,
+    },
+  });
+
+  const newPeriode = await prisma.periode.create({
+    data: {
+      nama: namaLengkapPeriode,
+      tahun: "Training",
+      semester: rawName,
+      isTraining: true,
+      unitId: trainingUnit.id ?? defaultUnit.id,
+      tahap: "PENGISIAN",
+      aktif: true,
+      sourceLocked: true,
+    },
+  });
+
+  if (masterIndikator.length > 0) {
+    await prisma.indikator.createMany({
+      data: masterIndikator.map((m, idx) => ({
+        periodeId: newPeriode.id,
+        kode: m.kode,
+        standar: m.standar,
+        pernyataanStandar: m.pernyataanStandar,
+        pernyataan: m.pernyataan,
+        buktiDiminta: m.buktiDiminta,
+        urutan: idx + 1,
+      })),
+    });
+  }
+
+  const [passwordHash, allUsers] = await Promise.all([
+    bcrypt.hash(DEFAULT_PASSWORD, 10),
+    prisma.user.findMany({ select: { username: true } }),
+  ]);
+  const passwordEnc = encryptPassword(DEFAULT_PASSWORD);
+  const usedUsernames = new Set(allUsers.map((u) => u.username.toLowerCase()));
+
+  const makeUniqueUsername = (rawUname: string | undefined, nama: string, rolePrefix: string, idx: number) => {
+    let base = (rawUname ?? "")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9._-]/g, "");
+    if (!base) {
+      const slug = nama
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "")
+        .slice(0, 10);
+      base = slug ? `${slug}_${rolePrefix}` : `${rolePrefix}_k${nomorKelompok}_${idx + 1}`;
+    }
+    let candidate = base;
+    let suffix = 1;
+    while (usedUsernames.has(candidate)) {
+      candidate = `${base}${suffix}`;
+      suffix++;
+    }
+    usedUsernames.add(candidate);
+    return candidate;
+  };
+
+  const toCreateUsers: {
+    nama: string;
+    nimNuptk: string;
+    username: string;
+    passwordHash: string;
+    passwordEnc: string;
+    role: "AUDITOR" | "AUDITEE";
+    isTraining: boolean;
+    trainingPeriodeId: string;
+    unitId: string;
+    aktif: boolean;
+  }[] = [];
+
+  cleanAuditors.forEach((a, idx) => {
+    const nama = a.nama.trim().slice(0, 120);
+    const uname = makeUniqueUsername(a.username, nama, "auditor", idx);
+    const nimNuptk = (a.nimNuptk ?? "").trim().slice(0, 64) || `TRN-AUD-${nomorKelompok}${idx + 1}`;
+    toCreateUsers.push({
+      nama,
+      nimNuptk,
+      username: uname,
+      passwordHash,
+      passwordEnc,
+      role: "AUDITOR",
+      isTraining: true,
+      trainingPeriodeId: newPeriode.id,
+      unitId: trainingUnit.id,
+      aktif: true,
+    });
+  });
+
+  cleanAuditees.forEach((a, idx) => {
+    const nama = a.nama.trim().slice(0, 120);
+    const uname = makeUniqueUsername(a.username, nama, "auditee", idx);
+    const nimNuptk = (a.nimNuptk ?? "").trim().slice(0, 64) || `TRN-ADE-${nomorKelompok}${idx + 1}`;
+    toCreateUsers.push({
+      nama,
+      nimNuptk,
+      username: uname,
+      passwordHash,
+      passwordEnc,
+      role: "AUDITEE",
+      isTraining: true,
+      trainingPeriodeId: newPeriode.id,
+      unitId: trainingUnit.id,
+      aktif: true,
+    });
+  });
+
+  if (toCreateUsers.length > 0) {
+    await prisma.user.createMany({
+      data: toCreateUsers,
+      skipDuplicates: true,
+    });
+  }
+
+  if (existingAuditorIds.length > 0) {
+    await prisma.user.updateMany({
+      where: { id: { in: existingAuditorIds }, isTraining: true },
+      data: {
+        role: "AUDITOR",
+        trainingPeriodeId: newPeriode.id,
+        unitId: trainingUnit.id,
+      },
+    });
+  }
+
+  if (existingAuditeeIds.length > 0) {
+    await prisma.user.updateMany({
+      where: { id: { in: existingAuditeeIds }, isTraining: true },
+      data: {
+        role: "AUDITEE",
+        trainingPeriodeId: newPeriode.id,
+        unitId: trainingUnit.id,
+      },
+    });
+  }
+
+  // Set default Ketua Auditor & Ketua Auditee kelompok ini
+  const groupMembers = await prisma.user.findMany({
+    where: { trainingPeriodeId: newPeriode.id, isTraining: true },
+    orderBy: { createdAt: "asc" },
+  });
+  const firstAuditor = groupMembers.find((m) => m.role === "AUDITOR");
+  const firstAuditee = groupMembers.find((m) => m.role === "AUDITEE");
+
+  await prisma.periode.update({
+    where: { id: newPeriode.id },
+    data: {
+      ketuaAuditorId: firstAuditor?.id ?? null,
+      ketuaAuditorNama: firstAuditor?.nama ?? null,
+      ketuaAuditorNip: firstAuditor?.nimNuptk ?? null,
+      ketuaAuditeeId: firstAuditee?.id ?? null,
+      ketuaAuditeeNama: firstAuditee?.nama ?? null,
+      ketuaAuditeeNip: firstAuditee?.nimNuptk ?? null,
+    },
+  });
+
+  await catat(
+    admin.id,
+    "SIMPAN_KELOMPOK_TRAINING",
+    `${namaLengkapPeriode}: ${groupMembers.filter((m) => m.role === "AUDITOR").length} Auditor, ${groupMembers.filter((m) => m.role === "AUDITEE").length} Auditee`
+  );
+
+  revalidatePath("/admin/training");
+  revalidatePath("/lpm");
+  revalidatePath("/lpm/indikator");
+  revalidatePath("/lpm/rekap");
+
+  return {
+    ok: true,
+    message: `Kelompok "${rawName}" berhasil disimpan (${groupMembers.filter((m) => m.role === "AUDITOR").length} Auditor di Kiri, ${groupMembers.filter((m) => m.role === "AUDITEE").length} Auditee di Kanan, + ${masterIndikator.length} Indikator LPM).`,
+  };
+}
+
+export async function masukkanAkunKeKelompokTraining(fd: FormData) {
+  const admin = await requireUser("SUPER_ADMIN", "LPM");
+  const periodeId = str(fd, "periodeId", 64);
+  const userId = str(fd, "userId", 64);
+  const role = str(fd, "role", 16) === "AUDITOR" ? "AUDITOR" : "AUDITEE";
+
+  const [periode, targetUser] = await Promise.all([
+    prisma.periode.findUnique({ where: { id: periodeId } }),
+    prisma.user.findUnique({ where: { id: userId } }),
+  ]);
+
+  if (!periode || !periode.isTraining || !targetUser || !targetUser.isTraining) {
+    fail("/admin/training", "Kelompok atau akun training tidak ditemukan.");
+  }
+
+  await prisma.user.update({
+    where: { id: targetUser.id },
+    data: {
+      role,
+      trainingPeriodeId: periode.id,
+      unitId: periode.unitId,
+    },
+  });
+
+  if (role === "AUDITOR" && !periode.ketuaAuditorId) {
+    await prisma.periode.update({
+      where: { id: periode.id },
+      data: {
+        ketuaAuditorId: targetUser.id,
+        ketuaAuditorNama: targetUser.nama,
+        ketuaAuditorNip: targetUser.nimNuptk || null,
+      },
+    });
+  } else if (role === "AUDITEE" && !periode.ketuaAuditeeId) {
+    await prisma.periode.update({
+      where: { id: periode.id },
+      data: {
+        ketuaAuditeeId: targetUser.id,
+        ketuaAuditeeNama: targetUser.nama,
+        ketuaAuditeeNip: targetUser.nimNuptk || null,
+      },
+    });
+  }
+
+  await catat(admin.id, "ASSIGN_TRAINING_MEMBER", `${targetUser.nama} -> ${periode.nama} (${role})`);
+  revalidatePath("/admin/training");
+  revalidatePath("/lpm");
+  ok("/admin/training", `${targetUser.nama} dimasukkan ke ${periode.semester} sebagai ${role}.`);
+}
+
+export async function tambahAkunBaruKeKelompokTraining(fd: FormData) {
+  const admin = await requireUser("SUPER_ADMIN", "LPM");
+  const periodeId = str(fd, "periodeId", 64);
+  const role = str(fd, "role", 16) === "AUDITOR" ? "AUDITOR" : "AUDITEE";
+  const nama = str(fd, "nama", 120);
+  const rawUname = str(fd, "username", 64).toLowerCase().replace(/[^a-z0-9._-]/g, "");
+
+  if (!periodeId || !nama) {
+    fail("/admin/training", "Nama peserta wajib diisi.");
+  }
+
+  const periode = await prisma.periode.findUnique({ where: { id: periodeId } });
+  if (!periode || !periode.isTraining) {
+    fail("/admin/training", "Kelompok training tidak ditemukan.");
+  }
+
+  const slug = nama.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 10);
+  let uname = rawUname || (slug ? `${slug}_${role.toLowerCase()}` : `peserta_${Date.now().toString().slice(-4)}`);
+  const exists = await prisma.user.findUnique({ where: { username: uname } });
+  if (exists) {
+    uname = `${uname}${Math.floor(10 + Math.random() * 89)}`;
+  }
+
+  const passwordHash = await bcrypt.hash(DEFAULT_PASSWORD, 10);
+  const passwordEnc = encryptPassword(DEFAULT_PASSWORD);
+
+  const created = await prisma.user.create({
+    data: {
+      nama,
+      nimNuptk: `TRN-${role.slice(0, 3)}-${Date.now().toString().slice(-3)}`,
+      username: uname,
+      passwordHash,
+      passwordEnc,
+      role,
+      isTraining: true,
+      trainingPeriodeId: periode.id,
+      unitId: periode.unitId,
+      aktif: true,
+    },
+  });
+
+  if (role === "AUDITOR" && !periode.ketuaAuditorId) {
+    await prisma.periode.update({
+      where: { id: periode.id },
+      data: {
+        ketuaAuditorId: created.id,
+        ketuaAuditorNama: created.nama,
+        ketuaAuditorNip: created.nimNuptk,
+      },
+    });
+  } else if (role === "AUDITEE" && !periode.ketuaAuditeeId) {
+    await prisma.periode.update({
+      where: { id: periode.id },
+      data: {
+        ketuaAuditeeId: created.id,
+        ketuaAuditeeNama: created.nama,
+        ketuaAuditeeNip: created.nimNuptk,
+      },
+    });
+  }
+
+  await catat(admin.id, "TAMBAH_ANGGOTA_TRAINING", `${created.nama} (${created.username}) -> ${periode.nama} (${role})`);
+  revalidatePath("/admin/training");
+  revalidatePath("/lpm");
+  ok("/admin/training", `Akun ${role} "${created.nama}" (${created.username}) berhasil ditambahkan ke ${periode.semester}.`);
+}
+
+export async function lepasAkunDariKelompokTraining(fd: FormData) {
+  await requireUser("SUPER_ADMIN", "LPM");
+  const userId = str(fd, "userId", 64);
+  const u = await prisma.user.findUnique({ where: { id: userId } });
+  if (!u || !u.isTraining) {
+    fail("/admin/training", "Akun training tidak ditemukan.");
+  }
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      trainingPeriodeId: null,
+      unitId: null,
+    },
+  });
+
+  revalidatePath("/admin/training");
+  revalidatePath("/lpm");
+  ok("/admin/training", `${u.nama} dikeluarkan dari kelompok.`);
+}
+
 export async function buatKelompokTraining(fd: FormData) {
   const admin = await requireUser("SUPER_ADMIN", "LPM");
   const rawJumlah = Number(str(fd, "jumlahKelompok", 10) || "5");
