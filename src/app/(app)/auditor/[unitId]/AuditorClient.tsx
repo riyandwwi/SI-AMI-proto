@@ -957,40 +957,6 @@ export default function AuditorClient({
                 {isFokus && <Badge tone="amber">🎯 Fokus Lapangan</Badge>}
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                {buka && mode === "dokumen" && (
-                  <button
-                    type="button"
-                    disabled={isPending}
-                    onClick={() => handleToggleLock([ind.id], !isVerifiedDokumen)}
-                    className={isVerifiedDokumen ? "btn-purple text-xs" : "btn-secondary text-xs"}
-                  >
-                    {isVerifiedDokumen
-                      ? "🔒 Dokumen Terkunci (Buka Kunci)"
-                      : "🔒 Kunci Upload Dosen"}
-                  </button>
-                )}
-                {buka && mode === "lapangan" && (
-                  <button
-                    type="button"
-                    disabled={isPending}
-                    onClick={() => handleToggleLockLapangan([ind.id], !isVerifiedLapangan)}
-                    className={isVerifiedLapangan ? "btn-purple text-xs" : "btn-secondary text-xs"}
-                  >
-                    {isVerifiedLapangan
-                      ? "🔒 Lapangan Terkunci (Buka Kunci)"
-                      : "🔒 Kunci Lapangan"}
-                  </button>
-                )}
-                {buka && mode === "rtl" && (
-                  <button
-                    type="button"
-                    disabled={isPending}
-                    onClick={() => handleToggleLockRtl([ind.id], !isVerifiedRtl)}
-                    className={isVerifiedRtl ? "btn-purple text-xs" : "btn-secondary text-xs"}
-                  >
-                    {isVerifiedRtl ? "🔒 RTL Terkunci (Buka Kunci)" : "🔒 Kunci RTL"}
-                  </button>
-                )}
                 {isian?.linkDrive ? (
                   <a
                     href={isian.linkDrive}
@@ -1102,19 +1068,11 @@ export default function AuditorClient({
                         <button
                           type="submit"
                           disabled={isPending}
-                          className="btn-secondary shrink-0 text-xs"
+                          className="btn shrink-0 text-xs"
                         >
                           {isPending && (savingId === ind.id || savingId === "ALL")
                             ? "..."
-                            : "Simpan"}
-                        </button>
-                        <button
-                          type="button"
-                          disabled={isPending}
-                          onClick={() => handleSaveDokumen(ind.id, true)}
-                          className="btn shrink-0 text-xs"
-                        >
-                          🔒 Simpan &amp; Kunci Dokumen
+                            : "💾 Simpan"}
                         </button>
                       </div>
                     )}
@@ -1187,19 +1145,11 @@ export default function AuditorClient({
                           <button
                             type="submit"
                             disabled={isPending}
-                            className="btn-secondary shrink-0 text-xs"
+                            className="btn shrink-0 text-xs"
                           >
                             {isPending && (savingId === ind.id || savingId === "ALL")
                               ? "..."
-                              : "Simpan"}
-                          </button>
-                          <button
-                            type="button"
-                            disabled={isPending}
-                            onClick={() => handleSaveLapangan(ind.id, true)}
-                            className="btn-success shrink-0 text-xs"
-                          >
-                            🔒 Simpan &amp; Kunci Lapangan
+                              : "💾 Simpan"}
                           </button>
                         </div>
                       )}
@@ -1272,19 +1222,11 @@ export default function AuditorClient({
                         <button
                           type="submit"
                           disabled={isPending}
-                          className="btn-secondary shrink-0 text-xs"
+                          className="btn shrink-0 text-xs"
                         >
                           {isPending && (savingId === ind.id || savingId === "ALL")
                             ? "..."
-                            : "Simpan"}
-                        </button>
-                        <button
-                          type="button"
-                          disabled={isPending}
-                          onClick={() => handleSaveRtl(ind.id, true)}
-                          className="btn-success shrink-0 text-xs"
-                        >
-                          🔒 Simpan &amp; Kunci RTL
+                            : "💾 Simpan"}
                         </button>
                       </div>
                     )}
