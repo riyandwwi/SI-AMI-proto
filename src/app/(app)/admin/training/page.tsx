@@ -57,6 +57,18 @@ export default async function AdminTrainingPage({ searchParams }: { searchParams
           <Link href="/admin" className="btn-secondary text-xs">
             ← Kelola Akun Utama
           </Link>
+          <Link
+            href="/admin/training/leaderboard?mode=auditee"
+            className="btn-primary text-xs font-black"
+          >
+            🏆 Live Leaderboard Auditee
+          </Link>
+          <Link
+            href="/admin/training/leaderboard?mode=auditor"
+            className="btn-secondary border-2 border-[#581C87] bg-[#F3E8FF] text-xs font-black text-[#581C87] hover:bg-[#E9D5FF]"
+          >
+            🕵️ Leaderboard Auditor (Besok)
+          </Link>
           {trainingPeriodes.length > 0 && (
             <form action={sinkronkanIndikatorTraining}>
               <button className="btn-secondary text-xs">
