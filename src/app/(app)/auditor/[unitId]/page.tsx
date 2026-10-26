@@ -5,7 +5,6 @@ import { prisma } from "@/lib/prisma";
 import { cleanupExpiredSignatures } from "@/lib/ttd-cleanup";
 import { Badge, Empty, Flash, PageHeader, one, type SP } from "@/components/ui";
 import { SignaturePadCard } from "@/components/SignaturePadCard";
-import { TabelInstrumenDanRekap } from "@/components/TabelInstrumenDanRekap";
 import AuditorClient, { type AuditorIndikatorItem } from "./AuditorClient";
 
 export default async function AuditorUnitWorkspacePage({
@@ -181,22 +180,13 @@ export default async function AuditorUnitWorkspacePage({
       ) : clientItems.length === 0 ? (
         <Empty>Belum ada indikator.</Empty>
       ) : (
-        <>
-          <TabelInstrumenDanRekap
-            periodeId={periode.id}
-            periodeNama={periode.nama}
-            indikator={clientItems}
-            defaultTab="rekap"
-          />
-
-          <AuditorClient
-            periodeId={periode.id}
-            unitId={targetUnitId}
-            mode={mode}
-            buka={buka}
-            indikator={clientItems}
-          />
-        </>
+        <AuditorClient
+          periodeId={periode.id}
+          unitId={targetUnitId}
+          mode={mode}
+          buka={buka}
+          indikator={clientItems}
+        />
       )}
 
       {/* Panel Tanda Tangan Ketua Auditor */}

@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { sortPeriodesChronological } from "@/lib/periode";
 import { cleanupExpiredSignatures } from "@/lib/ttd-cleanup";
 import { Badge, Empty, Flash, PageHeader, one, type SP } from "@/components/ui";
+import { SignaturePadCard } from "@/components/SignaturePadCard";
 import AuditeeClient, { type AuditeeIndikatorItem } from "./AuditeeClient";
 
 export default async function AuditeePage({ searchParams }: { searchParams: SP }) {
@@ -163,16 +164,6 @@ export default async function AuditeePage({ searchParams }: { searchParams: SP }
                 ? "🟢 Sesi Aktif Terbuka"
                 : "🔒 Sesi Terkunci"}
           </Badge>
-          <Link
-            href={
-              isReadOnlyArchive
-                ? `/auditee/detail?arsipId=${periode.id}`
-                : "/auditee/detail"
-            }
-            className="btn text-xs"
-          >
-            📑 Detail Indikator, Rekap &amp; TTD
-          </Link>
           <a
             href={`/api/rekap-excel?periodeId=${periode.id}&print=1`}
             target="_blank"
@@ -180,6 +171,12 @@ export default async function AuditeePage({ searchParams }: { searchParams: SP }
             className="btn-secondary text-xs"
           >
             🖨️ Print Rekap
+          </a>
+          <a
+            href={`/api/rekap-excel?periodeId=${periode.id}`}
+            className="btn-secondary text-xs"
+          >
+            📥 Excel
           </a>
         </div>
       </PageHeader>
@@ -241,6 +238,31 @@ export default async function AuditeePage({ searchParams }: { searchParams: SP }
           indikator={clientItems}
         />
       )}
+
+      {/* Panel Status & Tanda Tangan Laporan Ketua Auditee */}
+      <SignaturePadCard
+        session={{
+          periodeId: periode.id,
+          periodeNama: periode.nama,
+          isTraining: periode.isTraining,
+          ketuaAuditeeId: periode.isTraining ? user.id : periode.ketuaAuditeeId,
+          ketuaAuditeeNama: periode.ketuaAuditeeNama ?? (periode.isTraining ? user.nama : null),
+          ketuaAuditeeNip: periode.ketuaAuditeeNip ?? (periode.isTraining ? user.nimNuptk : null),
+          hasTtdAuditee: Boolean(periode.ttdAuditee),
+          ttdAuditeePreview: periode.ttdAuditee,
+          ketuaAuditorId: periode.ketuaAuditorId,
+          ketuaAuditorNama: periode.ketuaAuditorNama,
+          ketuaAuditorNip: periode.ketuaAuditorNip,
+          hasTtdAuditor: Boolean(periode.ttdAuditor),
+          ttdAuditorPreview: periode.ttdAuditor,
+          kepalaLpmNama: periode.kepalaLpmNama ?? periode.disahkanOleh,
+          kepalaLpmNip: periode.kepalaLpmNip,
+          hasTtdLpm: Boolean(periode.ttdLpm),
+          ttdLpmPreview: periode.ttdLpm,
+        }}
+        currentUserId={user.id}
+        currentRole="AUDITEE"
+      />
     </>
   );
 }
