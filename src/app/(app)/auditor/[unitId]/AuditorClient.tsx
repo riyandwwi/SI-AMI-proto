@@ -751,7 +751,7 @@ export default function AuditorClient({
     const hasBukti = Boolean(ind.isian?.linkDrive?.trim());
     const sudahDicek = isItemCheckedInMode(ind.id);
 
-    if (statusFilter === "ADA_BUKTI" && !hasBukti) return false;
+    if (activeMode !== "lapangan" && statusFilter === "ADA_BUKTI" && !hasBukti) return false;
     if (statusFilter === "BELUM_VERIF" && sudahDicek) return false;
     if (statusFilter === "SUDAH_VERIF" && !sudahDicek) return false;
 
@@ -774,6 +774,9 @@ export default function AuditorClient({
 
   const switchMode = (nextMode: "dokumen" | "lapangan" | "rtl") => {
     setActiveMode(nextMode);
+    if (nextMode === "lapangan" && statusFilter === "ADA_BUKTI") {
+      setStatusFilter("ALL");
+    }
     if (typeof window !== "undefined") {
       const url = new URL(window.location.href);
       url.searchParams.set("mode", nextMode);
@@ -1065,13 +1068,15 @@ export default function AuditorClient({
               >
                 Semua ({totalTargetMode})
               </button>
-              <button
-                type="button"
-                onClick={() => setStatusFilter("ADA_BUKTI")}
-                className={statusFilter === "ADA_BUKTI" ? "btn px-2.5 py-1 text-xs" : "btn-secondary px-2.5 py-1 text-xs"}
-              >
-                📥 Ada Bukti Auditee ({totalAdaBuktiAuditee})
-              </button>
+              {activeMode !== "lapangan" && (
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter("ADA_BUKTI")}
+                  className={statusFilter === "ADA_BUKTI" ? "btn px-2.5 py-1 text-xs" : "btn-secondary px-2.5 py-1 text-xs"}
+                >
+                  📥 Ada Bukti Auditee ({totalAdaBuktiAuditee})
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setStatusFilter("BELUM_VERIF")}
@@ -1305,11 +1310,20 @@ export default function AuditorClient({
                   {/* MODE 2: AUDIT LAPANGAN & KLASIFIKASI TEMUAN */}
                   {activeMode === "lapangan" && (
                     <>
-                      <div className="rounded-2xl border border-black/15 bg-[#BAE6FD]/45 p-3.5 text-xs whitespace-pre-wrap">
-                        <strong className="font-black text-black">
-                          Catatan Dokumen ({STATUS_DOK_LABEL[sav.statusDokumen]}):
-                        </strong>{" "}
-                        {sav.catatanDokumen || cur.catatanDokumen || "—"}
+                      <div className="rounded-2xl border-2 border-[#0369A1] border-l-8 border-l-[#0284C7] bg-[#E0F2FE] p-4 space-y-1.5 text-base leading-relaxed text-[#0F172A] shadow-sm">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-black text-[#0C4A6E]">
+                            📝 Catatan Audit Dokumen &amp; Pertanyaan Lapangan:
+                          </span>
+                          <Badge tone="amber">{STATUS_DOK_LABEL[sav.statusDokumen]}</Badge>
+                        </div>
+                        <div className="whitespace-pre-line font-bold text-[#0F172A]">
+                          {sav.catatanDokumen?.trim() || cur.catatanDokumen?.trim() || (
+                            <em className="font-semibold text-[#64748B]">
+                              Tidak ada catatan tambahan dari Audit Dokumen
+                            </em>
+                          )}
+                        </div>
                       </div>
 
                       <form
@@ -1383,27 +1397,32 @@ export default function AuditorClient({
                   {/* MODE 3: VERIFIKASI TINDAK LANJUT (RTL) */}
                   {activeMode === "rtl" && (
                     <div className="space-y-3 pt-1">
-                      <div className="rounded-2xl border border-black/15 bg-[#FEF08A]/45 p-3.5 text-xs space-y-1">
+                      <div className="rounded-2xl border-2 border-[#B45309] border-l-8 border-l-[#D97706] bg-[#FEF3C7] p-4 space-y-1.5 text-base leading-relaxed text-[#0F172A] shadow-sm">
                         <div>
-                          <strong>Temuan:</strong>{" "}
-                          {KLASIFIKASI_LABEL[sav.klasifikasi]} —{" "}
-                          {sav.catatanLapangan || isian?.catatanLapangan || "—"}
+                          <strong className="font-black text-[#78350F]">🚨 Temuan Lapangan:</strong>{" "}
+                          <span className="font-bold">
+                            {KLASIFIKASI_LABEL[sav.klasifikasi]} —{" "}
+                            {sav.catatanLapangan || isian?.catatanLapangan || "—"}
+                          </span>
                         </div>
                         <div>
-                          <strong>Rekomendasi Auditor:</strong>{" "}
-                          {sav.rekomendasi || isian?.rekomendasi || "—"}
+                          <strong className="font-black text-[#78350F]">💡 Rekomendasi Auditor:</strong>{" "}
+                          <span className="font-semibold">
+                            {sav.rekomendasi || isian?.rekomendasi || "—"}
+                          </span>
                         </div>
-                        <div>
-                          <strong>RTL Auditee:</strong> {isian?.rtlRencana ?? "—"}
+                        <div className="border-t border-[#D97706]/40 pt-1.5">
+                          <strong className="font-black text-[#0F172A]">🛠️ RTL Auditee:</strong>{" "}
+                          <span className="font-bold">{isian?.rtlRencana ?? "—"}</span>
                         </div>
                         {isian?.rtlLinkBukti && (
-                          <div>
-                            <strong>Drive RTL:</strong>{" "}
+                          <div className="truncate text-sm">
+                            <strong className="font-black text-[#0F172A]">📂 Drive Bukti RTL:</strong>{" "}
                             <a
                               href={isian.rtlLinkBukti}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="font-mono text-blue-700 underline"
+                              className="font-mono font-bold text-[#1D4ED8] underline"
                             >
                               {isian.rtlLinkBukti}
                             </a>
