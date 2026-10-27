@@ -495,18 +495,9 @@ export default function AuditeeClient({
         </div>
       )}
 
-      {/* Floating Tombol Angka Indikator yang Diupload Akun Auditee Ini */}
+      {/* Floating Tombol berlabel Indikator yang Diupload Akun Auditee Ini */}
       {currentUserName && (
         <div className="fixed bottom-5 right-5 z-40 flex items-center gap-2">
-          {statusFilter === "DIUPLOAD_SAYA" && (
-            <button
-              type="button"
-              onClick={() => setStatusFilter("ALL")}
-              className="rounded-2xl border-2 border-black bg-[#FEF08A] px-3 py-1.5 text-xs font-black text-black shadow-[3px_3px_0px_#000]"
-            >
-              👤 Diupload {currentUserName} ({myUploadedCount}) ✕
-            </button>
-          )}
           <button
             type="button"
             onClick={() => {
@@ -514,596 +505,665 @@ export default function AuditeeClient({
               setStatusFilter(statusFilter === "DIUPLOAD_SAYA" ? "ALL" : "DIUPLOAD_SAYA");
             }}
             title={`Klik untuk melihat ${myUploadedCount} indikator yang diupload oleh ${currentUserName}`}
-            className={`flex h-13 min-w-13 items-center justify-center rounded-full border-2 border-black px-3 text-base font-black text-black shadow-[4px_4px_0px_#000] transition hover:-translate-y-0.5 ${
+            className={`flex items-center gap-2 rounded-full border-2 border-black px-4 py-2.5 text-xs font-black text-black shadow-[4px_4px_0px_#000] transition hover:-translate-y-0.5 ${
               statusFilter === "DIUPLOAD_SAYA" ? "bg-[#4ADE80] ring-4 ring-black/20" : "bg-[#FDE047]"
             }`}
           >
-            {myUploadedCount}
+            <span>👤 Diupload Saya: {myUploadedCount}</span>
+            {statusFilter === "DIUPLOAD_SAYA" && <span className="ml-0.5">✕</span>}
           </button>
         </div>
       )}
 
-      {/* Bar Progres Visual + Filter Standar SPMI + Filter Status + Search Cepat */}
-      <div className="card space-y-3 py-3.5 text-xs">
-        {/* 1. Progress Bar Visual Kesiapan Auditee & Verifikasi Auditor */}
-        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-          <div className="rounded-xl border-2 border-black bg-[#EDF2F7] p-2.5 space-y-1.5">
-            <div className="flex items-center justify-between font-black text-[#0F172A]">
-              <span>📊 Progres Bukti Auditee</span>
-              <span>
-                {totalTersimpan} / {indikator.length} Indikator ({persenTerisi}%)
-              </span>
+      {/* Layout 2 Kolom: Sidebar Kiri Sticky (Progres, Filter & Aksi) + Area Tengah/Kanan Full untuk Mengisi Indikator */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-12 lg:items-start">
+        {/* SIDEBAR KIRI STICKY */}
+        <aside className="space-y-3 lg:sticky lg:top-20 lg:col-span-4 xl:col-span-3">
+          {/* Card 1: Progres Kesiapan Bukti & Verifikasi */}
+          <div className="card space-y-2.5 p-3.5 text-xs">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-black uppercase text-[#0F172A]">📊 Progres Evaluasi Diri</span>
+              <Badge tone={buka ? "green" : "slate"}>
+                {buka ? "🟢 Sesi Terbuka" : "🔒 Sesi Ditutup"}
+              </Badge>
             </div>
-            <div className="h-3 w-full overflow-hidden rounded-full border border-black bg-[#CBD5E1]">
-              <div
-                className="h-full bg-[#22C55E] transition-all duration-300"
-                style={{ width: `${persenTerisi}%` }}
-              />
+
+            <div className="space-y-2">
+              <div className="rounded-xl border border-black bg-[#EDF2F7] p-2.5 space-y-1">
+                <div className="flex items-center justify-between text-[11px] font-black text-[#0F172A]">
+                  <span>📊 Bukti Auditee Terisi</span>
+                  <span>
+                    {totalTersimpan}/{indikator.length} ({persenTerisi}%)
+                  </span>
+                </div>
+                <div className="h-2.5 w-full overflow-hidden rounded-full border border-black bg-[#CBD5E1]">
+                  <div
+                    className="h-full bg-[#22C55E] transition-all duration-300"
+                    style={{ width: `${persenTerisi}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-black bg-[#EDF2F7] p-2.5 space-y-1">
+                <div className="flex items-center justify-between text-[11px] font-black text-[#0F172A]">
+                  <span>🕵️ Diverifikasi Auditor</span>
+                  <span>
+                    {totalLockedAuditor}/{indikator.length} ({persenAuditor}%)
+                  </span>
+                </div>
+                <div className="h-2.5 w-full overflow-hidden rounded-full border border-black bg-[#CBD5E1]">
+                  <div
+                    className="h-full bg-[#38BDF8] transition-all duration-300"
+                    style={{ width: `${persenAuditor}%` }}
+                  />
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="rounded-xl border-2 border-black bg-[#EDF2F7] p-2.5 space-y-1.5">
-            <div className="flex items-center justify-between font-black text-[#0F172A]">
-              <span>🕵️ Diverifikasi Auditor</span>
-              <span>
-                {totalLockedAuditor} / {indikator.length} Indikator ({persenAuditor}%)
-              </span>
+          {/* Card 2: Pencarian, Filter Standar SPMI, Status & Klasifikasi Temuan */}
+          <div className="card space-y-2.5 p-3.5 text-xs">
+            {/* Kotak Cari Kata Kunci */}
+            <div className="space-y-1">
+              <label htmlFor="auditee-search" className="text-[11px] font-black uppercase text-black">
+                🔍 Cari Kode / Indikator / Bukti
+              </label>
+              <div className="flex items-center gap-1.5">
+                <input
+                  id="auditee-search"
+                  type="search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Ketik nomor / kode / kata kunci..."
+                  className="w-full rounded-xl border-2 border-black bg-white px-2.5 py-1.5 text-xs font-semibold text-black"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="btn-secondary px-2 py-1 text-xs"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
             </div>
-            <div className="h-3 w-full overflow-hidden rounded-full border border-black bg-[#CBD5E1]">
-              <div
-                className="h-full bg-[#38BDF8] transition-all duration-300"
-                style={{ width: `${persenAuditor}%` }}
-              />
-            </div>
-          </div>
-        </div>
 
-        {/* 2. Dropdown Standar SPMI + Tombol Lompat ke Belum Diisi + Toggle Buka/Minimize */}
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-            <label htmlFor="select-standar-spmi" className="shrink-0 font-black uppercase text-black">
-              📂 Standar SPMI:
-            </label>
-            <select
-              id="select-standar-spmi"
-              value={standarFilter}
-              onChange={(e) => setStandarFilter(e.target.value)}
-              className="min-w-[240px] max-w-full flex-1 rounded-xl border-2 border-black bg-white px-3 py-1.5 text-xs font-black text-black sm:max-w-md"
-            >
-              <option value="ALL">
-                Semua Standar ({allGroups.length} Standar — {indikator.length} Indikator)
-              </option>
-              {allGroups.map((g, idx) => {
-                const savedInGroup = g.items.filter(({ item }) =>
-                  Boolean((savedValues[item.id]?.linkDrive ?? item.isian?.linkDrive ?? "").trim()),
-                ).length;
-                return (
-                  <option key={g.standar} value={g.standar}>
-                    {idx + 1}. {g.standar} (#{g.startIndex}–#{g.endIndex}) — {savedInGroup}/{g.items.length} Terisi
-                  </option>
-                );
-              })}
-            </select>
-            {standarFilter !== "ALL" && (
-              <button
-                type="button"
-                onClick={() => setStandarFilter("ALL")}
-                className="btn-secondary px-2.5 py-1 text-xs"
-                title="Tampilkan kembali semua standar"
+            {/* Dropdown Filter Standar SPMI */}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <label htmlFor="select-standar-spmi" className="text-[11px] font-black uppercase text-black">
+                  📂 Standar SPMI
+                </label>
+                {standarFilter !== "ALL" && (
+                  <button
+                    type="button"
+                    onClick={() => setStandarFilter("ALL")}
+                    className="text-[11px] font-black text-blue-700 underline"
+                  >
+                    Reset Semua
+                  </button>
+                )}
+              </div>
+              <select
+                id="select-standar-spmi"
+                value={standarFilter}
+                onChange={(e) => setStandarFilter(e.target.value)}
+                className="w-full rounded-xl border-2 border-black bg-white px-2.5 py-1.5 text-xs font-bold text-black"
               >
-                ✕ Semua
-              </button>
-            )}
-          </div>
+                <option value="ALL">
+                  Semua Standar ({allGroups.length} Standar — {indikator.length} Indikator)
+                </option>
+                {allGroups.map((g, idx) => {
+                  const savedInGroup = g.items.filter(({ item }) =>
+                    Boolean((savedValues[item.id]?.linkDrive ?? item.isian?.linkDrive ?? "").trim()),
+                  ).length;
+                  return (
+                    <option key={g.standar} value={g.standar}>
+                      {idx + 1}. {g.standar} (#{g.startIndex}–#{g.endIndex}) — {savedInGroup}/{g.items.length} Terisi
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
 
-          <div className="flex flex-wrap items-center gap-1.5">
-            {nextUnfinishedCandidateId && (
-              <button
-                type="button"
-                onClick={() => {
-                  if (standarFilter !== "ALL" || statusFilter === "SUDAH") {
-                    setStandarFilter("ALL");
-                    setStatusFilter("ALL");
-                  }
-                  scrollToAndExpandIndikator(nextUnfinishedCandidateId);
-                }}
-                className="btn px-3 py-1 text-xs"
-              >
-                ⏭️ Buka Belum Diisi Berikutnya
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => {
-                if (allVisibleExpanded) {
-                  minimizeAll();
-                } else {
-                  expandAllVisible(visibleFlatItems);
-                }
-              }}
-              className="btn-secondary px-3 py-1 text-xs"
-            >
-              {allVisibleExpanded ? "🔼 Minimize Semua" : "🔽 Buka Semua"}
-            </button>
-            {buka && (
-              <button
-                type="button"
-                disabled={isPending || dirtyIds.length === 0}
-                onClick={() => handleSaveIndikator(undefined)}
-                className="btn-success px-3 py-1 text-xs disabled:opacity-50"
-              >
-                {isPending && savingId === "ALL"
-                  ? "Menyimpan..."
-                  : dirtyIds.length > 0
-                    ? `💾 Simpan Semua (${dirtyIds.length})`
-                    : "💾 Simpan Semua"}
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* 3. Filter Klasifikasi Temuan + Kotak Cari Kata Kunci */}
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-black/15 pt-2.5">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="font-black uppercase text-black">🏷️ Klasifikasi Temuan:</span>
-            <button
-              type="button"
-              onClick={() => {
-                setStatusFilter("ALL");
-                setKlasifikasiFilter("ALL");
-              }}
-              className={
-                statusFilter === "ALL" && klasifikasiFilter === "ALL"
-                  ? "btn px-2.5 py-1 text-xs"
-                  : "btn-secondary px-2.5 py-1 text-xs"
-              }
-            >
-              Semua ({indikator.length})
-            </button>
-            {(
-              [
-                { key: "MELAMPAUI" as Klasifikasi, label: "🌟 Melampaui" },
-                { key: "MENCAPAI" as Klasifikasi, label: "✅ Mencapai" },
-                { key: "OBSERVASI" as Klasifikasi, label: "🔍 Observasi" },
-                { key: "KTS_MINOR" as Klasifikasi, label: "⚠️ KTS Minor" },
-                { key: "KTS_MAYOR" as Klasifikasi, label: "🚨 KTS Mayor" },
-              ]
-            ).map(({ key, label }) => {
-              const active = klasifikasiFilter === key;
-              const count = klasifikasiCounts[key];
-              return (
+            {/* Filter Status Pengisian */}
+            <div className="space-y-1.5 border-t border-black/15 pt-2">
+              <div className="text-[11px] font-black uppercase text-black">📌 Filter Status</div>
+              <div className="flex flex-wrap gap-1.5">
                 <button
-                  key={key}
                   type="button"
                   onClick={() => {
                     setStatusFilter("ALL");
-                    setKlasifikasiFilter(active ? "ALL" : key);
+                    setKlasifikasiFilter("ALL");
                   }}
                   className={
-                    active
-                      ? "btn px-2.5 py-1 text-xs"
-                      : "btn-secondary px-2.5 py-1 text-xs"
+                    statusFilter === "ALL" && klasifikasiFilter === "ALL"
+                      ? "btn px-2.5 py-1 text-[11px]"
+                      : "btn-secondary px-2.5 py-1 text-[11px]"
                   }
                 >
-                  {label} ({count})
+                  Semua ({indikator.length})
                 </button>
-              );
-            })}
-            {totalWajibRtl > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  setKlasifikasiFilter("ALL");
-                  setStatusFilter(statusFilter === "RTL" ? "ALL" : "RTL");
-                }}
-                className={statusFilter === "RTL" ? "btn px-2.5 py-1 text-xs" : "btn-secondary px-2.5 py-1 text-xs"}
-              >
-                🛠️ Wajib RTL ({totalWajibRtl})
-              </button>
-            )}
-          </div>
-
-          <div className="flex min-w-[220px] flex-1 items-center gap-1.5 sm:max-w-xs">
-            <input
-              type="search"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="🔍 Cari kode / indikator / bukti..."
-              className="w-full rounded-xl border-2 border-black bg-white px-3 py-1 text-xs font-bold text-black"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery("")}
-                className="btn-secondary px-2 py-1 text-xs"
-              >
-                ✕
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Tampilkan Hanya 1 Save Terakhir agar Ringkas & Tidak Merusak Tampilan */}
-        {latestSavedDisplay && (
-          <div className="flex flex-wrap items-center gap-2 border-t border-black/15 pt-2">
-            <span className="text-xs font-black uppercase text-[#0F172A]">🕒 Save Terakhir:</span>
-            <Badge tone="blue">
-              👤 {latestSavedDisplay.nama} — Indikator {latestSavedDisplay.kode}
-            </Badge>
-          </div>
-        )}
-      </div>
-
-      {visibleGroups.map((group) => {
-        const groupSavedCount = group.items.filter(({ item }) =>
-          Boolean((savedValues[item.id]?.linkDrive ?? item.isian?.linkDrive ?? "").trim()),
-        ).length;
-
-        return (
-          <div key={group.standar} className="space-y-2.5 pt-1">
-            {/* Kepala Kelompok Standar (Opsi 1: Soft Cool Slate) */}
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border-2 border-black bg-[#CBD5E1] px-4 py-2.5 shadow-[3px_3px_0px_#000]">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-sm font-black text-[#0F172A]">📂 {group.standar}</span>
-                <Badge tone="slate">
-                  Indikator #{group.startIndex} – #{group.endIndex}
-                </Badge>
-              </div>
-              <div className="flex flex-wrap items-center gap-1.5">
-                <Badge tone={groupSavedCount === group.items.length ? "green" : "blue"}>
-                  ✓ {groupSavedCount}/{group.items.length} Terisi
-                </Badge>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setKlasifikasiFilter("ALL");
+                    setStatusFilter(statusFilter === "BELUM" ? "ALL" : "BELUM");
+                  }}
+                  className={
+                    statusFilter === "BELUM"
+                      ? "btn px-2.5 py-1 text-[11px]"
+                      : "btn-secondary px-2.5 py-1 text-[11px]"
+                  }
+                >
+                  ⏳ Belum ({Math.max(0, indikator.length - totalTersimpan)})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setKlasifikasiFilter("ALL");
+                    setStatusFilter(statusFilter === "SUDAH" ? "ALL" : "SUDAH");
+                  }}
+                  className={
+                    statusFilter === "SUDAH"
+                      ? "btn px-2.5 py-1 text-[11px]"
+                      : "btn-secondary px-2.5 py-1 text-[11px]"
+                  }
+                >
+                  ✅ Terisi ({totalTersimpan})
+                </button>
+                {totalWajibRtl > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setKlasifikasiFilter("ALL");
+                      setStatusFilter(statusFilter === "RTL" ? "ALL" : "RTL");
+                    }}
+                    className={
+                      statusFilter === "RTL"
+                        ? "btn px-2.5 py-1 text-[11px]"
+                        : "btn-secondary px-2.5 py-1 text-[11px]"
+                    }
+                  >
+                    🛠️ Wajib RTL ({totalWajibRtl})
+                  </button>
+                )}
               </div>
             </div>
 
-            {group.filteredItems.map(({ item: ind, noUrut }) => {
-              const isian = ind.isian;
-              const cur = values[ind.id] ?? { klaim: "", linkDrive: "", rtlRencana: "", rtlLinkBukti: "" };
-              const sav = savedValues[ind.id] ?? { klaim: "", linkDrive: "", diisiOleh: null };
-              const dirty = isDirty(ind.id);
-              const hasSavedDrive = Boolean(sav.linkDrive.trim());
-              const lockedByAuditor = Boolean(isian?.terverifikasiAuditor || isian?.terverifikasiLapangan);
-              const lockedLapangan = Boolean(isian?.terverifikasiLapangan);
-              const canEdit = buka && !lockedByAuditor;
-              const perluRtl = isian?.klasifikasi && BUTUH_RTL.includes(isian.klasifikasi);
-              const namaPengisi = sav.diisiOleh ?? isian?.diisiOleh;
-              const isExpanded = Boolean(expandedIds[ind.id]);
-
-              // Opsi 1: Soft Cool Slate (#EDF2F7 / #E2E8F0) — Sejuk di mata, 0% silau putih/kuning, tulisan hitam arang 16px tajam
-              const cardStyle = dirty
-                ? "border-l-8 border-l-[#0F172A] bg-[#E2E8F0] text-[#0F172A] ring-2 ring-[#0F172A]"
-                : hasSavedDrive
-                  ? "border-l-8 border-l-[#0F172A] bg-[#EDF2F7] text-[#0F172A]"
-                  : "border-l-8 border-l-slate-500 bg-[#E6ECF2] text-[#0F172A]";
-
-              return (
-                <div
-                  key={ind.id}
-                  id={`auditee-ind-${ind.id}`}
-                  className={`rounded-2xl border-2 border-black px-5 shadow-[4px_4px_0px_#000000] transition ${cardStyle} ${
-                    isExpanded ? "space-y-3.5 py-4" : "py-3"
-                  }`}
-                >
-                  {/* Baris Header Indikator (Klik untuk Buka / Minimize) */}
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => toggleExpand(ind.id)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        toggleExpand(ind.id);
+            {/* Filter Klasifikasi Temuan */}
+            <div className="space-y-1.5 border-t border-black/15 pt-2">
+              <div className="text-[11px] font-black uppercase text-black">🏷️ Klasifikasi Temuan</div>
+              <div className="flex flex-wrap gap-1.5">
+                {(
+                  [
+                    { key: "MELAMPAUI" as Klasifikasi, label: "🌟 Melampaui" },
+                    { key: "MENCAPAI" as Klasifikasi, label: "✅ Mencapai" },
+                    { key: "OBSERVASI" as Klasifikasi, label: "🔍 Observasi" },
+                    { key: "KTS_MINOR" as Klasifikasi, label: "⚠️ KTS Minor" },
+                    { key: "KTS_MAYOR" as Klasifikasi, label: "🚨 KTS Mayor" },
+                  ]
+                ).map(({ key, label }) => {
+                  const active = klasifikasiFilter === key;
+                  const count = klasifikasiCounts[key];
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => {
+                        setStatusFilter("ALL");
+                        setKlasifikasiFilter(active ? "ALL" : key);
+                      }}
+                      className={
+                        active
+                          ? "btn px-2.5 py-1 text-[11px]"
+                          : "btn-secondary px-2.5 py-1 text-[11px]"
                       }
-                    }}
-                    className={`flex cursor-pointer select-none flex-wrap items-center justify-between gap-2 ${
-                      isExpanded ? "border-b-2 border-black/15 pb-3" : ""
-                    }`}
-                  >
-                    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                      <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border-2 border-black bg-[#CBD5E1] text-xs font-black text-[#0F172A]">
-                        {isExpanded ? "▼" : "▶"}
-                      </span>
-                      <Badge tone="purple">Indikator #{noUrut}</Badge>
-                      <code className="rounded-xl border border-black bg-[#BAE6FD] px-2.5 py-0.5 text-sm font-black text-[#0F172A]">
-                        {ind.kode}
-                      </code>
-                      {!isExpanded ? (
-                        <span className="line-clamp-1 max-w-2xl text-base font-bold text-[#0F172A]">
-                          {ind.pernyataan}
-                        </span>
-                      ) : (
-                        <span className="text-base font-black text-[#0F172A]">{ind.standar}</span>
-                      )}
-                    </div>
+                    >
+                      {label} ({count})
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
 
-                    {/* Tanda Status Visual (Sangat Jelas Saat Minimize Maupun Expand) */}
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      {dirty && <Badge tone="amber">📝 Belum Disimpan</Badge>}
+          {/* Card 3: Aksi Cepat & Save Terakhir */}
+          <div className="card space-y-2 p-3.5 text-xs">
+            <div className="text-[11px] font-black uppercase text-black">⚡ Aksi Cepat</div>
+            <div className="grid grid-cols-1 gap-1.5">
+              {nextUnfinishedCandidateId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (standarFilter !== "ALL" || statusFilter === "SUDAH") {
+                      setStandarFilter("ALL");
+                      setStatusFilter("ALL");
+                    }
+                    scrollToAndExpandIndikator(nextUnfinishedCandidateId);
+                  }}
+                  className="btn w-full justify-center py-1.5 text-xs"
+                >
+                  ⏭️ Buka Belum Diisi Berikutnya
+                </button>
+              )}
 
-                      {hasSavedDrive ? (
-                        <Badge tone="green">
-                          ✅ SUDAH DIISI{namaPengisi ? ` (${namaPengisi})` : ""}
-                        </Badge>
-                      ) : (
-                        <Badge tone="amber">⏳ BELUM DIISI</Badge>
-                      )}
+              <button
+                type="button"
+                onClick={() => {
+                  if (allVisibleExpanded) {
+                    minimizeAll();
+                  } else {
+                    expandAllVisible(visibleFlatItems);
+                  }
+                }}
+                className="btn-secondary w-full justify-center py-1.5 text-xs"
+              >
+                {allVisibleExpanded ? "🔼 Minimize Semua Kartu" : "🔽 Buka Semua Kartu"}
+              </button>
 
-                      {lockedByAuditor && (
-                        <Badge tone="purple">
-                          🔒 Dikunci Auditor{isian?.diperiksaOleh ? ` (${isian.diperiksaOleh})` : ""}
-                        </Badge>
-                      )}
+              {buka && (
+                <button
+                  type="button"
+                  disabled={isPending || dirtyIds.length === 0}
+                  onClick={() => handleSaveIndikator(undefined)}
+                  className="btn-success w-full justify-center py-1.5 text-xs disabled:opacity-50"
+                >
+                  {isPending && savingId === "ALL"
+                    ? "Menyimpan..."
+                    : dirtyIds.length > 0
+                      ? `💾 Simpan Semua (${dirtyIds.length})`
+                      : "💾 Simpan Semua"}
+                </button>
+              )}
+            </div>
 
-                      {lockedLapangan && (
-                        <Badge tone="purple">🔒 Lapangan Terverifikasi</Badge>
-                      )}
+            {latestSavedDisplay && (
+              <div className="flex flex-wrap items-center justify-between gap-1 border-t border-black/15 pt-2 text-[11px]">
+                <span className="font-bold text-slate-700">Save Terakhir:</span>
+                <Badge tone="blue">
+                  👤 {latestSavedDisplay.nama} ({latestSavedDisplay.kode})
+                </Badge>
+              </div>
+            )}
+          </div>
+        </aside>
 
-                      {isian?.klasifikasi && (
-                        <Badge
-                          tone={
-                            isian.klasifikasi === "MELAMPAUI" || isian.klasifikasi === "MENCAPAI"
-                              ? "green"
-                              : isian.klasifikasi === "OBSERVASI"
-                                ? "blue"
-                                : isian.klasifikasi === "KTS_MINOR"
-                                  ? "amber"
-                                  : "red"
-                          }
-                        >
-                          {KLASIFIKASI_LABEL[isian.klasifikasi]}
-                        </Badge>
-                      )}
+        {/* AREA TENGAH / KANAN FULL UNTUK MENGISI INDIKATOR */}
+        <div className="space-y-3 lg:col-span-8 xl:col-span-9">
+          {visibleGroups.map((group) => {
+            const groupSavedCount = group.items.filter(({ item }) =>
+              Boolean((savedValues[item.id]?.linkDrive ?? item.isian?.linkDrive ?? "").trim()),
+            ).length;
 
-                      {perluRtl && (
-                        <Badge tone={isian?.rtlStatus === "TERVERIFIKASI" ? "green" : "red"}>
-                          🛠️ RTL: {RTL_LABEL[isian!.rtlStatus]}
-                        </Badge>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleExpand(ind.id);
-                        }}
-                        className="rounded-xl border-2 border-black bg-white px-3 py-1 text-xs font-black text-black hover:bg-[#FEF08A]"
-                      >
-                        {isExpanded ? "▲ Minimize" : canEdit ? "▼ Buka & Isi" : "▼ Lihat"}
-                      </button>
-                    </div>
+            return (
+              <div key={group.standar} className="space-y-2.5">
+                {/* Kepala Kelompok Standar (Opsi 1: Soft Cool Slate) */}
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border-2 border-black bg-[#CBD5E1] px-4 py-2.5 shadow-[3px_3px_0px_#000]">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-black text-[#0F172A]">📂 {group.standar}</span>
+                    <Badge tone="slate">
+                      Indikator #{group.startIndex} – #{group.endIndex}
+                    </Badge>
                   </div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <Badge tone={groupSavedCount === group.items.length ? "green" : "blue"}>
+                      ✓ {groupSavedCount}/{group.items.length} Terisi
+                    </Badge>
+                  </div>
+                </div>
 
-                  {/* Isi Lengkap Indikator & Form Pengisian (Hanya tampil saat Expanded) */}
-                  {isExpanded && (
-                    <div className="space-y-3.5 pt-1">
-                      {ind.pernyataanStandar && (
-                        <div className="rounded-xl border border-black/25 bg-[#E2E8F0] px-4 py-3 text-base font-semibold leading-relaxed text-[#0F172A]">
-                          <strong className="font-black text-[#0F172A]">📜 Isi Pernyataan Standar:</strong>{" "}
-                          {ind.pernyataanStandar}
-                        </div>
-                      )}
+                {group.filteredItems.map(({ item: ind, noUrut }) => {
+                  const isian = ind.isian;
+                  const cur = values[ind.id] ?? { klaim: "", linkDrive: "", rtlPic: "", rtlRencana: "", rtlLinkBukti: "", rtlStatus: "PROSES" };
+                  const sav = savedValues[ind.id] ?? { klaim: "", linkDrive: "", diisiOleh: null };
+                  const dirty = isDirty(ind.id);
+                  const hasSavedDrive = Boolean(sav.linkDrive.trim());
+                  const lockedByAuditor = Boolean(isian?.terverifikasiAuditor || isian?.terverifikasiLapangan);
+                  const lockedLapangan = Boolean(isian?.terverifikasiLapangan);
+                  const canEdit = buka && !lockedByAuditor;
+                  const perluRtl = isian?.klasifikasi && BUTUH_RTL.includes(isian.klasifikasi);
+                  const namaPengisi = sav.diisiOleh ?? isian?.diisiOleh;
+                  const isExpanded = Boolean(expandedIds[ind.id]);
 
-                      {/* Kotak Gabungan Ter-Highlight: Indikator Kinerja + Dokumen Bukti + Form Evaluasi Diri & Link Drive */}
-                      <div className="rounded-2xl border-2 border-[#1E3A8A] border-l-8 border-l-[#1D4ED8] bg-[#DCE5EF] p-4 space-y-3 text-[#0F172A] shadow-sm">
-                        <div className="text-base font-bold leading-relaxed">
-                          <strong className="font-black text-[#0F172A]">🎯 Indikator Kinerja ({ind.kode}):</strong>{" "}
-                          {ind.pernyataan}
-                        </div>
+                  const cardStyle = dirty
+                    ? "border-l-8 border-l-[#0F172A] bg-[#E2E8F0] text-[#0F172A] ring-2 ring-[#0F172A]"
+                    : hasSavedDrive
+                      ? "border-l-8 border-l-[#0F172A] bg-[#EDF2F7] text-[#0F172A]"
+                      : "border-l-8 border-l-slate-500 bg-[#E6ECF2] text-[#0F172A]";
 
-                        {ind.buktiDiminta && (
-                          <div className="text-[15px] font-semibold leading-relaxed text-[#1E293B]">
-                            <strong className="font-black text-[#0F172A]">📋 Dokumen Bukti yang Diminta:</strong>{" "}
-                            {ind.buktiDiminta}
-                          </div>
-                        )}
-
-                        {/* Form Evaluasi Diri & Link Google Drive */}
-                        <form
-                          onSubmit={(e) => {
+                  return (
+                    <div
+                      key={ind.id}
+                      id={`auditee-ind-${ind.id}`}
+                      className={`rounded-2xl border-2 border-black px-5 shadow-[4px_4px_0px_#000000] transition ${cardStyle} ${
+                        isExpanded ? "space-y-3.5 py-4" : "py-3"
+                      }`}
+                    >
+                      {/* Baris Header Indikator (Klik untuk Buka / Minimize) */}
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => toggleExpand(ind.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
                             e.preventDefault();
-                            handleSaveIndikator(ind.id);
-                          }}
-                          className="grid grid-cols-1 gap-3.5 border-t-2 border-[#94A3B8] pt-3 md:grid-cols-2"
-                        >
-                          <div className="space-y-1.5">
-                            <label className="!text-sm !font-black !text-[#1E3A8A]">✍️ Evaluasi Diri Auditee</label>
-                            <textarea
-                              name="klaim"
-                              rows={3}
-                              required
-                              disabled={!canEdit}
-                              value={cur.klaim}
-                              onChange={(e) => updateField(ind.id, "klaim", e.target.value)}
-                              placeholder="Ketik evaluasi diri di sini..."
-                              className="w-full text-base font-semibold !border-2 !border-black !bg-[#F8FAFC] !text-[#0F172A] focus:!bg-white disabled:!bg-slate-200"
-                            />
-                          </div>
-                          <div className="space-y-1.5">
-                            <label className="!text-sm !font-black !text-[#1E3A8A]">📂 Link Google Drive Bukti</label>
-                            <div className="flex gap-2">
-                              <input
-                                name="linkDrive"
-                                type="url"
-                                required
-                                disabled={!canEdit}
-                                value={cur.linkDrive}
-                                onChange={(e) => updateField(ind.id, "linkDrive", e.target.value)}
-                                placeholder="https://drive.google.com/..."
-                                className="w-full font-mono text-sm font-bold !border-2 !border-black !bg-[#F8FAFC] !text-[#0F172A] focus:!bg-white disabled:!bg-slate-200"
-                              />
-                              {canEdit && (
-                                <button
-                                  type="submit"
-                                  disabled={isPending}
-                                  className="btn shrink-0 text-sm"
-                                >
-                                  {isPending && (savingId === ind.id || savingId === "ALL")
-                                    ? "..."
-                                    : "💾 Simpan"}
-                                </button>
-                              )}
-                            </div>
-                            {(sav.linkDrive || cur.linkDrive) && (
-                              <div className="pt-1 text-right text-sm">
-                                <a
-                                  href={cur.linkDrive || sav.linkDrive}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="font-black text-blue-700 underline hover:text-black"
-                                >
-                                  ↗ Buka Dokumen di Google Drive
-                                </a>
-                              </div>
-                            )}
-                          </div>
-                        </form>
+                            toggleExpand(ind.id);
+                          }
+                        }}
+                        className={`flex cursor-pointer select-none flex-wrap items-center justify-between gap-2 ${
+                          isExpanded ? "border-b-2 border-black/15 pb-3" : ""
+                        }`}
+                      >
+                        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                          <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border-2 border-black bg-[#CBD5E1] text-xs font-black text-[#0F172A]">
+                            {isExpanded ? "▼" : "▶"}
+                          </span>
+                          <Badge tone="purple">Indikator #{noUrut}</Badge>
+                          <code className="rounded-xl border border-black bg-[#BAE6FD] px-2.5 py-0.5 text-sm font-black text-[#0F172A]">
+                            {ind.kode}
+                          </code>
+                          {!isExpanded ? (
+                            <span className="line-clamp-1 max-w-xl text-base font-bold text-[#0F172A]">
+                              {ind.pernyataan}
+                            </span>
+                          ) : (
+                            <span className="text-base font-black text-[#0F172A]">{ind.standar}</span>
+                          )}
+                        </div>
+
+                        {/* Tanda Status Visual */}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {dirty && <Badge tone="amber">📝 Belum Disimpan</Badge>}
+
+                          {hasSavedDrive ? (
+                            <Badge tone="green">
+                              ✅ SUDAH DIISI{namaPengisi ? ` (${namaPengisi})` : ""}
+                            </Badge>
+                          ) : (
+                            <Badge tone="amber">⏳ BELUM DIISI</Badge>
+                          )}
+
+                          {lockedByAuditor && (
+                            <Badge tone="purple">
+                              🔒 Dikunci Auditor{isian?.diperiksaOleh ? ` (${isian.diperiksaOleh})` : ""}
+                            </Badge>
+                          )}
+
+                          {lockedLapangan && (
+                            <Badge tone="purple">🔒 Lapangan Terverifikasi</Badge>
+                          )}
+
+                          {isian?.klasifikasi && (
+                            <Badge
+                              tone={
+                                isian.klasifikasi === "MELAMPAUI" || isian.klasifikasi === "MENCAPAI"
+                                  ? "green"
+                                  : isian.klasifikasi === "OBSERVASI"
+                                    ? "blue"
+                                    : isian.klasifikasi === "KTS_MINOR"
+                                      ? "amber"
+                                      : "red"
+                              }
+                            >
+                              {KLASIFIKASI_LABEL[isian.klasifikasi]}
+                            </Badge>
+                          )}
+
+                          {perluRtl && (
+                            <Badge tone={isian?.rtlStatus === "TERVERIFIKASI" ? "green" : "red"}>
+                              🛠️ RTL: {RTL_LABEL[isian!.rtlStatus]}
+                            </Badge>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleExpand(ind.id);
+                            }}
+                            className="rounded-xl border-2 border-black bg-white px-3 py-1 text-xs font-black text-black hover:bg-[#FEF08A]"
+                          >
+                            {isExpanded ? "▲ Minimize" : canEdit ? "▼ Buka & Isi" : "▼ Lihat"}
+                          </button>
+                        </div>
                       </div>
 
-                      {/* Catatan Auditor (Jika sudah diperiksa) */}
-                      {(isian?.catatanDokumen || isian?.catatanLapangan || isian?.rekomendasi) && (
-                        <div className="space-y-1.5 rounded-2xl border-2 border-black bg-[#FAF7EE] p-4 text-sm font-semibold text-black">
-                          {isian.diperiksaOleh && (
-                            <div className="font-black text-black">🕵️ Diperiksa Auditor: {isian.diperiksaOleh}</div>
-                          )}
-                          {isian.catatanDokumen && (
-                            <div>
-                              <strong className="font-black text-black">
-                                Catatan Dokumen ({STATUS_DOK_LABEL[isian.statusDokumen]}):
-                              </strong>{" "}
-                              {isian.catatanDokumen}
+                      {/* Isi Lengkap Indikator & Form Pengisian (Hanya tampil saat Expanded) */}
+                      {isExpanded && (
+                        <div className="space-y-3.5 pt-1">
+                          {ind.pernyataanStandar && (
+                            <div className="rounded-xl border border-black/25 bg-[#E2E8F0] px-4 py-3 text-base font-semibold leading-relaxed text-[#0F172A]">
+                              <strong className="font-black text-[#0F172A]">📜 Isi Pernyataan Standar:</strong>{" "}
+                              {ind.pernyataanStandar}
                             </div>
                           )}
-                          {isian.catatanLapangan && (
-                            <div>
-                              <strong className="font-black text-black">Temuan Lapangan:</strong>{" "}
-                              {isian.catatanLapangan}
+
+                          {/* Kotak Gabungan Ter-Highlight: Indikator Kinerja + Dokumen Bukti + Form Evaluasi Diri & Link Drive */}
+                          <div className="rounded-2xl border-2 border-[#1E3A8A] border-l-8 border-l-[#1D4ED8] bg-[#DCE5EF] p-4 space-y-3 text-[#0F172A] shadow-sm">
+                            <div className="text-base font-bold leading-relaxed">
+                              <strong className="font-black text-[#0F172A]">🎯 Indikator Kinerja ({ind.kode}):</strong>{" "}
+                              {ind.pernyataan}
+                            </div>
+
+                            {ind.buktiDiminta && (
+                              <div className="text-[15px] font-semibold leading-relaxed text-[#1E293B]">
+                                <strong className="font-black text-[#0F172A]">📋 Dokumen Bukti yang Diminta:</strong>{" "}
+                                {ind.buktiDiminta}
+                              </div>
+                            )}
+
+                            {/* Form Evaluasi Diri & Link Google Drive */}
+                            <form
+                              onSubmit={(e) => {
+                                e.preventDefault();
+                                handleSaveIndikator(ind.id);
+                              }}
+                              className="grid grid-cols-1 gap-3.5 border-t-2 border-[#94A3B8] pt-3 md:grid-cols-2"
+                            >
+                              <div className="space-y-1.5">
+                                <label className="!text-sm !font-black !text-[#1E3A8A]">✍️ Evaluasi Diri Auditee</label>
+                                <textarea
+                                  name="klaim"
+                                  rows={3}
+                                  required
+                                  disabled={!canEdit}
+                                  value={cur.klaim}
+                                  onChange={(e) => updateField(ind.id, "klaim", e.target.value)}
+                                  placeholder="Ketik evaluasi diri di sini..."
+                                  className="w-full text-base font-semibold !border-2 !border-black !bg-[#F8FAFC] !text-[#0F172A] focus:!bg-white disabled:!bg-slate-200"
+                                />
+                              </div>
+                              <div className="space-y-1.5">
+                                <label className="!text-sm !font-black !text-[#1E3A8A]">📂 Link Google Drive Bukti</label>
+                                <div className="flex gap-2">
+                                  <input
+                                    name="linkDrive"
+                                    type="url"
+                                    required
+                                    disabled={!canEdit}
+                                    value={cur.linkDrive}
+                                    onChange={(e) => updateField(ind.id, "linkDrive", e.target.value)}
+                                    placeholder="https://drive.google.com/..."
+                                    className="w-full font-mono text-sm font-bold !border-2 !border-black !bg-[#F8FAFC] !text-[#0F172A] focus:!bg-white disabled:!bg-slate-200"
+                                  />
+                                  {canEdit && (
+                                    <button
+                                      type="submit"
+                                      disabled={isPending}
+                                      className="btn shrink-0 text-sm"
+                                    >
+                                      {isPending && (savingId === ind.id || savingId === "ALL")
+                                        ? "..."
+                                        : "💾 Simpan"}
+                                    </button>
+                                  )}
+                                </div>
+                                {(sav.linkDrive || cur.linkDrive) && (
+                                  <div className="pt-1 text-right text-sm">
+                                    <a
+                                      href={cur.linkDrive || sav.linkDrive}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="font-black text-blue-700 underline hover:text-black"
+                                    >
+                                      ↗ Buka Dokumen di Google Drive
+                                    </a>
+                                  </div>
+                                )}
+                              </div>
+                            </form>
+                          </div>
+
+                          {/* Catatan Auditor (Jika sudah diperiksa) */}
+                          {(isian?.catatanDokumen || isian?.catatanLapangan || isian?.rekomendasi) && (
+                            <div className="space-y-1.5 rounded-2xl border-2 border-black bg-[#FAF7EE] p-4 text-sm font-semibold text-black">
+                              {isian.diperiksaOleh && (
+                                <div className="font-black text-black">🕵️ Diperiksa Auditor: {isian.diperiksaOleh}</div>
+                              )}
+                              {isian.catatanDokumen && (
+                                <div>
+                                  <strong className="font-black text-black">
+                                    Catatan Dokumen ({STATUS_DOK_LABEL[isian.statusDokumen]}):
+                                  </strong>{" "}
+                                  {isian.catatanDokumen}
+                                </div>
+                              )}
+                              {isian.catatanLapangan && (
+                                <div>
+                                  <strong className="font-black text-black">Temuan Lapangan:</strong>{" "}
+                                  {isian.catatanLapangan}
+                                </div>
+                              )}
+                              {isian.rekomendasi && (
+                                <div>
+                                  <strong className="font-black text-black">Rekomendasi:</strong>{" "}
+                                  {isian.rekomendasi}
+                                </div>
+                              )}
                             </div>
                           )}
-                          {isian.rekomendasi && (
-                            <div>
-                              <strong className="font-black text-black">Rekomendasi:</strong>{" "}
-                              {isian.rekomendasi}
-                            </div>
+
+                          {/* Form Rencana Tindak Lanjut (RTL) jika terdapat temuan OB / KTS — Diperluas menjadi 2 kolom lega dengan textarea */}
+                          {isian && perluRtl && (
+                            <form
+                              onSubmit={(e) => {
+                                e.preventDefault();
+                                handleSaveRtl(ind.id, isian.id);
+                              }}
+                              className="space-y-3 rounded-2xl border-2 border-black bg-[#FEF9C3] p-4"
+                            >
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <span className="text-sm font-black text-black">
+                                  🛠️ Tindak Lanjut Perbaikan (RTL) — {KLASIFIKASI_LABEL[isian.klasifikasi!]}
+                                </span>
+                                <Badge tone={isian.rtlStatus === "TERVERIFIKASI" ? "green" : isian.rtlStatus === "SELESAI_AUDITEE" ? "blue" : "amber"}>
+                                  {RTL_LABEL[isian.rtlStatus]}
+                                </Badge>
+                              </div>
+
+                              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                <div className="space-y-1">
+                                  <label className="!text-sm !font-black !text-black">
+                                    👤 PIC Tindak Perbaikan
+                                  </label>
+                                  <input
+                                    name="rtlPic"
+                                    required
+                                    disabled={!buka || isian.rtlStatus === "TERVERIFIKASI"}
+                                    value={cur.rtlPic}
+                                    onChange={(e) => updateField(ind.id, "rtlPic", e.target.value)}
+                                    placeholder="Misal: Rektor / Dekan / Kaprodi..."
+                                    className="w-full text-sm font-bold !border-2 !border-black !bg-white !text-black"
+                                  />
+                                </div>
+
+                                <div className="space-y-1">
+                                  <label className="!text-sm !font-black !text-black">
+                                    📂 Link Drive Bukti RTL
+                                  </label>
+                                  <input
+                                    name="rtlLinkBukti"
+                                    type="url"
+                                    disabled={!buka || isian.rtlStatus === "TERVERIFIKASI"}
+                                    value={cur.rtlLinkBukti}
+                                    onChange={(e) => updateField(ind.id, "rtlLinkBukti", e.target.value)}
+                                    placeholder="https://drive.google.com/... (opsional)"
+                                    className="w-full font-mono text-sm !border-2 !border-black !bg-white !text-black"
+                                  />
+                                </div>
+
+                                <div className="space-y-1">
+                                  <label className="!text-sm !font-black !text-black">
+                                    🛠️ Tindakan Perbaikan
+                                  </label>
+                                  <textarea
+                                    name="rtlRencana"
+                                    rows={2}
+                                    disabled={!buka || isian.rtlStatus === "TERVERIFIKASI"}
+                                    value={cur.rtlRencana}
+                                    onChange={(e) => updateField(ind.id, "rtlRencana", e.target.value)}
+                                    placeholder="Uraikan tindakan perbaikan yang dilakukan..."
+                                    className="w-full text-sm !border-2 !border-black !bg-white !text-black"
+                                  />
+                                </div>
+
+                                <div className="space-y-1">
+                                  <label className="!text-sm !font-black !text-black">
+                                    📌 Status Perbaikan
+                                  </label>
+                                  <div className="flex gap-2">
+                                    <select
+                                      name="rtlStatus"
+                                      disabled={!buka || isian.rtlStatus === "TERVERIFIKASI"}
+                                      value={cur.rtlStatus}
+                                      onChange={(e) =>
+                                        updateField(
+                                          ind.id,
+                                          "rtlStatus",
+                                          e.target.value === "SELESAI_AUDITEE"
+                                            ? "SELESAI_AUDITEE"
+                                            : "PROSES"
+                                        )
+                                      }
+                                      className="w-full text-sm font-bold !border-2 !border-black !bg-white !text-black"
+                                    >
+                                      <option value="PROSES">⏳ Menunggu Perbaikan</option>
+                                      <option value="SELESAI_AUDITEE">✅ Selesai</option>
+                                    </select>
+
+                                    {buka && isian.rtlStatus !== "TERVERIFIKASI" && (
+                                      <button
+                                        type="submit"
+                                        disabled={isPending}
+                                        className="btn shrink-0 text-xs"
+                                      >
+                                        {isPending && savingId === `RTL_${ind.id}` ? "..." : "💾 Simpan"}
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {isian.rtlCatatanAuditor && (
+                                <div className="text-sm font-semibold text-black">
+                                  <strong className="font-black text-black">Catatan RTL Auditor:</strong>{" "}
+                                  {isian.rtlCatatanAuditor}
+                                </div>
+                              )}
+                            </form>
                           )}
                         </div>
                       )}
-
-                      {/* Form Rencana Tindak Lanjut (RTL) jika terdapat temuan OB / KTS */}
-                      {isian && perluRtl && (
-                        <form
-                          onSubmit={(e) => {
-                            e.preventDefault();
-                            handleSaveRtl(ind.id, isian.id);
-                          }}
-                          className="space-y-3 rounded-2xl border-2 border-black bg-[#FEF9C3] p-4"
-                        >
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <span className="text-sm font-black text-black">
-                              🛠️ Tindak Lanjut Perbaikan (RTL) — {KLASIFIKASI_LABEL[isian.klasifikasi!]}
-                            </span>
-                            <Badge tone={isian.rtlStatus === "TERVERIFIKASI" ? "green" : isian.rtlStatus === "SELESAI_AUDITEE" ? "blue" : "amber"}>
-                              {RTL_LABEL[isian.rtlStatus]}
-                            </Badge>
-                          </div>
-
-                          <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-                            <div className="space-y-1">
-                              <label className="!text-sm !font-black !text-black">
-                                👤 PIC Tindak Perbaikan
-                              </label>
-                              <input
-                                name="rtlPic"
-                                required
-                                disabled={!buka || isian.rtlStatus === "TERVERIFIKASI"}
-                                value={cur.rtlPic}
-                                onChange={(e) => updateField(ind.id, "rtlPic", e.target.value)}
-                                placeholder="Misal: Rektor / Dekan / Kaprodi..."
-                                className="w-full text-sm font-bold !border-2 !border-black !bg-white !text-black"
-                              />
-                            </div>
-
-                            <div className="space-y-1">
-                              <label className="!text-sm !font-black !text-black">
-                                🛠️ Tindakan Perbaikan
-                              </label>
-                              <input
-                                name="rtlRencana"
-                                disabled={!buka || isian.rtlStatus === "TERVERIFIKASI"}
-                                value={cur.rtlRencana}
-                                onChange={(e) => updateField(ind.id, "rtlRencana", e.target.value)}
-                                placeholder="Isi tindakan (boleh kosong jika menunggu)..."
-                                className="w-full text-sm !border-2 !border-black !bg-white !text-black"
-                              />
-                            </div>
-
-                            <div className="space-y-1">
-                              <label className="!text-sm !font-black !text-black">
-                                📂 Link Drive Bukti RTL
-                              </label>
-                              <input
-                                name="rtlLinkBukti"
-                                type="url"
-                                disabled={!buka || isian.rtlStatus === "TERVERIFIKASI"}
-                                value={cur.rtlLinkBukti}
-                                onChange={(e) => updateField(ind.id, "rtlLinkBukti", e.target.value)}
-                                placeholder="https://drive.google.com/... (opsional)"
-                                className="w-full font-mono text-sm !border-2 !border-black !bg-white !text-black"
-                              />
-                            </div>
-
-                            <div className="space-y-1">
-                              <label className="!text-sm !font-black !text-black">
-                                📌 Status Perbaikan
-                              </label>
-                              <div className="flex gap-2">
-                                <select
-                                  name="rtlStatus"
-                                  disabled={!buka || isian.rtlStatus === "TERVERIFIKASI"}
-                                  value={cur.rtlStatus}
-                                  onChange={(e) =>
-                                    updateField(
-                                      ind.id,
-                                      "rtlStatus",
-                                      e.target.value === "SELESAI_AUDITEE"
-                                        ? "SELESAI_AUDITEE"
-                                        : "PROSES"
-                                    )
-                                  }
-                                  className="w-full text-sm font-bold !border-2 !border-black !bg-white !text-black"
-                                >
-                                  <option value="PROSES">⏳ Menunggu Perbaikan</option>
-                                  <option value="SELESAI_AUDITEE">✅ Selesai</option>
-                                </select>
-
-                                {buka && isian.rtlStatus !== "TERVERIFIKASI" && (
-                                  <button
-                                    type="submit"
-                                    disabled={isPending}
-                                    className="btn shrink-0 text-xs"
-                                  >
-                                    {isPending && savingId === `RTL_${ind.id}` ? "..." : "💾 Simpan"}
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-
-                          {isian.rtlCatatanAuditor && (
-                            <div className="text-sm font-semibold text-black">
-                              <strong className="font-black text-black">Catatan RTL Auditor:</strong>{" "}
-                              {isian.rtlCatatanAuditor}
-                            </div>
-                          )}
-                        </form>
-                      )}
                     </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        );
-      })}
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }

@@ -27,6 +27,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const navItems = [...NAV[user.role]];
 
+  const auditorBaseHref = user.trainingPeriodeId
+    ? `/auditor/${user.trainingPeriodeId}`
+    : "/auditor";
+
   const shortcuts =
     user.role === "LPM"
       ? [
@@ -38,9 +42,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       : user.role === "AUDITOR"
         ? [
             { href: "/auditor", label: "Sesi Audit", icon: "🏛️", bg: "bg-[#E9D5FF]" },
-            { href: "/auditor", label: "Dokumen", icon: "📂", bg: "bg-[#FEF08A]" },
-            { href: "/auditor", label: "Lapangan", icon: "🔍", bg: "bg-[#D9F99D]" },
-            { href: "/auditor", label: "Verifikasi", icon: "🔒", bg: "bg-[#BAE6FD]" },
+            { href: `${auditorBaseHref}?mode=dokumen`, label: "Dokumen", icon: "📂", bg: "bg-[#FEF08A]" },
+            { href: `${auditorBaseHref}?mode=lapangan`, label: "Lapangan", icon: "🔍", bg: "bg-[#D9F99D]" },
+            { href: `${auditorBaseHref}?mode=rtl`, label: "Verifikasi RTL", icon: "🔒", bg: "bg-[#BAE6FD]" },
           ]
         : user.role === "AUDITEE"
           ? [
@@ -59,18 +63,21 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-screen bg-[#DCE3EC] text-[#0F172A]">
       <header className="sticky top-0 z-30 border-b-2 border-black bg-[#DCE3EC]/95 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3">
+        <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-3 px-4 py-2.5">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl border-2 border-black bg-[#FF5C38] text-sm font-black text-white shadow-[2.5px_2.5px_0px_#000000]">
+            <div className="flex h-9 w-9 items-center justify-center rounded-2xl border-2 border-black bg-[#FF5C38] text-xs font-black text-white shadow-[2.5px_2.5px_0px_#000000]">
               AMI
             </div>
-            <div className="text-lg font-black tracking-tight text-black">SI-AMI ITBMP</div>
+            <div className="text-base font-black tracking-tight text-black">SI-AMI ITBMP</div>
             <LiveSync />
+            <div className="hidden md:block pl-2">
+              <NavLinks items={navItems} />
+            </div>
           </div>
 
           <div className="flex items-center gap-2.5 text-sm">
             <div className="text-right">
-              <div className="font-extrabold text-black">
+              <div className="font-bold text-black">
                 {user.nama}
               </div>
               <div className="flex items-center justify-end gap-1.5 pt-0.5 text-xs">
@@ -96,34 +103,33 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </div>
         </div>
 
-        <div className="mx-auto max-w-7xl px-4 pb-2.5">
+        <div className="mx-auto max-w-[1440px] px-4 pb-2 md:hidden">
           <NavLinks items={navItems} />
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl space-y-6 px-4 py-6">
-        <section className="space-y-3">
-          <h2 className="text-2xl font-black tracking-tight text-black sm:text-3xl">
-            Welcome Back, {firstName}!
-          </h2>
-
-          <div className="flex flex-wrap items-center gap-4 sm:gap-6">
+      <main className="mx-auto max-w-[1440px] space-y-4 px-4 py-4">
+        <section className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-4 sm:gap-5">
             {shortcuts.map((sc, idx) => (
               <Link
                 key={idx}
                 href={sc.href}
-                className="group flex flex-col items-center gap-1.5"
+                className="group flex flex-col items-center gap-1"
               >
                 <div
-                  className={`flex h-14 w-14 items-center justify-center rounded-full border-2 border-black text-xl shadow-[3px_3px_0px_#000000] transition-all group-hover:-translate-x-0.5 group-hover:-translate-y-0.5 group-hover:shadow-[5px_5px_0px_#000000] group-active:translate-x-0.5 group-active:translate-y-0.5 group-active:shadow-[1px_1px_0px_#000000] ${sc.bg}`}
+                  className={`flex h-12 w-12 items-center justify-center rounded-full border-2 border-black text-lg shadow-[3px_3px_0px_#000000] transition-all group-hover:-translate-x-0.5 group-hover:-translate-y-0.5 group-hover:shadow-[4.5px_4.5px_0px_#000000] group-active:translate-x-0.5 group-active:translate-y-0.5 group-active:shadow-[1px_1px_0px_#000000] ${sc.bg}`}
                 >
                   {sc.icon}
                 </div>
-                <span className="text-xs font-black text-black group-hover:underline">
+                <span className="text-xs font-extrabold text-black group-hover:underline">
                   {sc.label}
                 </span>
               </Link>
             ))}
+          </div>
+          <div className="text-sm font-bold text-slate-700">
+            Halo, <span className="font-black text-black">{firstName}</span>
           </div>
         </section>
 
