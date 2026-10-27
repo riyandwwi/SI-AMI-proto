@@ -185,45 +185,59 @@ export async function simpanBatchAuditLapangan(
 
 export async function simpanBatchVerifikasiRtl(
   periodeId: string,
+  unitId: string,
   items: Array<{
     indikatorId: string;
-    isianId: string;
+    isianId?: string;
     rtlStatus: StatusRtl;
     rtlCatatanAuditor: string;
   }>
 ): Promise<AuditorActionResult> {
   const user = await requireUser("AUDITOR");
-  if (!periodeId || !items.length) {
+  if (!periodeId || !unitId || !items.length) {
     return { ok: false, error: "Data tidak lengkap." };
   }
+
+  const indikatorList = await prisma.indikator.findMany({
+    where: { id: { in: items.map((i) => i.indikatorId) } },
+    include: { periode: true },
+  });
+  if (indikatorList.length === 0) {
+    return { ok: false, error: "Indikator tidak ditemukan." };
+  }
+  if (indikatorList.some((ind) => !ind.periode.aktif)) {
+    return { ok: false, error: "Sesi AMI sedang dikunci oleh LPM." };
+  }
+  const indMap = new Map(indikatorList.map((ind) => [ind.id, ind]));
 
   const savedIds: string[] = [];
   const savedCodes: string[] = [];
 
   for (const item of items) {
-    const isian = await prisma.isian.findUnique({
-      where: { id: item.isianId },
-      include: { indikator: { include: { periode: true } } },
-    });
-    if (!isian) continue;
-    if (!isian.indikator.periode.aktif) {
-      return { ok: false, error: "Sesi AMI sedang dikunci oleh LPM." };
-    }
+    const ind = indMap.get(item.indikatorId);
+    if (!ind) continue;
 
     const rtlStatus = VALID_RTL.includes(item.rtlStatus) ? item.rtlStatus : "PROSES";
     const rtlCatatanAuditor = item.rtlCatatanAuditor.trim().slice(0, 4000) || null;
 
-    await prisma.isian.update({
-      where: { id: isian.id },
-      data: {
+    await prisma.isian.upsert({
+      where: { indikatorId_unitId: { indikatorId: ind.id, unitId } },
+      create: {
+        indikatorId: ind.id,
+        unitId,
+        rtlStatus,
+        rtlCatatanAuditor,
+        diperiksaOleh: user.nama,
+      },
+      update: {
         rtlStatus,
         rtlCatatanAuditor,
         diperiksaOleh: user.nama,
       },
     });
 
-    savedIds.push(item.indikatorId);
-    savedCodes.push(isian.indikator.kode);
+    savedIds.push(ind.id);
+    savedCodes.push(ind.kode);
   }
 
   await catat(user.id, "VERIFIKASI_RTL", `${user.nama}: ${savedCodes.join(", ")}`);
@@ -459,13 +473,15 @@ export async function simpanAuditLapangan(fd: FormData) {
 
 export async function verifikasiRtlAuditor(fd: FormData) {
   const periodeId = str(fd, "periodeId", 64);
+  const unitId = str(fd, "unitId", 64);
+  const indikatorId = str(fd, "indikatorId", 64);
   const isianId = str(fd, "isianId", 64);
   const rtlStatus = str(fd, "rtlStatus", 32) as StatusRtl;
   const rtlCatatanAuditor = str(fd, "rtlCatatanAuditor", 4000);
-  const path = `/auditor/${periodeId}?mode=rtl`;
+  const path = `/auditor/${unitId}?periodeId=${periodeId}&mode=rtl`;
 
-  const res = await simpanBatchVerifikasiRtl(periodeId, [
-    { indikatorId: "", isianId, rtlStatus, rtlCatatanAuditor },
+  const res = await simpanBatchVerifikasiRtl(periodeId, unitId, [
+    { indikatorId, isianId, rtlStatus, rtlCatatanAuditor },
   ]);
   if (!res.ok) fail(path, res.error ?? "Gagal menyimpan.");
   ok(path, res.message ?? "Berhasil disimpan.");

@@ -125,46 +125,6 @@ export default async function AuditorUnitWorkspacePage({
       </PageHeader>
       <Flash ok={one(sp.ok)} err={one(sp.err)} />
 
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-black pb-3">
-        <div className="flex flex-wrap gap-2">
-          <Link
-            href={`/auditor/${periode.id}?mode=dokumen`}
-            className={mode === "dokumen" ? "btn text-xs" : "btn-secondary text-xs"}
-          >
-            📄 1. Audit Dokumen
-          </Link>
-          <Link
-            href={`/auditor/${periode.id}?mode=lapangan`}
-            className={mode === "lapangan" ? "btn text-xs" : "btn-secondary text-xs"}
-          >
-            🏛️ 2. Audit Lapangan ({jmlFokusLapangan})
-          </Link>
-          <Link
-            href={`/auditor/${periode.id}?mode=rtl`}
-            className={mode === "rtl" ? "btn text-xs" : "btn-secondary text-xs"}
-          >
-            🛠️ 3. Verifikasi RTL
-          </Link>
-          <a
-            href={`/api/rekap-excel?periodeId=${periode.id}&print=1`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn-secondary text-xs"
-          >
-            🖨️ Print Rekap
-          </a>
-          <a
-            href={`/api/rekap-excel?periodeId=${periode.id}`}
-            className="btn-secondary text-xs"
-          >
-            📥 Excel
-          </a>
-        </div>
-        <Badge tone={buka ? "green" : "amber"}>
-          {buka ? "🟢 Sesi Terbuka" : "🔒 Sesi Terkunci"}
-        </Badge>
-      </div>
-
       {!periode.sourceLocked ? (
         <Empty>
           ⏳ Instrumen &amp; Indikator sedang disusun atau diedit oleh LPM. Indikator akan otomatis muncul di halaman Auditor setelah dikunci oleh LPM.
