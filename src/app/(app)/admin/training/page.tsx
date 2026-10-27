@@ -70,6 +70,14 @@ export default async function AdminTrainingPage({ searchParams }: { searchParams
             🕵️ Leaderboard Auditor (Besok)
           </Link>
           {trainingPeriodes.length > 0 && (
+            <a
+              href="/api/export-isian?training=all"
+              className="btn-success text-xs font-black"
+            >
+              📥 Download Excel Semua Kelompok ({trainingPeriodes.length})
+            </a>
+          )}
+          {trainingPeriodes.length > 0 && (
             <form action={sinkronkanIndikatorTraining}>
               <button className="btn-secondary text-xs">
                 🔄 Sinkronkan Indikator LPM ({masterIndikatorSet.size} Indikator)

@@ -145,6 +145,14 @@ export default function LeaderboardClient({
             >
               ← Kembali ke Sesi Training
             </Link>
+            {teams.length > 0 && (
+              <a
+                href="/api/export-isian?training=all"
+                className="rounded-xl border-2 border-[#065F46] bg-[#D1FAE5] px-4 py-2 text-sm font-black text-[#065F46] hover:bg-[#A7F3D0]"
+              >
+                📥 Excel Semua Kelompok
+              </a>
+            )}
             <button
               type="button"
               onClick={() => {
@@ -320,13 +328,19 @@ export default function LeaderboardClient({
                       </span>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-2.5">
                       {latestBy && (
                         <span className="rounded-lg border border-[#1E3A8A] bg-[#DBEAFE] px-3 py-1 text-xs font-bold text-[#1E3A8A]">
                           🕒 Save Terakhir: 👤 {latestBy}
                           {latestKode ? ` (${latestKode})` : ""}
                         </span>
                       )}
+                      <a
+                        href={`/api/export-isian?periodeId=${encodeURIComponent(team.periodeId)}`}
+                        className="rounded-xl border-2 border-[#065F46] bg-[#D1FAE5] px-3 py-1 text-xs font-black text-[#065F46] hover:bg-[#A7F3D0]"
+                      >
+                        📥 Excel Kelompok
+                      </a>
                       <span className="rounded-xl border-2 border-[#0F172A] bg-[#0F172A] px-3.5 py-1 text-lg font-black text-white">
                         {pct}% ({doneCount}/{team.totalIndikator})
                       </span>

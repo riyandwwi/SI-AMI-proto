@@ -202,10 +202,18 @@ export function KelompokTrainingBoard({
                     <Badge tone="purple">🕵️ {groupAuditors.length} Auditor</Badge>
                     <Badge tone="green">📝 {groupAuditees.length} Auditee</Badge>
                   </div>
-                  <form action={hapusSatuKelompokTraining}>
-                    <input type="hidden" name="periodeId" value={tp.id} />
-                    <button className="btn-danger text-xs">🗑️ Hapus Kelompok</button>
-                  </form>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <a
+                      href={`/api/export-isian?periodeId=${encodeURIComponent(tp.id)}`}
+                      className="btn-success text-xs"
+                    >
+                      📥 Download Excel Isian Kelompok
+                    </a>
+                    <form action={hapusSatuKelompokTraining}>
+                      <input type="hidden" name="periodeId" value={tp.id} />
+                      <button className="btn-danger text-xs">🗑️ Hapus Kelompok</button>
+                    </form>
+                  </div>
                 </div>
 
                 {/* 2 Kolom Drop Zone: SISI KIRI (AUDITOR) & SISI KANAN (AUDITEE) */}

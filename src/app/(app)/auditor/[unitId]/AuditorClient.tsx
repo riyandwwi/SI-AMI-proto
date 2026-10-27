@@ -340,15 +340,6 @@ export default function AuditorClient({
             return next;
           });
         }
-        if (targetIndikatorId) {
-          const idx = indikator.findIndex((i) => i.id === targetIndikatorId);
-          const nextItem = indikator.slice(idx + 1).find((i) => !verifiedMap[i.id] && i.id !== targetIndikatorId);
-          if (nextItem) {
-            setTimeout(() => {
-              document.getElementById(`auditor-ind-${nextItem.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
-            }, 100);
-          }
-        }
       }
       setNotice({ ok: res.message ?? "Tersimpan." });
       router.refresh();
@@ -391,15 +382,6 @@ export default function AuditorClient({
               for (const id of res.savedIds!) next[id] = true;
               return next;
             });
-          }
-        }
-        if (targetIndikatorId) {
-          const idx = indikator.findIndex((i) => i.id === targetIndikatorId);
-          const nextItem = indikator.slice(idx + 1).find((i) => !verifiedLapanganMap[i.id] && i.id !== targetIndikatorId);
-          if (nextItem) {
-            setTimeout(() => {
-              document.getElementById(`auditor-ind-${nextItem.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
-            }, 100);
           }
         }
       }
@@ -606,20 +588,52 @@ export default function AuditorClient({
 
   return (
     <div className="space-y-4">
-      {notice?.ok && (
-        <div className="rounded-2xl border-2 border-black bg-[#D9F99D] px-4 py-3 text-sm font-black text-black shadow-[4px_4px_0px_#000]">
-          ✓ {notice.ok}
-        </div>
-      )}
-      {notice?.err && (
-        <div className="rounded-2xl border-2 border-black bg-[#FECDD3] px-4 py-3 text-sm font-black text-black shadow-[4px_4px_0px_#000]">
-          ⚠️ {notice.err}
+      {/* Bar Melayang (Floating Bottom-Right) agar munculnya notifikasi / tombol Simpan Semua TIDAK menggeser posisi layar */}
+      {(notice?.ok || notice?.err || (buka && dirtyIds.length > 0)) && (
+        <div className="fixed bottom-4 right-4 z-50 flex max-w-md flex-col items-end gap-2">
+          {notice?.ok && (
+            <div className="rounded-2xl border-2 border-black bg-[#D9F99D] px-4 py-2.5 text-sm font-black text-black shadow-[4px_4px_0px_#000]">
+              ✓ {notice.ok}
+            </div>
+          )}
+          {notice?.err && (
+            <div className="rounded-2xl border-2 border-black bg-[#FECDD3] px-4 py-2.5 text-sm font-black text-black shadow-[4px_4px_0px_#000]">
+              ⚠️ {notice.err}
+            </div>
+          )}
+          {buka && dirtyIds.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-black bg-[#CBD5E1] px-4 py-2.5 text-xs shadow-[4px_4px_0px_#000]">
+              <div className="font-black text-[#0F172A]">
+                📝 {dirtyIds.length} indikator belum disimpan
+              </div>
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={() => {
+                  if (mode === "dokumen") handleSaveDokumen(undefined);
+                  else if (mode === "lapangan") handleSaveLapangan(undefined);
+                  else handleSaveRtl(undefined);
+                }}
+                className="btn text-xs"
+              >
+                {isPending && savingId === "ALL"
+                  ? "..."
+                  : `💾 Simpan Semua (${dirtyIds.length})`}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
       {/* Bar Verifikasi & Kunci Semua + Ringkasan 1 Save Terakhir */}
       <div className="card flex flex-wrap items-center justify-between gap-3 py-3">
         <div className="flex flex-wrap items-center gap-2 text-xs">
+          <a
+            href={`/api/export-isian?periodeId=${encodeURIComponent(periodeId)}&unitId=${encodeURIComponent(unitId)}`}
+            className="btn-success px-3 py-1 text-xs"
+          >
+            📥 Download Excel Isian
+          </a>
           {latestAuditeeSave && (
             <>
               <span className="font-black uppercase text-[#0F172A]">🕒 Save Terakhir Auditee:</span>
@@ -715,28 +729,6 @@ export default function AuditorClient({
           </div>
         )}
       </div>
-
-      {buka && dirtyIds.length > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-black bg-[#FEF08A] px-4 py-3 text-xs shadow-[4px_4px_0px_#000]">
-          <div className="font-black text-black">
-            📝 {dirtyIds.length} indikator belum disimpan
-          </div>
-          <button
-            type="button"
-            disabled={isPending}
-            onClick={() => {
-              if (mode === "dokumen") handleSaveDokumen(undefined);
-              else if (mode === "lapangan") handleSaveLapangan(undefined);
-              else handleSaveRtl(undefined);
-            }}
-            className="btn text-xs"
-          >
-            {isPending && savingId === "ALL"
-              ? "..."
-              : `💾 Simpan Semua (${dirtyIds.length})`}
-          </button>
-        </div>
-      )}
 
       {standarGroups.length > 0 && (
         <div className="card space-y-3 py-3.5 text-xs">

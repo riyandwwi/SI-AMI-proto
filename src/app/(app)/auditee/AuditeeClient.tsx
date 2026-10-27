@@ -200,23 +200,15 @@ export default function AuditeeClient({
 
   const dirtyIds = indikator.map((i) => i.id).filter(isDirty);
 
-  // Single-Expand pintar: membuka indikator yang diklik & menutup indikator lain yang tidak punya ketikan belum disimpan
+  // Toggle buka/tutup mandiri per kartu: TIDAK menutup kartu lain di atasnya agar layar tidak pernah loncat ke atas
   const toggleExpand = (indId: string) => {
     setExpandedIds((prev) => {
-      const willOpen = !prev[indId];
-      if (!willOpen) {
-        const next = { ...prev };
+      const next = { ...prev };
+      if (next[indId]) {
         delete next[indId];
-        return next;
+      } else {
+        next[indId] = true;
       }
-      const next: Record<string, boolean> = {};
-      // Pertahankan indikator lain yang sedang diketik (dirty) agar ketikan tidak tertutup tiba-tiba
-      for (const id of Object.keys(prev)) {
-        if (prev[id] && isDirty(id)) {
-          next[id] = true;
-        }
-      }
-      next[indId] = true;
       return next;
     });
   };
@@ -235,7 +227,7 @@ export default function AuditeeClient({
     setExpandedIds({});
   };
 
-  // Cari indikator berikutnya yang belum diisi link Drive-nya
+  // Cari indikator berikutnya yang belum diisi link Drive-nya (hanya untuk tombol manual "Lompat ke Belum Diisi")
   const findNextUnfinishedId = (
     afterId?: string,
     justSavedSet?: Set<string>
@@ -260,14 +252,10 @@ export default function AuditeeClient({
   };
 
   const scrollToAndExpandIndikator = (indId: string) => {
-    setExpandedIds((prev) => {
-      const next: Record<string, boolean> = {};
-      for (const id of Object.keys(prev)) {
-        if (prev[id] && isDirty(id)) next[id] = true;
-      }
-      next[indId] = true;
-      return next;
-    });
+    setExpandedIds((prev) => ({
+      ...prev,
+      [indId]: true,
+    }));
     setTimeout(() => {
       const el = document.getElementById(`auditee-ind-${indId}`);
       if (el) {
@@ -298,7 +286,6 @@ export default function AuditeeClient({
       }
 
       if (res.savedIds && res.savedIds.length > 0) {
-        const justSavedSet = new Set(res.savedIds);
         const lastSavedId = res.savedIds[res.savedIds.length - 1];
         const lastSavedInd = indikator.find((i) => i.id === lastSavedId);
         if (lastSavedInd && res.diisiOleh) {
@@ -315,31 +302,6 @@ export default function AuditeeClient({
           }
           return next;
         });
-
-        // Otomatis minimize indikator yang baru disimpan & langsung buka indikator belum diisi berikutnya!
-        const nextUnfinishedId = targetIndikatorId
-          ? findNextUnfinishedId(targetIndikatorId, justSavedSet)
-          : null;
-
-        setExpandedIds((prev) => {
-          const next = { ...prev };
-          for (const id of res.savedIds!) {
-            delete next[id];
-          }
-          if (nextUnfinishedId) {
-            next[nextUnfinishedId] = true;
-          }
-          return next;
-        });
-
-        if (nextUnfinishedId) {
-          setTimeout(() => {
-            const el = document.getElementById(`auditee-ind-${nextUnfinishedId}`);
-            if (el) {
-              el.scrollIntoView({ behavior: "smooth", block: "center" });
-            }
-          }, 100);
-        }
 
         try {
           const raw = localStorage.getItem(storageKey);
@@ -377,13 +339,6 @@ export default function AuditeeClient({
         setNotice({ err: res.error ?? "Gagal menyimpan RTL." });
         return;
       }
-
-      // Otomatis minimize setelah RTL tersimpan
-      setExpandedIds((prev) => {
-        const next = { ...prev };
-        delete next[indId];
-        return next;
-      });
 
       setNotice({ ok: res.message ?? "RTL disimpan." });
       router.refresh();
@@ -449,14 +404,34 @@ export default function AuditeeClient({
 
   return (
     <div className="space-y-4">
-      {notice?.ok && (
-        <div className="rounded-2xl border-2 border-black bg-[#D9F99D] px-4 py-3 text-sm font-black text-black shadow-[4px_4px_0px_#000]">
-          ✓ {notice.ok}
-        </div>
-      )}
-      {notice?.err && (
-        <div className="rounded-2xl border-2 border-black bg-[#FECDD3] px-4 py-3 text-sm font-black text-black shadow-[4px_4px_0px_#000]">
-          ⚠️ {notice.err}
+      {/* Bar Melayang (Floating Bottom-Right) agar munculnya notifikasi / tombol Simpan Semua TIDAK menggeser posisi layar */}
+      {(notice?.ok || notice?.err || (buka && dirtyIds.length > 0)) && (
+        <div className="fixed bottom-4 right-4 z-50 flex max-w-md flex-col items-end gap-2">
+          {notice?.ok && (
+            <div className="rounded-2xl border-2 border-black bg-[#D9F99D] px-4 py-2.5 text-sm font-black text-black shadow-[4px_4px_0px_#000]">
+              ✓ {notice.ok}
+            </div>
+          )}
+          {notice?.err && (
+            <div className="rounded-2xl border-2 border-black bg-[#FECDD3] px-4 py-2.5 text-sm font-black text-black shadow-[4px_4px_0px_#000]">
+              ⚠️ {notice.err}
+            </div>
+          )}
+          {buka && dirtyIds.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-black bg-[#CBD5E1] px-4 py-2.5 text-xs shadow-[4px_4px_0px_#000]">
+              <div className="font-black text-[#0F172A]">
+                📝 {dirtyIds.length} indikator belum disimpan
+              </div>
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={() => handleSaveIndikator(undefined)}
+                className="btn text-xs"
+              >
+                {isPending && savingId === "ALL" ? "Menyimpan..." : `💾 Simpan Semua (${dirtyIds.length})`}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -549,6 +524,12 @@ export default function AuditeeClient({
                 ⏭️ Buka Belum Diisi Berikutnya
               </button>
             )}
+            <a
+              href={`/api/export-isian?periodeId=${encodeURIComponent(periodeId)}&unitId=${encodeURIComponent(unitId)}`}
+              className="btn-success px-3 py-1 text-xs"
+            >
+              📥 Download Excel Isian
+            </a>
             <button
               type="button"
               onClick={() => {
@@ -631,22 +612,6 @@ export default function AuditeeClient({
           </div>
         )}
       </div>
-
-      {buka && dirtyIds.length > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-black bg-[#CBD5E1] px-4 py-3 text-xs shadow-[4px_4px_0px_#000]">
-          <div className="font-black text-[#0F172A]">
-            📝 {dirtyIds.length} indikator sedang diketik &amp; belum disimpan
-          </div>
-          <button
-            type="button"
-            disabled={isPending}
-            onClick={() => handleSaveIndikator(undefined)}
-            className="btn text-xs"
-          >
-            {isPending && savingId === "ALL" ? "Menyimpan..." : `💾 Simpan Semua (${dirtyIds.length})`}
-          </button>
-        </div>
-      )}
 
       {visibleGroups.map((group) => {
         const groupSavedCount = group.items.filter(({ item }) =>
