@@ -196,8 +196,6 @@ export default function AuditorClient({
     "ALL" | "ADA_BUKTI" | "BELUM_VERIF" | "SUDAH_VERIF" | "DICEK_SAYA"
   >("ALL");
   const [klasifikasiFilter, setKlasifikasiFilter] = useState<"ALL" | Klasifikasi>("ALL");
-  const [contributorAuditorFilter, setContributorAuditorFilter] = useState<string | null>(null);
-  const [contributorAuditeeFilter, setContributorAuditeeFilter] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [minimizedRtlIds, setMinimizedRtlIds] = useState<Record<string, boolean>>({});
   const [isPending, startTransition] = useTransition();
@@ -743,9 +741,6 @@ export default function AuditorClient({
     KTS_MAYOR: 0,
   };
 
-  const auditorContribMap = new Map<string, { count: number; codes: string[] }>();
-  const auditeeContribMap = new Map<string, { count: number; codes: string[] }>();
-
   for (const ind of indikator) {
     const hasBukti = Boolean(ind.isian?.linkDrive?.trim());
     if (hasBukti) totalAdaBuktiAuditee++;
@@ -756,25 +751,11 @@ export default function AuditorClient({
     }
 
     const pemeriksa = diperiksaOlehMap[ind.id] ?? ind.isian?.diperiksaOleh ?? null;
-    const pengisi = ind.isian?.diisiOleh ?? null;
-
-    if (hasBukti && pengisi) {
-      const prev = auditeeContribMap.get(pengisi) ?? { count: 0, codes: [] };
-      prev.count++;
-      prev.codes.push(ind.kode);
-      auditeeContribMap.set(pengisi, prev);
-    }
 
     if (isTargetInMode(ind.id) && isItemCheckedInMode(ind.id)) {
       totalSudahDicekMode++;
       if (currentUserName && pemeriksa === currentUserName) {
         myCheckedCountMode++;
-      }
-      if (pemeriksa) {
-        const prev = auditorContribMap.get(pemeriksa) ?? { count: 0, codes: [] };
-        prev.count++;
-        prev.codes.push(ind.kode);
-        auditorContribMap.set(pemeriksa, prev);
       }
     }
 
@@ -814,7 +795,6 @@ export default function AuditorClient({
     const hasBukti = Boolean(ind.isian?.linkDrive?.trim());
     const sudahDicek = isItemCheckedInMode(ind.id);
     const pemeriksa = diperiksaOlehMap[ind.id] ?? ind.isian?.diperiksaOleh ?? null;
-    const pengisi = ind.isian?.diisiOleh ?? null;
     const effKlas = getEffectiveKlasifikasi(ind.id);
 
     if (activeMode !== "lapangan" && statusFilter === "ADA_BUKTI" && !hasBukti) return false;
@@ -828,16 +808,8 @@ export default function AuditorClient({
       return false;
     }
 
-    if (contributorAuditorFilter && (!sudahDicek || pemeriksa !== contributorAuditorFilter)) {
-      return false;
-    }
-
-    if (contributorAuditeeFilter && (!hasBukti || pengisi !== contributorAuditeeFilter)) {
-      return false;
-    }
-
     if (qNorm) {
-      const hay = `#${noUrut} ${ind.kode} ${ind.standar} ${ind.pernyataanStandar ?? ""} ${ind.pernyataan} ${ind.buktiDiminta ?? ""} ${ind.isian?.klaim ?? ""} ${pemeriksa ?? ""} ${pengisi ?? ""}`.toLowerCase();
+      const hay = `#${noUrut} ${ind.kode} ${ind.standar} ${ind.pernyataanStandar ?? ""} ${ind.pernyataan} ${ind.buktiDiminta ?? ""} ${ind.isian?.klaim ?? ""}`.toLowerCase();
       if (!hay.includes(qNorm)) return false;
     }
     return true;
@@ -857,6 +829,14 @@ export default function AuditorClient({
     setActiveMode(nextMode);
     if (nextMode === "lapangan" && statusFilter === "ADA_BUKTI") {
       setStatusFilter("ALL");
+    }
+    if (nextMode === "rtl") {
+      if (statusFilter !== "ALL" && statusFilter !== "DICEK_SAYA") {
+        setStatusFilter("ALL");
+      }
+      if (klasifikasiFilter === "MELAMPAUI" || klasifikasiFilter === "MENCAPAI") {
+        setKlasifikasiFilter("ALL");
+      }
     }
     if (typeof window !== "undefined") {
       const url = new URL(window.location.href);
@@ -1160,52 +1140,55 @@ export default function AuditorClient({
             </div>
           </div>
 
-          {/* 3. Filter Status Cepat + Filter Klasifikasi Temuan + Kotak Cari Kata Kunci */}
+          {/* 3. Filter Status / Klasifikasi Temuan + Kotak Cari Kata Kunci */}
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-black/15 pt-2.5">
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="font-black uppercase text-black">Filter Status:</span>
+              <span className="font-black uppercase text-black">
+                {activeMode === "rtl" ? "🏷️ Klasifikasi Temuan:" : "Filter Status:"}
+              </span>
               <button
                 type="button"
                 onClick={() => {
                   setStatusFilter("ALL");
                   setKlasifikasiFilter("ALL");
-                  setContributorAuditorFilter(null);
-                  setContributorAuditeeFilter(null);
                 }}
                 className={
-                  statusFilter === "ALL" &&
-                  klasifikasiFilter === "ALL" &&
-                  !contributorAuditorFilter &&
-                  !contributorAuditeeFilter
+                  statusFilter === "ALL" && klasifikasiFilter === "ALL"
                     ? "btn px-2.5 py-1 text-xs"
                     : "btn-secondary px-2.5 py-1 text-xs"
                 }
               >
                 Semua ({totalTargetMode})
               </button>
-              {activeMode !== "lapangan" && (
-                <button
-                  type="button"
-                  onClick={() => setStatusFilter("ADA_BUKTI")}
-                  className={statusFilter === "ADA_BUKTI" ? "btn px-2.5 py-1 text-xs" : "btn-secondary px-2.5 py-1 text-xs"}
-                >
-                  📥 Ada Bukti Auditee ({totalAdaBuktiAuditee})
-                </button>
+
+              {activeMode !== "rtl" && (
+                <>
+                  {activeMode !== "lapangan" && (
+                    <button
+                      type="button"
+                      onClick={() => setStatusFilter("ADA_BUKTI")}
+                      className={statusFilter === "ADA_BUKTI" ? "btn px-2.5 py-1 text-xs" : "btn-secondary px-2.5 py-1 text-xs"}
+                    >
+                      📥 Ada Bukti Auditee ({totalAdaBuktiAuditee})
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setStatusFilter("BELUM_VERIF")}
+                    className={statusFilter === "BELUM_VERIF" ? "btn px-2.5 py-1 text-xs" : "btn-secondary px-2.5 py-1 text-xs"}
+                  >
+                    ⏳ Belum Dicek ({totalBelumDicekMode})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStatusFilter("SUDAH_VERIF")}
+                    className={statusFilter === "SUDAH_VERIF" ? "btn px-2.5 py-1 text-xs" : "btn-secondary px-2.5 py-1 text-xs"}
+                  >
+                    ✅ Sudah Dicek ({totalSudahDicekMode})
+                  </button>
+                </>
               )}
-              <button
-                type="button"
-                onClick={() => setStatusFilter("BELUM_VERIF")}
-                className={statusFilter === "BELUM_VERIF" ? "btn px-2.5 py-1 text-xs" : "btn-secondary px-2.5 py-1 text-xs"}
-              >
-                ⏳ Belum Dicek ({totalBelumDicekMode})
-              </button>
-              <button
-                type="button"
-                onClick={() => setStatusFilter("SUDAH_VERIF")}
-                className={statusFilter === "SUDAH_VERIF" ? "btn px-2.5 py-1 text-xs" : "btn-secondary px-2.5 py-1 text-xs"}
-              >
-                ✅ Sudah Dicek ({totalSudahDicekMode})
-              </button>
+
               {currentUserName && (
                 <button
                   type="button"
@@ -1223,16 +1206,21 @@ export default function AuditorClient({
                 </button>
               )}
 
-              {/* Tombol Filter Klasifikasi Temuan tepat di samping Filter Sudah Dicek */}
-              <span className="mx-0.5 font-black text-black/30">|</span>
-              {(
-                [
-                  { key: "MELAMPAUI" as Klasifikasi, label: "🌟 Melampaui" },
-                  { key: "MENCAPAI" as Klasifikasi, label: "✅ Mencapai" },
-                  { key: "OBSERVASI" as Klasifikasi, label: "🔍 Observasi" },
-                  { key: "KTS_MINOR" as Klasifikasi, label: "⚠️ KTS Minor" },
-                  { key: "KTS_MAYOR" as Klasifikasi, label: "🚨 KTS Mayor" },
-                ]
+              {activeMode !== "rtl" && <span className="mx-0.5 font-black text-black/30">|</span>}
+
+              {(activeMode === "rtl"
+                ? [
+                    { key: "OBSERVASI" as Klasifikasi, label: "🔍 Observasi" },
+                    { key: "KTS_MINOR" as Klasifikasi, label: "⚠️ KTS Minor" },
+                    { key: "KTS_MAYOR" as Klasifikasi, label: "🚨 KTS Mayor" },
+                  ]
+                : [
+                    { key: "MELAMPAUI" as Klasifikasi, label: "🌟 Melampaui" },
+                    { key: "MENCAPAI" as Klasifikasi, label: "✅ Mencapai" },
+                    { key: "OBSERVASI" as Klasifikasi, label: "🔍 Observasi" },
+                    { key: "KTS_MINOR" as Klasifikasi, label: "⚠️ KTS Minor" },
+                    { key: "KTS_MAYOR" as Klasifikasi, label: "🚨 KTS Mayor" },
+                  ]
               ).map(({ key, label }) => {
                 const active = klasifikasiFilter === key;
                 const count = klasifikasiCounts[key];
@@ -1245,12 +1233,6 @@ export default function AuditorClient({
                         setKlasifikasiFilter("ALL");
                       } else {
                         setKlasifikasiFilter(key);
-                        if (
-                          activeMode === "rtl" &&
-                          (key === "MELAMPAUI" || key === "MENCAPAI")
-                        ) {
-                          switchMode("lapangan");
-                        }
                       }
                     }}
                     className={
@@ -1284,75 +1266,6 @@ export default function AuditorClient({
               )}
             </div>
           </div>
-
-          {/* 4. Ringkasan & Filter Kontribusi per Akun (Auditor yang Mengecek & Auditee yang Mengupload) */}
-          {(auditorContribMap.size > 0 || auditeeContribMap.size > 0 || currentUserName) && (
-            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-black/15 pt-2.5">
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="font-black uppercase text-black">🕵️ Dicek Auditor:</span>
-                {currentUserName && !auditorContribMap.has(currentUserName) && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setContributorAuditorFilter(
-                        contributorAuditorFilter === currentUserName ? null : currentUserName
-                      )
-                    }
-                    className={
-                      contributorAuditorFilter === currentUserName
-                        ? "btn px-2.5 py-0.5 text-xs"
-                        : "btn-secondary px-2.5 py-0.5 text-xs"
-                    }
-                  >
-                    ⭐ Saya ({currentUserName}): 0 Indikator
-                  </button>
-                )}
-                {Array.from(auditorContribMap.entries()).map(([nama, info]) => {
-                  const isMe = currentUserName === nama;
-                  const active = contributorAuditorFilter === nama;
-                  return (
-                    <button
-                      key={nama}
-                      type="button"
-                      onClick={() => setContributorAuditorFilter(active ? null : nama)}
-                      title={`Indikator yang dicek ${nama}: ${info.codes.join(", ")}`}
-                      className={
-                        active
-                          ? "btn px-2.5 py-0.5 text-xs"
-                          : "btn-secondary px-2.5 py-0.5 text-xs"
-                      }
-                    >
-                      {isMe ? `⭐ Saya (${nama})` : `🕵️ ${nama}`}: {info.count} Indikator
-                    </button>
-                  );
-                })}
-              </div>
-
-              {auditeeContribMap.size > 0 && (
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="font-black uppercase text-black">👤 Diupload Auditee:</span>
-                  {Array.from(auditeeContribMap.entries()).map(([nama, info]) => {
-                    const active = contributorAuditeeFilter === nama;
-                    return (
-                      <button
-                        key={nama}
-                        type="button"
-                        onClick={() => setContributorAuditeeFilter(active ? null : nama)}
-                        title={`Indikator yang diupload ${nama}: ${info.codes.join(", ")}`}
-                        className={
-                          active
-                            ? "btn px-2.5 py-0.5 text-xs"
-                            : "btn-secondary px-2.5 py-0.5 text-xs"
-                        }
-                      >
-                        👤 {nama}: {info.count} Indikator
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
         </div>
       )}
 
