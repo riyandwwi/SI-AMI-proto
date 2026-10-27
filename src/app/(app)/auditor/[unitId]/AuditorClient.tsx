@@ -192,7 +192,15 @@ export default function AuditorClient({
   const [filterStandar, setFilterStandar] = useState<string>("SEMUA");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "ADA_BUKTI" | "BELUM_VERIF" | "SUDAH_VERIF">("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [minimizedRtlIds, setMinimizedRtlIds] = useState<Record<string, boolean>>({});
   const [isPending, startTransition] = useTransition();
+
+  const toggleMinimizeRtl = (indId: string) => {
+    setMinimizedRtlIds((prev) => ({
+      ...prev,
+      [indId]: !prev[indId],
+    }));
+  };
 
   const standarGroups = groupIndikatorByStandar(indikator);
 
@@ -931,36 +939,58 @@ export default function AuditorClient({
           </div>
         )}
 
-        {buka && activeMode === "rtl" && rtlCount > 0 && (
+        {activeMode === "rtl" && rtlCount > 0 && (
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              disabled={isPending}
-              onClick={() => handleToggleLockRtl(rtlTargetIds, true)}
-              className="btn text-xs"
-            >
-              🔒 Verifikasi &amp; Kunci Semua RTL
-            </button>
-            <button
-              type="button"
-              disabled={isPending}
-              onClick={() => handleToggleLockRtl(rtlTargetIds, false)}
+              onClick={() => {
+                const allMinimized = rtlTargetIds.every((id) => minimizedRtlIds[id]);
+                if (allMinimized) {
+                  setMinimizedRtlIds({});
+                } else {
+                  const next: Record<string, boolean> = {};
+                  for (const id of rtlTargetIds) next[id] = true;
+                  setMinimizedRtlIds(next);
+                }
+              }}
               className="btn-secondary text-xs"
             >
-              🔓 Buka Kunci RTL
+              {rtlTargetIds.every((id) => minimizedRtlIds[id])
+                ? "🔽 Buka Semua Tindakan Perbaikan"
+                : "🔼 Minimize Semua Tindakan Perbaikan"}
             </button>
-            <button
-              type="button"
-              disabled={isPending || dirtyIds.length === 0}
-              onClick={() => handleSaveRtl(undefined)}
-              className="btn-success text-xs disabled:opacity-50"
-            >
-              {isPending && savingId === "ALL"
-                ? "Menyimpan..."
-                : dirtyIds.length > 0
-                  ? `💾 Simpan Semua (${dirtyIds.length})`
-                  : "💾 Simpan Semua"}
-            </button>
+            {buka && (
+              <>
+                <button
+                  type="button"
+                  disabled={isPending}
+                  onClick={() => handleToggleLockRtl(rtlTargetIds, true)}
+                  className="btn text-xs"
+                >
+                  🔒 Verifikasi &amp; Kunci Semua RTL
+                </button>
+                <button
+                  type="button"
+                  disabled={isPending}
+                  onClick={() => handleToggleLockRtl(rtlTargetIds, false)}
+                  className="btn-secondary text-xs"
+                >
+                  🔓 Buka Kunci RTL
+                </button>
+                <button
+                  type="button"
+                  disabled={isPending || dirtyIds.length === 0}
+                  onClick={() => handleSaveRtl(undefined)}
+                  className="btn-success text-xs disabled:opacity-50"
+                >
+                  {isPending && savingId === "ALL"
+                    ? "Menyimpan..."
+                    : dirtyIds.length > 0
+                      ? `💾 Simpan Semua (${dirtyIds.length})`
+                      : "💾 Simpan Semua"}
+                </button>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -1399,38 +1429,48 @@ export default function AuditorClient({
                   {activeMode === "rtl" && (() => {
                     const parsedRtl = parseRtlData(isian?.rtlRencana);
                     const statusRtlCurrent = isian?.rtlStatus ?? sav.rtlStatus;
+                    const isRtlMinimized = Boolean(minimizedRtlIds[ind.id]);
                     return (
                       <div className="space-y-3 pt-1">
-                        <div className="rounded-2xl border-2 border-[#B45309] border-l-8 border-l-[#D97706] bg-[#FEF3C7] p-4 space-y-2 text-base leading-relaxed text-[#0F172A] shadow-sm">
-                          <div>
-                            <strong className="font-black text-[#78350F]">🚨 Temuan Lapangan:</strong>{" "}
-                            <span className="font-bold">
-                              {KLASIFIKASI_LABEL[sav.klasifikasi]} —{" "}
-                              {sav.catatanLapangan || isian?.catatanLapangan || "—"}
-                            </span>
-                          </div>
-                          <div>
-                            <strong className="font-black text-[#78350F]">💡 Rekomendasi Auditor:</strong>{" "}
-                            <span className="font-semibold">
-                              {sav.rekomendasi || isian?.rekomendasi || "—"}
-                            </span>
-                          </div>
-
-                          <div className="border-t-2 border-[#D97706]/40 pt-2.5 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                            <div className="rounded-xl border border-[#B45309]/30 bg-white/80 px-3 py-2">
-                              <div className="text-xs font-black uppercase text-[#78350F]">
-                                👤 PIC Tindak Perbaikan
+                        <div className="rounded-2xl border-2 border-[#B45309] border-l-8 border-l-[#D97706] bg-[#FEF3C7] p-4 space-y-2.5 text-base leading-relaxed text-[#0F172A] shadow-sm">
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div className="space-y-1 flex-1 min-w-[220px]">
+                              <div>
+                                <strong className="font-black text-[#78350F]">🚨 Temuan Lapangan:</strong>{" "}
+                                <span className="font-bold">
+                                  {KLASIFIKASI_LABEL[sav.klasifikasi]} —{" "}
+                                  {sav.catatanLapangan || isian?.catatanLapangan || "—"}
+                                </span>
                               </div>
-                              <div className="mt-0.5 font-black text-[#0F172A]">
-                                {parsedRtl.pic || <em className="font-semibold text-[#64748B]">Belum diisi</em>}
+                              <div>
+                                <strong className="font-black text-[#78350F]">💡 Rekomendasi Auditor:</strong>{" "}
+                                <span className="font-semibold">
+                                  {sav.rekomendasi || isian?.rekomendasi || "—"}
+                                </span>
                               </div>
                             </div>
 
-                            <div className="rounded-xl border border-[#B45309]/30 bg-white/80 px-3 py-2">
-                              <div className="text-xs font-black uppercase text-[#78350F]">
-                                📌 Status Perbaikan (Auditee)
-                              </div>
-                              <div className="mt-1">
+                            <button
+                              type="button"
+                              onClick={() => toggleMinimizeRtl(ind.id)}
+                              className="shrink-0 rounded-xl border-2 border-black bg-white px-3 py-1.5 text-xs font-black text-black shadow-[2px_2px_0px_#000] transition hover:bg-[#FDE68A]"
+                            >
+                              {isRtlMinimized
+                                ? "🔽 Buka Tindakan Perbaikan"
+                                : "🔼 Minimize Tindakan Perbaikan"}
+                            </button>
+                          </div>
+
+                          {/* Ringkasan Singkat saat Tindakan Perbaikan di-Minimize */}
+                          {isRtlMinimized ? (
+                            <div
+                              onClick={() => toggleMinimizeRtl(ind.id)}
+                              className="cursor-pointer border-t-2 border-[#D97706]/40 pt-2.5 flex flex-wrap items-center justify-between gap-2 text-xs font-bold text-[#78350F] hover:opacity-80"
+                            >
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="rounded-lg border border-[#B45309]/40 bg-white/90 px-2.5 py-1 text-[#0F172A]">
+                                  👤 PIC: <strong>{parsedRtl.pic || "Belum diisi"}</strong>
+                                </span>
                                 <Badge
                                   tone={
                                     statusRtlCurrent === "TERVERIFIKASI" ||
@@ -1441,44 +1481,84 @@ export default function AuditorClient({
                                 >
                                   {RTL_LABEL[statusRtlCurrent]}
                                 </Badge>
-                              </div>
-                            </div>
-
-                            <div className="rounded-xl border border-[#B45309]/30 bg-white/80 px-3 py-2 sm:col-span-2">
-                              <div className="text-xs font-black uppercase text-[#78350F]">
-                                🛠️ Isi Tindakan Perbaikan
-                              </div>
-                              <div className="mt-0.5 font-bold text-[#0F172A]">
-                                {parsedRtl.rencana || (
-                                  <em className="font-semibold text-[#64748B]">
-                                    Belum diisi (Menunggu Perbaikan)
-                                  </em>
+                                <span className="rounded-lg border border-[#B45309]/40 bg-white/90 px-2.5 py-1 text-[#0F172A]">
+                                  {parsedRtl.rencana
+                                    ? "🛠️ Tindakan sudah diisi"
+                                    : "⏳ Tindakan belum diisi"}
+                                </span>
+                                {isian?.rtlLinkBukti && (
+                                  <span className="rounded-lg border border-[#B45309]/40 bg-[#DBEAFE] px-2.5 py-1 text-[#1E3A8A]">
+                                    📂 Ada Link Bukti RTL
+                                  </span>
                                 )}
                               </div>
+                              <span className="underline font-black">Klik untuk lihat detail ▾</span>
                             </div>
-
-                            <div className="rounded-xl border border-[#B45309]/30 bg-white/80 px-3 py-2 sm:col-span-2">
-                              <div className="text-xs font-black uppercase text-[#78350F]">
-                                📂 Link Drive Bukti Perbaikan (RTL)
+                          ) : (
+                            <div className="border-t-2 border-[#D97706]/40 pt-2.5 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                              <div className="rounded-xl border border-[#B45309]/30 bg-white/80 px-3 py-2">
+                                <div className="text-xs font-black uppercase text-[#78350F]">
+                                  👤 PIC Tindak Perbaikan
+                                </div>
+                                <div className="mt-0.5 font-black text-[#0F172A]">
+                                  {parsedRtl.pic || <em className="font-semibold text-[#64748B]">Belum diisi</em>}
+                                </div>
                               </div>
-                              <div className="mt-0.5 truncate text-sm">
-                                {isian?.rtlLinkBukti ? (
-                                  <a
-                                    href={isian.rtlLinkBukti}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="font-mono font-bold text-[#1D4ED8] underline"
+
+                              <div className="rounded-xl border border-[#B45309]/30 bg-white/80 px-3 py-2">
+                                <div className="text-xs font-black uppercase text-[#78350F]">
+                                  📌 Status Perbaikan (Auditee)
+                                </div>
+                                <div className="mt-1">
+                                  <Badge
+                                    tone={
+                                      statusRtlCurrent === "TERVERIFIKASI" ||
+                                      statusRtlCurrent === "SELESAI_AUDITEE"
+                                        ? "green"
+                                        : "amber"
+                                    }
                                   >
-                                    {isian.rtlLinkBukti}
-                                  </a>
-                                ) : (
-                                  <em className="font-semibold text-[#64748B]">
-                                    Belum ada link bukti Drive
-                                  </em>
-                                )}
+                                    {RTL_LABEL[statusRtlCurrent]}
+                                  </Badge>
+                                </div>
+                              </div>
+
+                              <div className="rounded-xl border border-[#B45309]/30 bg-white/80 px-3 py-2 sm:col-span-2">
+                                <div className="text-xs font-black uppercase text-[#78350F]">
+                                  🛠️ Isi Tindakan Perbaikan
+                                </div>
+                                <div className="mt-0.5 font-bold text-[#0F172A]">
+                                  {parsedRtl.rencana || (
+                                    <em className="font-semibold text-[#64748B]">
+                                      Belum diisi (Menunggu Perbaikan)
+                                    </em>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="rounded-xl border border-[#B45309]/30 bg-white/80 px-3 py-2 sm:col-span-2">
+                                <div className="text-xs font-black uppercase text-[#78350F]">
+                                  📂 Link Drive Bukti Perbaikan (RTL)
+                                </div>
+                                <div className="mt-0.5 truncate text-sm">
+                                  {isian?.rtlLinkBukti ? (
+                                    <a
+                                      href={isian.rtlLinkBukti}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="font-mono font-bold text-[#1D4ED8] underline"
+                                    >
+                                      {isian.rtlLinkBukti}
+                                    </a>
+                                  ) : (
+                                    <em className="font-semibold text-[#64748B]">
+                                      Belum ada link bukti Drive
+                                    </em>
+                                  )}
+                                </div>
                               </div>
                             </div>
-                          </div>
+                          )}
                         </div>
 
                         <form
