@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { Klasifikasi, StatusDokumen, StatusRtl } from "@prisma/client";
 import {
@@ -91,6 +91,10 @@ export default function AuditeeClient({
     }
     return init;
   });
+  const savedValuesRef = useRef(savedValues);
+  useEffect(() => {
+    savedValuesRef.current = savedValues;
+  }, [savedValues]);
 
   // State buka/minimize per indikator (default semua ter-minimize agar ringkas)
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
@@ -102,6 +106,7 @@ export default function AuditeeClient({
   const [lastSavedManual, setLastSavedManual] = useState<{ nama: string; kode: string } | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  // Muat draft localStorage HANYA sekali saat komponen pertama kali dibuka
   useEffect(() => {
     try {
       const raw = localStorage.getItem(storageKey);
@@ -129,28 +134,18 @@ export default function AuditeeClient({
     } catch {
       // Abaikan
     }
-  }, [storageKey, indikator]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storageKey]);
 
-  // Sinkronisasi Real-Time: Saat prop `indikator` berubah dari server (misal Auditee lain menyimpan atau Auditor mengunci),
-  // perbarui savedValues dan values (untuk indikator yang tidak sedang diketik oleh user ini).
+  // Sinkronisasi Aman: Saat prop `indikator` berubah dari server, jangan pernah menimpa indikator yang sedang diketik oleh user ini.
   useEffect(() => {
-    setSavedValues((prevSaved) => {
-      const nextSaved = { ...prevSaved };
-      for (const ind of indikator) {
-        nextSaved[ind.id] = {
-          klaim: ind.isian?.klaim ?? "",
-          linkDrive: ind.isian?.linkDrive ?? "",
-          diisiOleh: ind.isian?.diisiOleh ?? null,
-        };
-      }
-      return nextSaved;
-    });
+    const currentSavMap = savedValuesRef.current;
 
     setValues((prevValues) => {
       const nextValues = { ...prevValues };
       for (const ind of indikator) {
         const cur = prevValues[ind.id];
-        const prevSav = savedValues[ind.id];
+        const prevSav = currentSavMap[ind.id];
         const isCurrentlyDirty =
           cur &&
           prevSav &&
@@ -170,7 +165,19 @@ export default function AuditeeClient({
       }
       return nextValues;
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
+    setSavedValues((prevSaved) => {
+      const nextSaved = { ...prevSaved };
+      for (const ind of indikator) {
+        nextSaved[ind.id] = {
+          klaim: ind.isian?.klaim ?? "",
+          linkDrive: ind.isian?.linkDrive ?? "",
+          diisiOleh: ind.isian?.diisiOleh ?? null,
+        };
+      }
+      savedValuesRef.current = nextSaved;
+      return nextSaved;
+    });
   }, [indikator]);
 
   const updateField = (indId: string, field: keyof DraftEntry, val: string) => {
@@ -269,8 +276,14 @@ export default function AuditeeClient({
     setSavingId(targetIndikatorId ?? "ALL");
 
     startTransition(async () => {
+      // Jika klik Simpan di 1 kartu indikator, HANYA simpan 1 indikator itu saja.
+      // Jika klik Simpan Semua (targetIndikatorId === undefined), baru simpan semua indikator yang dirty.
       const payloadItems = indikator
-        .filter((ind) => !ind.isian?.terverifikasiAuditor && (ind.id === targetIndikatorId || isDirty(ind.id)))
+        .filter(
+          (ind) =>
+            !ind.isian?.terverifikasiAuditor &&
+            (targetIndikatorId ? ind.id === targetIndikatorId : isDirty(ind.id))
+        )
         .map((ind) => ({
           indikatorId: ind.id,
           klaim: values[ind.id]?.klaim ?? "",
@@ -300,6 +313,7 @@ export default function AuditeeClient({
               diisiOleh: res.diisiOleh ?? prev[id]?.diisiOleh ?? null,
             };
           }
+          savedValuesRef.current = next;
           return next;
         });
 
@@ -318,7 +332,6 @@ export default function AuditeeClient({
       }
 
       setNotice({ ok: res.message ?? "Tersimpan." });
-      router.refresh();
     });
   };
 
@@ -341,7 +354,6 @@ export default function AuditeeClient({
       }
 
       setNotice({ ok: res.message ?? "RTL disimpan." });
-      router.refresh();
     });
   };
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { Klasifikasi, StatusDokumen, StatusRtl } from "@prisma/client";
 import {
@@ -99,6 +99,37 @@ export default function AuditorClient({
   const [savedValues, setSavedValues] = useState<Record<string, AuditorDraftEntry>>(() =>
     buildInitialMap(indikator)
   );
+  const savedValuesRef = useRef<Record<string, AuditorDraftEntry>>(savedValues);
+  useEffect(() => {
+    savedValuesRef.current = savedValues;
+  }, [savedValues]);
+
+  const [diperiksaOlehMap, setDiperiksaOlehMap] = useState<Record<string, string | null>>(() => {
+    const m: Record<string, string | null> = {};
+    for (const ind of indikator) {
+      m[ind.id] = ind.isian?.diperiksaOleh ?? null;
+    }
+    return m;
+  });
+
+  const [savedLapanganMap, setSavedLapanganMap] = useState<Record<string, boolean>>(() => {
+    const m: Record<string, boolean> = {};
+    for (const ind of indikator) {
+      m[ind.id] = Boolean(
+        ind.isian?.klasifikasi ||
+          ind.isian?.catatanLapangan?.trim() ||
+          ind.isian?.rekomendasi?.trim() ||
+          ind.isian?.terverifikasiLapangan
+      );
+    }
+    return m;
+  });
+
+  const [lastSavedManualAuditor, setLastSavedManualAuditor] = useState<{
+    nama: string;
+    kode: string;
+  } | null>(null);
+
   const [verifiedMap, setVerifiedMap] = useState<Record<string, boolean>>(() => {
     const m: Record<string, boolean> = {};
     for (const ind of indikator) {
@@ -130,6 +161,7 @@ export default function AuditorClient({
 
   const standarGroups = groupIndikatorByStandar(indikator);
 
+  // Muat draft localStorage HANYA sekali saat komponen pertama kali dibuka (jangan jalankan ulang saat indikator prop berubah)
   useEffect(() => {
     try {
       const raw = localStorage.getItem(storageKey);
@@ -173,10 +205,10 @@ export default function AuditorClient({
     } catch {
       // Abaikan
     }
-  }, [storageKey, indikator]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storageKey]);
 
-  // Sinkronisasi Real-Time: Saat prop `indikator` berubah dari server (misal Auditee upload bukti atau Auditor lain menyimpan),
-  // perbarui status verifikasi dan isian yang tidak sedang diketik oleh Auditor ini.
+  // Sinkronisasi Aman: Saat prop `indikator` berubah dari server, jangan pernah menimpa indikator yang sedang diubah oleh Auditor
   useEffect(() => {
     setVerifiedMap(() => {
       const m: Record<string, boolean> = {};
@@ -193,14 +225,38 @@ export default function AuditorClient({
       for (const ind of indikator) m[ind.id] = ind.isian?.rtlStatus === "TERVERIFIKASI";
       return m;
     });
+    setDiperiksaOlehMap((prev) => {
+      const next = { ...prev };
+      for (const ind of indikator) {
+        if (ind.isian?.diperiksaOleh) {
+          next[ind.id] = ind.isian.diperiksaOleh;
+        }
+      }
+      return next;
+    });
+    setSavedLapanganMap((prev) => {
+      const next = { ...prev };
+      for (const ind of indikator) {
+        if (
+          ind.isian?.klasifikasi ||
+          ind.isian?.catatanLapangan?.trim() ||
+          ind.isian?.rekomendasi?.trim() ||
+          ind.isian?.terverifikasiLapangan
+        ) {
+          next[ind.id] = true;
+        }
+      }
+      return next;
+    });
 
     const freshMap = buildInitialMap(indikator);
-    setSavedValues(freshMap);
+    const currentSavMap = savedValuesRef.current;
+
     setValues((prev) => {
       const next = { ...prev };
       for (const ind of indikator) {
         const cur = prev[ind.id];
-        const prevSav = savedValues[ind.id];
+        const prevSav = currentSavMap[ind.id];
         const dirty =
           cur &&
           prevSav &&
@@ -219,7 +275,9 @@ export default function AuditorClient({
       }
       return next;
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
+    setSavedValues(freshMap);
+    savedValuesRef.current = freshMap;
   }, [indikator]);
 
   const updateField = <K extends keyof AuditorDraftEntry>(
@@ -284,7 +342,7 @@ export default function AuditorClient({
 
   const dirtyIds = indikator.map((i) => i.id).filter(isDirtyMode);
 
-  const clearSavedFromStorage = (savedIds: string[]) => {
+  const clearSavedFromStorage = (savedIds: string[], pemeriksaNama?: string) => {
     setSavedValues((prev) => {
       const next = { ...prev };
       for (const id of savedIds) {
@@ -292,8 +350,24 @@ export default function AuditorClient({
           next[id] = { ...values[id] };
         }
       }
+      savedValuesRef.current = next;
       return next;
     });
+
+    if (pemeriksaNama) {
+      setDiperiksaOlehMap((prev) => {
+        const next = { ...prev };
+        for (const id of savedIds) {
+          next[id] = pemeriksaNama;
+        }
+        return next;
+      });
+      const lastId = savedIds[savedIds.length - 1];
+      const lastInd = indikator.find((i) => i.id === lastId);
+      if (lastInd) {
+        setLastSavedManualAuditor({ nama: pemeriksaNama, kode: lastInd.kode });
+      }
+    }
 
     try {
       const raw = localStorage.getItem(storageKey);
@@ -314,8 +388,10 @@ export default function AuditorClient({
     setSavingId(targetIndikatorId ?? "ALL");
 
     startTransition(async () => {
+      // Jika klik Simpan di 1 kartu indikator, HANYA simpan 1 indikator itu saja.
+      // Jika klik Simpan Semua (targetIndikatorId === undefined), baru simpan semua indikator yang dirty.
       const itemsToSave = indikator
-        .filter((ind) => ind.id === targetIndikatorId || isDirtyDokumen(ind.id))
+        .filter((ind) => (targetIndikatorId ? ind.id === targetIndikatorId : isDirtyDokumen(ind.id)))
         .map((ind) => ({
           indikatorId: ind.id,
           buktiDiminta: values[ind.id]?.buktiDiminta ?? "",
@@ -332,7 +408,7 @@ export default function AuditorClient({
       }
 
       if (res.savedIds) {
-        clearSavedFromStorage(res.savedIds);
+        clearSavedFromStorage(res.savedIds, res.diperiksaOleh);
         if (lockDokumen !== undefined) {
           setVerifiedMap((prev) => {
             const next = { ...prev };
@@ -342,7 +418,6 @@ export default function AuditorClient({
         }
       }
       setNotice({ ok: res.message ?? "Tersimpan." });
-      router.refresh();
     });
   };
 
@@ -352,7 +427,7 @@ export default function AuditorClient({
 
     startTransition(async () => {
       const itemsToSave = indikator
-        .filter((ind) => ind.id === targetIndikatorId || isDirtyLapangan(ind.id))
+        .filter((ind) => (targetIndikatorId ? ind.id === targetIndikatorId : isDirtyLapangan(ind.id)))
         .map((ind) => ({
           indikatorId: ind.id,
           klasifikasi: values[ind.id]?.klasifikasi ?? "MENCAPAI",
@@ -369,7 +444,12 @@ export default function AuditorClient({
       }
 
       if (res.savedIds) {
-        clearSavedFromStorage(res.savedIds);
+        clearSavedFromStorage(res.savedIds, res.diperiksaOleh);
+        setSavedLapanganMap((prev) => {
+          const next = { ...prev };
+          for (const id of res.savedIds!) next[id] = true;
+          return next;
+        });
         if (lockLapangan !== undefined) {
           setVerifiedLapanganMap((prev) => {
             const next = { ...prev };
@@ -386,7 +466,6 @@ export default function AuditorClient({
         }
       }
       setNotice({ ok: res.message ?? "Tersimpan." });
-      router.refresh();
     });
   };
 
@@ -396,7 +475,7 @@ export default function AuditorClient({
 
     startTransition(async () => {
       const itemsToSave = indikator
-        .filter((ind) => ind.isian && (ind.id === targetIndikatorId || isDirtyRtl(ind.id)))
+        .filter((ind) => ind.isian && (targetIndikatorId ? ind.id === targetIndikatorId : isDirtyRtl(ind.id)))
         .map((ind) => ({
           indikatorId: ind.id,
           isianId: ind.isian!.id,
@@ -415,7 +494,7 @@ export default function AuditorClient({
       }
 
       if (res.savedIds) {
-        clearSavedFromStorage(res.savedIds);
+        clearSavedFromStorage(res.savedIds, res.diperiksaOleh);
         if (forceVerifyLock) {
           setVerifiedRtlMap((prev) => {
             const next = { ...prev };
@@ -428,7 +507,6 @@ export default function AuditorClient({
         }
       }
       setNotice({ ok: res.message ?? "Tersimpan." });
-      router.refresh();
     });
   };
 
@@ -521,21 +599,40 @@ export default function AuditorClient({
     return k && BUTUH_RTL.includes(k);
   }).length;
 
-  // Cari hanya 1 Save Terakhir Auditee & 1 Save Terakhir Auditor + Statistik Progres
+  // Cari hanya 1 Save Terakhir Auditee & 1 Save Terakhir Auditor + Statistik Progres Pengecekan Auditor
   let latestAuditeeSave: { nama: string; kode: string; ts: number } | null = null;
-  let latestAuditorSave: { nama: string; kode: string; ts: number } | null = null;
+  let latestAuditorDbSave: { nama: string; kode: string; ts: number } | null = null;
   let totalAdaBuktiAuditee = 0;
-  let totalSudahVerifMode = 0;
+  let totalSudahDicekMode = 0;
 
-  const isItemVerifiedInMode = (indId: string) => {
-    if (mode === "dokumen") return Boolean(verifiedMap[indId]);
-    if (mode === "lapangan") return Boolean(verifiedLapanganMap[indId]);
-    return Boolean(verifiedRtlMap[indId]);
+  const isItemCheckedInMode = (indId: string) => {
+    const sav = savedValues[indId];
+    if (mode === "dokumen") {
+      return Boolean(
+        diperiksaOlehMap[indId] ||
+          (sav && sav.statusDokumen !== "BELUM_DICEK") ||
+          sav?.catatanDokumen?.trim() ||
+          verifiedMap[indId]
+      );
+    }
+    if (mode === "lapangan") {
+      return Boolean(
+        savedLapanganMap[indId] ||
+          sav?.catatanLapangan?.trim() ||
+          sav?.rekomendasi?.trim() ||
+          verifiedLapanganMap[indId]
+      );
+    }
+    return Boolean(
+      sav?.rtlStatus === "TERVERIFIKASI" ||
+        sav?.rtlCatatanAuditor?.trim() ||
+        verifiedRtlMap[indId]
+    );
   };
 
   for (const ind of indikator) {
     if (ind.isian?.linkDrive?.trim()) totalAdaBuktiAuditee++;
-    if (isItemVerifiedInMode(ind.id)) totalSudahVerifMode++;
+    if (isItemCheckedInMode(ind.id)) totalSudahDicekMode++;
 
     const ts = ind.isian?.updatedAt ? new Date(ind.isian.updatedAt).getTime() : 1;
     if (ind.isian?.diisiOleh) {
@@ -544,27 +641,33 @@ export default function AuditorClient({
       }
     }
     if (ind.isian?.diperiksaOleh) {
-      if (!latestAuditorSave || ts >= latestAuditorSave.ts) {
-        latestAuditorSave = { nama: ind.isian.diperiksaOleh, kode: ind.kode, ts };
+      if (!latestAuditorDbSave || ts >= latestAuditorDbSave.ts) {
+        latestAuditorDbSave = { nama: ind.isian.diperiksaOleh, kode: ind.kode, ts };
       }
     }
   }
 
+  const latestAuditorSave =
+    lastSavedManualAuditor ??
+    (latestAuditorDbSave
+      ? { nama: latestAuditorDbSave.nama, kode: latestAuditorDbSave.kode }
+      : null);
+
   const totalTargetMode = mode === "rtl" ? rtlCount : indikator.length;
-  const totalBelumVerifMode = Math.max(0, totalTargetMode - totalSudahVerifMode);
+  const totalBelumDicekMode = Math.max(0, totalTargetMode - totalSudahDicekMode);
   const persenBuktiAuditee =
     indikator.length > 0 ? Math.round((totalAdaBuktiAuditee / indikator.length) * 100) : 0;
-  const persenVerifAuditor =
-    totalTargetMode > 0 ? Math.round((totalSudahVerifMode / totalTargetMode) * 100) : 0;
+  const persenDicekAuditor =
+    totalTargetMode > 0 ? Math.round((totalSudahDicekMode / totalTargetMode) * 100) : 0;
 
   const qNorm = searchQuery.trim().toLowerCase();
   const matchesAuditorFilter = (ind: AuditorIndikatorItem, noUrut: number) => {
     const hasBukti = Boolean(ind.isian?.linkDrive?.trim());
-    const verif = isItemVerifiedInMode(ind.id);
+    const sudahDicek = isItemCheckedInMode(ind.id);
 
     if (statusFilter === "ADA_BUKTI" && !hasBukti) return false;
-    if (statusFilter === "BELUM_VERIF" && verif) return false;
-    if (statusFilter === "SUDAH_VERIF" && !verif) return false;
+    if (statusFilter === "BELUM_VERIF" && sudahDicek) return false;
+    if (statusFilter === "SUDAH_VERIF" && !sudahDicek) return false;
 
     if (qNorm) {
       const hay = `#${noUrut} ${ind.kode} ${ind.standar} ${ind.pernyataanStandar ?? ""} ${ind.pernyataan} ${ind.buktiDiminta ?? ""} ${ind.isian?.klaim ?? ""}`.toLowerCase();
@@ -583,7 +686,7 @@ export default function AuditorClient({
       const k = savedValues[ind.id]?.klasifikasi ?? ind.isian?.klasifikasi;
       if (!k || !BUTUH_RTL.includes(k)) return false;
     }
-    return !isItemVerifiedInMode(ind.id);
+    return !isItemCheckedInMode(ind.id);
   });
 
   return (
@@ -752,16 +855,16 @@ export default function AuditorClient({
             <div className="rounded-xl border-2 border-black bg-[#FAF7EE] p-2.5 space-y-1.5">
               <div className="flex items-center justify-between font-black text-black">
                 <span>
-                  🕵️ Progres Verifikasi Auditor ({mode === "dokumen" ? "Dokumen" : mode === "lapangan" ? "Lapangan" : "RTL"})
+                  🕵️ Progres Pengecekan Auditor ({mode === "dokumen" ? "Dokumen" : mode === "lapangan" ? "Lapangan" : "RTL"})
                 </span>
                 <span>
-                  {totalSudahVerifMode} / {totalTargetMode} Indikator ({persenVerifAuditor}%)
+                  {totalSudahDicekMode} / {totalTargetMode} Indikator ({persenDicekAuditor}%)
                 </span>
               </div>
               <div className="h-3 w-full overflow-hidden rounded-full border border-black bg-white">
                 <div
                   className="h-full bg-[#38BDF8] transition-all duration-300"
-                  style={{ width: `${persenVerifAuditor}%` }}
+                  style={{ width: `${persenDicekAuditor}%` }}
                 />
               </div>
             </div>
@@ -816,7 +919,7 @@ export default function AuditorClient({
                   }}
                   className="btn px-3 py-1 text-xs"
                 >
-                  ⏭️ Lompat ke Belum Diverifikasi
+                  ⏭️ Lompat ke Belum Dicek Berikutnya
                 </button>
               )}
               <Badge tone="blue">{standarGroups.length} Standar SPMI</Badge>
@@ -846,14 +949,14 @@ export default function AuditorClient({
                 onClick={() => setStatusFilter("BELUM_VERIF")}
                 className={statusFilter === "BELUM_VERIF" ? "btn px-2.5 py-1 text-xs" : "btn-secondary px-2.5 py-1 text-xs"}
               >
-                ⏳ Belum Diverifikasi ({totalBelumVerifMode})
+                ⏳ Belum Dicek ({totalBelumDicekMode})
               </button>
               <button
                 type="button"
                 onClick={() => setStatusFilter("SUDAH_VERIF")}
                 className={statusFilter === "SUDAH_VERIF" ? "btn px-2.5 py-1 text-xs" : "btn-secondary px-2.5 py-1 text-xs"}
               >
-                🔒 Sudah Diverifikasi ({totalSudahVerifMode})
+                ✅ Sudah Dicek ({totalSudahDicekMode})
               </button>
             </div>
 
@@ -916,6 +1019,8 @@ export default function AuditorClient({
                 sav.statusDokumen === "PERLU_KLARIFIKASI" ||
                 cur.statusDokumen === "PERLU_KLARIFIKASI";
               const dirty = isDirtyMode(ind.id);
+              const isCheckedInMode = isItemCheckedInMode(ind.id);
+              const namaPemeriksa = diperiksaOlehMap[ind.id] ?? isian?.diperiksaOleh;
               const isVerifiedDokumen = Boolean(verifiedMap[ind.id]);
               const isVerifiedLapangan = Boolean(verifiedLapanganMap[ind.id]);
               const isVerifiedRtl =
@@ -939,7 +1044,12 @@ export default function AuditorClient({
                       </code>
                       <span className="text-base font-black text-black">{ind.standar}</span>
                 {isian?.diisiOleh && <Badge tone="blue">👤 {isian.diisiOleh}</Badge>}
-                {isian?.diperiksaOleh && <Badge tone="purple">🕵️ {isian.diperiksaOleh}</Badge>}
+                {namaPemeriksa && <Badge tone="purple">🕵️ {namaPemeriksa}</Badge>}
+                {isCheckedInMode ? (
+                  <Badge tone="green">✅ Sudah Dicek</Badge>
+                ) : (
+                  <Badge tone="amber">⏳ Belum Dicek</Badge>
+                )}
                 {dirty && <Badge tone="amber">📝 Belum Disimpan</Badge>}
                 {isFokus && <Badge tone="amber">🎯 Fokus Lapangan</Badge>}
               </div>

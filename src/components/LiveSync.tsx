@@ -1,67 +1,35 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 export function LiveSync() {
   const router = useRouter();
-  const lastVersionRef = useRef<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const [justSynced, setJustSynced] = useState(false);
 
-  useEffect(() => {
-    let active = true;
-
-    const checkVersion = async () => {
-      if (!active) return;
-      if (typeof document !== "undefined" && document.visibilityState !== "visible") {
-        return;
-      }
-
-      try {
-        const res = await fetch("/api/sync-version", { cache: "no-store" });
-        if (!res.ok) return;
-        const data = (await res.json()) as { v?: string };
-        if (!data.v) return;
-
-        if (lastVersionRef.current === null) {
-          lastVersionRef.current = data.v;
-          return;
-        }
-
-        if (lastVersionRef.current !== data.v) {
-          lastVersionRef.current = data.v;
-          router.refresh();
-        }
-      } catch {
-        // Abaikan gangguan jaringan sementara
-      }
-    };
-
-    checkVersion();
-    const interval = setInterval(checkVersion, 5000);
-
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") {
-        checkVersion();
-      }
-    };
-    window.addEventListener("visibilitychange", onVisibility);
-    window.addEventListener("focus", onVisibility);
-
-    return () => {
-      active = false;
-      clearInterval(interval);
-      window.removeEventListener("visibilitychange", onVisibility);
-      window.removeEventListener("focus", onVisibility);
-    };
-  }, [router]);
+  const handleManualSync = () => {
+    startTransition(() => {
+      router.refresh();
+      setJustSynced(true);
+      setTimeout(() => setJustSynced(false), 2000);
+    });
+  };
 
   return (
-    <span
-      title="Sinkronisasi Real-Time Aktif"
-      className="inline-flex items-center gap-1 rounded-full border border-black/25 bg-[#D9F99D] px-2.5 py-0.5 text-[11px] font-black text-black"
+    <button
+      type="button"
+      onClick={handleManualSync}
+      disabled={isPending}
+      title="Klik untuk memuat pembaruan terbaru dari anggota tim lain tanpa mengganggu ketikan Anda"
+      className="inline-flex items-center gap-1.5 rounded-full border border-black/30 bg-[#D9F99D] px-2.5 py-0.5 text-[11px] font-black text-black hover:bg-[#BEF264] disabled:opacity-60"
     >
-      <span className="h-2 w-2 rounded-full bg-green-600 animate-pulse" />
-      Live
-    </span>
+      <span
+        className={`h-2 w-2 rounded-full bg-green-700 ${
+          isPending ? "animate-ping" : ""
+        }`}
+      />
+      {isPending ? "Memuat..." : justSynced ? "✓ Tersinkron" : "🔄 Sinkron"}
+    </button>
   );
 }

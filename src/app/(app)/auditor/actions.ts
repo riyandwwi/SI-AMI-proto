@@ -90,9 +90,6 @@ export async function simpanBatchAuditDokumen(
     lockDokumen ? "AUDIT_DOKUMEN_KUNCI" : "AUDIT_DOKUMEN",
     `${user.nama}: ${savedCodes.join(", ")}`
   );
-  revalidatePath(`/auditor/${periodeId}`);
-  revalidatePath("/auditee");
-  revalidatePath("/lpm");
 
   return {
     ok: true,
@@ -175,9 +172,6 @@ export async function simpanBatchAuditLapangan(
     lockLapangan ? "AUDIT_LAPANGAN_KUNCI" : "AUDIT_LAPANGAN",
     `${user.nama}: ${savedCodes.join(", ")}`
   );
-  revalidatePath(`/auditor/${periodeId}`);
-  revalidatePath("/auditee");
-  revalidatePath("/lpm");
 
   return {
     ok: true,
@@ -233,9 +227,6 @@ export async function simpanBatchVerifikasiRtl(
   }
 
   await catat(user.id, "VERIFIKASI_RTL", `${user.nama}: ${savedCodes.join(", ")}`);
-  revalidatePath(`/auditor/${periodeId}`);
-  revalidatePath("/auditee");
-  revalidatePath("/lpm");
 
   return {
     ok: true,

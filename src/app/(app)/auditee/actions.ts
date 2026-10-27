@@ -147,11 +147,6 @@ export async function simpanBatchIsianAuditee(
     `${user.nama} (${user.unit?.nama ?? ""}): ${savedCodes.join(", ")}`
   );
 
-  revalidatePath("/auditee");
-  revalidatePath("/auditee/detail");
-  revalidatePath("/auditor");
-  revalidatePath("/lpm");
-
   return {
     ok: true,
     savedIds,
