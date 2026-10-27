@@ -9,6 +9,7 @@ import {
   RTL_LABEL,
   STATUS_DOK_LABEL,
   groupIndikatorByStandar,
+  parseRtlData,
 } from "@/lib/periode";
 import { Badge, Empty } from "@/components/ui";
 import {
@@ -1395,91 +1396,143 @@ export default function AuditorClient({
                   )}
 
                   {/* MODE 3: VERIFIKASI TINDAK LANJUT (RTL) */}
-                  {activeMode === "rtl" && (
-                    <div className="space-y-3 pt-1">
-                      <div className="rounded-2xl border-2 border-[#B45309] border-l-8 border-l-[#D97706] bg-[#FEF3C7] p-4 space-y-1.5 text-base leading-relaxed text-[#0F172A] shadow-sm">
-                        <div>
-                          <strong className="font-black text-[#78350F]">🚨 Temuan Lapangan:</strong>{" "}
-                          <span className="font-bold">
-                            {KLASIFIKASI_LABEL[sav.klasifikasi]} —{" "}
-                            {sav.catatanLapangan || isian?.catatanLapangan || "—"}
-                          </span>
-                        </div>
-                        <div>
-                          <strong className="font-black text-[#78350F]">💡 Rekomendasi Auditor:</strong>{" "}
-                          <span className="font-semibold">
-                            {sav.rekomendasi || isian?.rekomendasi || "—"}
-                          </span>
-                        </div>
-                        <div className="border-t border-[#D97706]/40 pt-1.5">
-                          <strong className="font-black text-[#0F172A]">🛠️ RTL Auditee:</strong>{" "}
-                          <span className="font-bold">{isian?.rtlRencana ?? "—"}</span>
-                        </div>
-                        {isian?.rtlLinkBukti && (
-                          <div className="truncate text-sm">
-                            <strong className="font-black text-[#0F172A]">📂 Drive Bukti RTL:</strong>{" "}
-                            <a
-                              href={isian.rtlLinkBukti}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="font-mono font-bold text-[#1D4ED8] underline"
-                            >
-                              {isian.rtlLinkBukti}
-                            </a>
+                  {activeMode === "rtl" && (() => {
+                    const parsedRtl = parseRtlData(isian?.rtlRencana);
+                    const statusRtlCurrent = isian?.rtlStatus ?? sav.rtlStatus;
+                    return (
+                      <div className="space-y-3 pt-1">
+                        <div className="rounded-2xl border-2 border-[#B45309] border-l-8 border-l-[#D97706] bg-[#FEF3C7] p-4 space-y-2 text-base leading-relaxed text-[#0F172A] shadow-sm">
+                          <div>
+                            <strong className="font-black text-[#78350F]">🚨 Temuan Lapangan:</strong>{" "}
+                            <span className="font-bold">
+                              {KLASIFIKASI_LABEL[sav.klasifikasi]} —{" "}
+                              {sav.catatanLapangan || isian?.catatanLapangan || "—"}
+                            </span>
                           </div>
-                        )}
-                      </div>
+                          <div>
+                            <strong className="font-black text-[#78350F]">💡 Rekomendasi Auditor:</strong>{" "}
+                            <span className="font-semibold">
+                              {sav.rekomendasi || isian?.rekomendasi || "—"}
+                            </span>
+                          </div>
 
-                      <form
-                        onSubmit={(e) => {
-                          e.preventDefault();
-                          handleSaveRtl(ind.id);
-                        }}
-                        className="grid grid-cols-1 gap-3 md:grid-cols-3"
-                      >
-                        <div className="space-y-1">
-                          <label>Status RTL ({RTL_LABEL[sav.rtlStatus]})</label>
-                          <select
-                            name="rtlStatus"
-                            disabled={!buka}
-                            value={cur.rtlStatus}
-                            onChange={(e) =>
-                              updateField(ind.id, "rtlStatus", e.target.value as StatusRtl)
-                            }
-                            className="w-full"
-                          >
-                            <option value="PROSES">⏳ Proses</option>
-                            <option value="TERVERIFIKASI">✅ Terverifikasi (Kunci RTL)</option>
-                          </select>
-                        </div>
-                        <div className="space-y-1 md:col-span-2">
-                          <label>Catatan Verifikasi RTL</label>
-                          <textarea
-                            name="rtlCatatanAuditor"
-                            rows={3}
-                            disabled={!buka}
-                            value={cur.rtlCatatanAuditor}
-                            onChange={(e) => updateField(ind.id, "rtlCatatanAuditor", e.target.value)}
-                            placeholder="Catatan verifikasi RTL..."
-                            className="w-full text-sm"
-                          />
-                          {buka && (
-                            <div className="flex flex-wrap justify-end gap-2 pt-1">
-                              <button
-                                type="submit"
-                                disabled={isPending}
-                                className="btn shrink-0 text-xs"
-                              >
-                                {isPending && (savingId === ind.id || savingId === "ALL")
-                                  ? "..."
-                                  : "💾 Simpan"}
-                              </button>
+                          <div className="border-t-2 border-[#D97706]/40 pt-2.5 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                            <div className="rounded-xl border border-[#B45309]/30 bg-white/80 px-3 py-2">
+                              <div className="text-xs font-black uppercase text-[#78350F]">
+                                👤 PIC Tindak Perbaikan
+                              </div>
+                              <div className="mt-0.5 font-black text-[#0F172A]">
+                                {parsedRtl.pic || <em className="font-semibold text-[#64748B]">Belum diisi</em>}
+                              </div>
                             </div>
-                          )}
+
+                            <div className="rounded-xl border border-[#B45309]/30 bg-white/80 px-3 py-2">
+                              <div className="text-xs font-black uppercase text-[#78350F]">
+                                📌 Status Perbaikan (Auditee)
+                              </div>
+                              <div className="mt-1">
+                                <Badge
+                                  tone={
+                                    statusRtlCurrent === "TERVERIFIKASI" ||
+                                    statusRtlCurrent === "SELESAI_AUDITEE"
+                                      ? "green"
+                                      : "amber"
+                                  }
+                                >
+                                  {RTL_LABEL[statusRtlCurrent]}
+                                </Badge>
+                              </div>
+                            </div>
+
+                            <div className="rounded-xl border border-[#B45309]/30 bg-white/80 px-3 py-2 sm:col-span-2">
+                              <div className="text-xs font-black uppercase text-[#78350F]">
+                                🛠️ Isi Tindakan Perbaikan
+                              </div>
+                              <div className="mt-0.5 font-bold text-[#0F172A]">
+                                {parsedRtl.rencana || (
+                                  <em className="font-semibold text-[#64748B]">
+                                    Belum diisi (Menunggu Perbaikan)
+                                  </em>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="rounded-xl border border-[#B45309]/30 bg-white/80 px-3 py-2 sm:col-span-2">
+                              <div className="text-xs font-black uppercase text-[#78350F]">
+                                📂 Link Drive Bukti Perbaikan (RTL)
+                              </div>
+                              <div className="mt-0.5 truncate text-sm">
+                                {isian?.rtlLinkBukti ? (
+                                  <a
+                                    href={isian.rtlLinkBukti}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="font-mono font-bold text-[#1D4ED8] underline"
+                                  >
+                                    {isian.rtlLinkBukti}
+                                  </a>
+                                ) : (
+                                  <em className="font-semibold text-[#64748B]">
+                                    Belum ada link bukti Drive
+                                  </em>
+                                )}
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                      </form>
-                    </div>
-                  )}
+
+                        <form
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            handleSaveRtl(ind.id);
+                          }}
+                          className="grid grid-cols-1 gap-3 md:grid-cols-3"
+                        >
+                          <div className="space-y-1">
+                            <label>Verifikasi Status RTL ({RTL_LABEL[sav.rtlStatus]})</label>
+                            <select
+                              name="rtlStatus"
+                              disabled={!buka}
+                              value={cur.rtlStatus}
+                              onChange={(e) =>
+                                updateField(ind.id, "rtlStatus", e.target.value as StatusRtl)
+                              }
+                              className="w-full"
+                            >
+                              <option value="PROSES">⏳ Menunggu Perbaikan</option>
+                              <option value="SELESAI_AUDITEE">✅ Selesai (Auditee)</option>
+                              <option value="TERVERIFIKASI">🔒 Terverifikasi (Kunci RTL)</option>
+                            </select>
+                          </div>
+                          <div className="space-y-1 md:col-span-2">
+                            <label>Catatan Verifikasi RTL</label>
+                            <textarea
+                              name="rtlCatatanAuditor"
+                              rows={3}
+                              disabled={!buka}
+                              value={cur.rtlCatatanAuditor}
+                              onChange={(e) => updateField(ind.id, "rtlCatatanAuditor", e.target.value)}
+                              placeholder="Catatan verifikasi RTL..."
+                              className="w-full text-sm"
+                            />
+                            {buka && (
+                              <div className="flex flex-wrap justify-end gap-2 pt-1">
+                                <button
+                                  type="submit"
+                                  disabled={isPending}
+                                  className="btn shrink-0 text-xs"
+                                >
+                                  {isPending && (savingId === ind.id || savingId === "ALL")
+                                    ? "..."
+                                    : "💾 Simpan"}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </form>
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })}

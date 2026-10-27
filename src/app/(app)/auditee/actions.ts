@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
-import { BUTUH_RTL } from "@/lib/periode";
+import { BUTUH_RTL, encodeRtlData } from "@/lib/periode";
 import { catat, fail, isGoogleDriveLink, ok, str } from "@/lib/actions";
 
 export interface IsianInputItem {
@@ -157,8 +157,10 @@ export async function simpanBatchIsianAuditee(
 
 export async function simpanRtlAuditeeClient(payload: {
   isianId: string;
+  rtlPic: string;
   rtlRencana: string;
   rtlLinkBukti: string;
+  rtlStatus: "PROSES" | "SELESAI_AUDITEE";
 }): Promise<ActionResult> {
   const user = await requireUser("AUDITEE");
   if (!user.unitId) {
@@ -166,11 +168,13 @@ export async function simpanRtlAuditeeClient(payload: {
   }
 
   const isianId = payload.isianId.trim().slice(0, 64);
+  const rtlPic = payload.rtlPic.trim().slice(0, 200);
   const rtlRencana = payload.rtlRencana.trim().slice(0, 2000);
   const rtlLinkBukti = payload.rtlLinkBukti.trim().slice(0, 500);
+  const rtlStatusInput = payload.rtlStatus === "SELESAI_AUDITEE" ? "SELESAI_AUDITEE" : "PROSES";
 
-  if (!isianId || !rtlRencana) {
-    return { ok: false, error: "Rencana tindak lanjut wajib diisi." };
+  if (!isianId || (!rtlPic && !rtlRencana)) {
+    return { ok: false, error: "Minimal PIC Tindak Perbaikan wajib diisi." };
   }
   if (rtlLinkBukti && !isGoogleDriveLink(rtlLinkBukti)) {
     return {
@@ -196,18 +200,23 @@ export async function simpanRtlAuditeeClient(payload: {
     return { ok: false, error: "RTL sudah diverifikasi & dikunci oleh Auditor sehingga tidak dapat diubah lagi." };
   }
 
-  const nextStatus = rtlLinkBukti ? "SELESAI_AUDITEE" : "PROSES";
+  const combinedRencana = encodeRtlData(rtlPic, rtlRencana);
+
   await prisma.isian.update({
     where: { id: isianId },
     data: {
-      rtlRencana,
+      rtlRencana: combinedRencana || null,
       rtlLinkBukti: rtlLinkBukti || null,
-      rtlStatus: nextStatus,
+      rtlStatus: rtlStatusInput,
       diisiOleh: user.nama,
     },
   });
 
-  await catat(user.id, "ISI_RTL_AUDITEE", `${user.nama}: ${isian.indikator.kode} -> ${nextStatus}`);
+  await catat(
+    user.id,
+    "ISI_RTL_AUDITEE",
+    `${user.nama}: ${isian.indikator.kode} (PIC: ${rtlPic || "-"}) -> ${rtlStatusInput}`
+  );
   revalidatePath("/auditee");
   revalidatePath("/auditee/detail");
   revalidatePath("/auditor");
@@ -216,7 +225,7 @@ export async function simpanRtlAuditeeClient(payload: {
   return {
     ok: true,
     diisiOleh: user.nama,
-    message: `RTL "${isian.indikator.kode}" disimpan oleh ${user.nama}.`,
+    message: `Tindak Perbaikan (RTL) "${isian.indikator.kode}" disimpan oleh ${user.nama}.`,
   };
 }
 
@@ -231,9 +240,18 @@ export async function simpanIsianAuditee(fd: FormData) {
 
 export async function simpanRtlAuditee(fd: FormData) {
   const isianId = str(fd, "isianId", 64);
+  const rtlPic = str(fd, "rtlPic", 200);
   const rtlRencana = str(fd, "rtlRencana", 2000);
   const rtlLinkBukti = str(fd, "rtlLinkBukti", 500);
-  const res = await simpanRtlAuditeeClient({ isianId, rtlRencana, rtlLinkBukti });
+  const rtlStatusRaw = str(fd, "rtlStatus", 32);
+  const rtlStatus = rtlStatusRaw === "SELESAI_AUDITEE" ? "SELESAI_AUDITEE" : "PROSES";
+  const res = await simpanRtlAuditeeClient({
+    isianId,
+    rtlPic,
+    rtlRencana,
+    rtlLinkBukti,
+    rtlStatus,
+  });
   if (!res.ok) fail("/auditee", res.error ?? "Gagal menyimpan RTL.");
   ok("/auditee", res.message ?? "RTL berhasil disimpan.");
 }

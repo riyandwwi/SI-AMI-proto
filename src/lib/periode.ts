@@ -45,11 +45,41 @@ export const STATUS_DOK_LABEL: Record<StatusDokumen, string> = {
 };
 
 export const RTL_LABEL: Record<StatusRtl, string> = {
-  BELUM: "Belum ada RTL",
-  PROSES: "Dalam proses",
-  SELESAI_AUDITEE: "Diajukan selesai",
-  TERVERIFIKASI: "Terverifikasi",
+  BELUM: "Belum Diisi",
+  PROSES: "⏳ Menunggu Perbaikan",
+  SELESAI_AUDITEE: "✅ Selesai",
+  TERVERIFIKASI: "🔒 Terverifikasi",
 };
+
+/**
+ * Menyimpan PIC Tindak Perbaikan dan Isi Tindakan Perbaikan secara terstruktur
+ * di dalam kolom rtlRencana tanpa perlu migrasi skema database baru.
+ */
+export function encodeRtlData(pic: string, rencana: string): string {
+  const cleanPic = pic.replace(/[\[\]]/g, "").trim();
+  const cleanRencana = rencana.trim();
+  if (!cleanPic && !cleanRencana) return "";
+  if (!cleanPic) return cleanRencana;
+  return `[PIC: ${cleanPic}] ${cleanRencana}`.trim();
+}
+
+export function parseRtlData(raw: string | null | undefined): {
+  pic: string;
+  rencana: string;
+} {
+  const text = (raw ?? "").trim();
+  const match = text.match(/^\[PIC:\s*([^\]]*)\]\s*([\s\S]*)$/);
+  if (match) {
+    return {
+      pic: match[1].trim(),
+      rencana: match[2].trim(),
+    };
+  }
+  return {
+    pic: "",
+    rencana: text,
+  };
+}
 
 /** Klasifikasi yang wajib ditindaklanjuti dengan RTL. */
 export const BUTUH_RTL: Klasifikasi[] = ["OBSERVASI", "KTS_MINOR", "KTS_MAYOR"];

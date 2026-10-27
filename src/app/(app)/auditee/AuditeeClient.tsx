@@ -9,6 +9,7 @@ import {
   RTL_LABEL,
   STATUS_DOK_LABEL,
   groupIndikatorByStandar,
+  parseRtlData,
 } from "@/lib/periode";
 import { Badge } from "@/components/ui";
 import { simpanBatchIsianAuditee, simpanRtlAuditeeClient } from "./actions";
@@ -45,8 +46,10 @@ export interface AuditeeIndikatorItem {
 interface DraftEntry {
   klaim: string;
   linkDrive: string;
+  rtlPic: string;
   rtlRencana: string;
   rtlLinkBukti: string;
+  rtlStatus: "PROSES" | "SELESAI_AUDITEE";
 }
 
 export default function AuditeeClient({
@@ -68,11 +71,15 @@ export default function AuditeeClient({
   const [values, setValues] = useState<Record<string, DraftEntry>>(() => {
     const init: Record<string, DraftEntry> = {};
     for (const ind of indikator) {
+      const parsedRtl = parseRtlData(ind.isian?.rtlRencana);
       init[ind.id] = {
         klaim: ind.isian?.klaim ?? "",
         linkDrive: ind.isian?.linkDrive ?? "",
-        rtlRencana: ind.isian?.rtlRencana ?? "",
+        rtlPic: parsedRtl.pic,
+        rtlRencana: parsedRtl.rencana,
         rtlLinkBukti: ind.isian?.rtlLinkBukti ?? "",
+        rtlStatus:
+          ind.isian?.rtlStatus === "SELESAI_AUDITEE" ? "SELESAI_AUDITEE" : "PROSES",
       };
     }
     return init;
@@ -120,13 +127,19 @@ export default function AuditeeClient({
           if (!d) continue;
           const dbKlaim = ind.isian?.klaim ?? "";
           const dbLink = ind.isian?.linkDrive ?? "";
-          const dbRtlRencana = ind.isian?.rtlRencana ?? "";
+          const parsedRtl = parseRtlData(ind.isian?.rtlRencana);
+          const dbRtlPic = parsedRtl.pic;
+          const dbRtlRencana = parsedRtl.rencana;
           const dbRtlLink = ind.isian?.rtlLinkBukti ?? "";
+          const dbRtlStatus =
+            ind.isian?.rtlStatus === "SELESAI_AUDITEE" ? "SELESAI_AUDITEE" : "PROSES";
           next[ind.id] = {
             klaim: d.klaim !== undefined && d.klaim !== "" ? d.klaim : dbKlaim,
             linkDrive: d.linkDrive !== undefined && d.linkDrive !== "" ? d.linkDrive : dbLink,
+            rtlPic: d.rtlPic !== undefined && d.rtlPic !== "" ? d.rtlPic : dbRtlPic,
             rtlRencana: d.rtlRencana !== undefined && d.rtlRencana !== "" ? d.rtlRencana : dbRtlRencana,
             rtlLinkBukti: d.rtlLinkBukti !== undefined && d.rtlLinkBukti !== "" ? d.rtlLinkBukti : dbRtlLink,
+            rtlStatus: d.rtlStatus ?? dbRtlStatus,
           };
         }
         return next;
@@ -155,11 +168,16 @@ export default function AuditeeClient({
             cur.linkDrive.trim() !== prevSav.linkDrive.trim());
 
         if (!cur || !isCurrentlyDirty) {
+          const parsedRtl = parseRtlData(ind.isian?.rtlRencana);
           nextValues[ind.id] = {
             klaim: ind.isian?.klaim ?? "",
             linkDrive: ind.isian?.linkDrive ?? "",
-            rtlRencana: cur?.rtlRencana || ind.isian?.rtlRencana || "",
+            rtlPic: cur?.rtlPic || parsedRtl.pic || "",
+            rtlRencana: cur?.rtlRencana || parsedRtl.rencana || "",
             rtlLinkBukti: cur?.rtlLinkBukti || ind.isian?.rtlLinkBukti || "",
+            rtlStatus:
+              cur?.rtlStatus ||
+              (ind.isian?.rtlStatus === "SELESAI_AUDITEE" ? "SELESAI_AUDITEE" : "PROSES"),
           };
         }
       }
@@ -182,7 +200,14 @@ export default function AuditeeClient({
 
   const updateField = (indId: string, field: keyof DraftEntry, val: string) => {
     setValues((prev) => {
-      const current = prev[indId] ?? { klaim: "", linkDrive: "", rtlRencana: "", rtlLinkBukti: "" };
+      const current = prev[indId] ?? {
+        klaim: "",
+        linkDrive: "",
+        rtlPic: "",
+        rtlRencana: "",
+        rtlLinkBukti: "",
+        rtlStatus: "PROSES",
+      };
       const next = {
         ...prev,
         [indId]: { ...current, [field]: val },
@@ -343,8 +368,10 @@ export default function AuditeeClient({
       const cur = values[indId];
       const res = await simpanRtlAuditeeClient({
         isianId,
+        rtlPic: cur?.rtlPic ?? "",
         rtlRencana: cur?.rtlRencana ?? "",
         rtlLinkBukti: cur?.rtlLinkBukti ?? "",
+        rtlStatus: cur?.rtlStatus === "SELESAI_AUDITEE" ? "SELESAI_AUDITEE" : "PROSES",
       });
       setSavingId(null);
 
@@ -354,6 +381,7 @@ export default function AuditeeClient({
       }
 
       setNotice({ ok: res.message ?? "RTL disimpan." });
+      router.refresh();
     });
   };
 
@@ -883,49 +911,95 @@ export default function AuditeeClient({
                         >
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <span className="text-sm font-black text-black">
-                              🛠️ Tindak Lanjut (RTL) — {KLASIFIKASI_LABEL[isian.klasifikasi!]}
+                              🛠️ Tindak Lanjut Perbaikan (RTL) — {KLASIFIKASI_LABEL[isian.klasifikasi!]}
                             </span>
-                            <Badge tone={isian.rtlStatus === "TERVERIFIKASI" ? "green" : "amber"}>
+                            <Badge tone={isian.rtlStatus === "TERVERIFIKASI" ? "green" : isian.rtlStatus === "SELESAI_AUDITEE" ? "blue" : "amber"}>
                               {RTL_LABEL[isian.rtlStatus]}
                             </Badge>
                           </div>
-                          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+
+                          <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
                             <div className="space-y-1">
-                              <label className="!text-sm !font-black !text-black">Tindakan Perbaikan</label>
+                              <label className="!text-sm !font-black !text-black">
+                                👤 PIC Tindak Perbaikan
+                              </label>
+                              <input
+                                name="rtlPic"
+                                required
+                                disabled={!buka || isian.rtlStatus === "TERVERIFIKASI"}
+                                value={cur.rtlPic}
+                                onChange={(e) => updateField(ind.id, "rtlPic", e.target.value)}
+                                placeholder="Misal: Rektor / Dekan / Kaprodi..."
+                                className="w-full text-sm font-bold !border-2 !border-black !bg-white !text-black"
+                              />
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="!text-sm !font-black !text-black">
+                                🛠️ Tindakan Perbaikan
+                              </label>
                               <input
                                 name="rtlRencana"
-                                required
                                 disabled={!buka || isian.rtlStatus === "TERVERIFIKASI"}
                                 value={cur.rtlRencana}
                                 onChange={(e) => updateField(ind.id, "rtlRencana", e.target.value)}
-                                placeholder="Tindakan perbaikan..."
-                                className="w-full text-base !border-2 !border-black !bg-white !text-black"
+                                placeholder="Isi tindakan (boleh kosong jika menunggu)..."
+                                className="w-full text-sm !border-2 !border-black !bg-white !text-black"
                               />
                             </div>
+
                             <div className="space-y-1">
-                              <label className="!text-sm !font-black !text-black">Link Drive Bukti RTL</label>
+                              <label className="!text-sm !font-black !text-black">
+                                📂 Link Drive Bukti RTL
+                              </label>
+                              <input
+                                name="rtlLinkBukti"
+                                type="url"
+                                disabled={!buka || isian.rtlStatus === "TERVERIFIKASI"}
+                                value={cur.rtlLinkBukti}
+                                onChange={(e) => updateField(ind.id, "rtlLinkBukti", e.target.value)}
+                                placeholder="https://drive.google.com/... (opsional)"
+                                className="w-full font-mono text-sm !border-2 !border-black !bg-white !text-black"
+                              />
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="!text-sm !font-black !text-black">
+                                📌 Status Perbaikan
+                              </label>
                               <div className="flex gap-2">
-                                <input
-                                  name="rtlLinkBukti"
-                                  type="url"
+                                <select
+                                  name="rtlStatus"
                                   disabled={!buka || isian.rtlStatus === "TERVERIFIKASI"}
-                                  value={cur.rtlLinkBukti}
-                                  onChange={(e) => updateField(ind.id, "rtlLinkBukti", e.target.value)}
-                                  placeholder="https://drive.google.com/..."
-                                  className="w-full font-mono text-sm !border-2 !border-black !bg-white !text-black"
-                                />
+                                  value={cur.rtlStatus}
+                                  onChange={(e) =>
+                                    updateField(
+                                      ind.id,
+                                      "rtlStatus",
+                                      e.target.value === "SELESAI_AUDITEE"
+                                        ? "SELESAI_AUDITEE"
+                                        : "PROSES"
+                                    )
+                                  }
+                                  className="w-full text-sm font-bold !border-2 !border-black !bg-white !text-black"
+                                >
+                                  <option value="PROSES">⏳ Menunggu Perbaikan</option>
+                                  <option value="SELESAI_AUDITEE">✅ Selesai</option>
+                                </select>
+
                                 {buka && isian.rtlStatus !== "TERVERIFIKASI" && (
                                   <button
                                     type="submit"
                                     disabled={isPending}
                                     className="btn shrink-0 text-xs"
                                   >
-                                    {isPending && savingId === `RTL_${ind.id}` ? "..." : "Simpan RTL"}
+                                    {isPending && savingId === `RTL_${ind.id}` ? "..." : "💾 Simpan"}
                                   </button>
                                 )}
                               </div>
                             </div>
                           </div>
+
                           {isian.rtlCatatanAuditor && (
                             <div className="text-sm font-semibold text-black">
                               <strong className="font-black text-black">Catatan RTL Auditor:</strong>{" "}
