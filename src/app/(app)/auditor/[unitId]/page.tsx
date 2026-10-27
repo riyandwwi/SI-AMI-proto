@@ -137,6 +137,7 @@ export default async function AuditorUnitWorkspacePage({
           unitId={targetUnitId}
           mode={mode}
           buka={buka}
+          currentUserName={user.nama}
           indikator={clientItems}
         />
       )}

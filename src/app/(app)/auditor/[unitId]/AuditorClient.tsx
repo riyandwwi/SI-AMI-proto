@@ -66,12 +66,14 @@ export default function AuditorClient({
   unitId,
   mode,
   buka,
+  currentUserName,
   indikator,
 }: {
   periodeId: string;
   unitId: string;
   mode: string;
   buka: boolean;
+  currentUserName?: string;
   indikator: AuditorIndikatorItem[];
 }) {
   const router = useRouter();
@@ -190,7 +192,12 @@ export default function AuditorClient({
   const [notice, setNotice] = useState<{ ok?: string; err?: string } | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [filterStandar, setFilterStandar] = useState<string>("SEMUA");
-  const [statusFilter, setStatusFilter] = useState<"ALL" | "ADA_BUKTI" | "BELUM_VERIF" | "SUDAH_VERIF">("ALL");
+  const [statusFilter, setStatusFilter] = useState<
+    "ALL" | "ADA_BUKTI" | "BELUM_VERIF" | "SUDAH_VERIF" | "DICEK_SAYA"
+  >("ALL");
+  const [klasifikasiFilter, setKlasifikasiFilter] = useState<"ALL" | Klasifikasi>("ALL");
+  const [contributorAuditorFilter, setContributorAuditorFilter] = useState<string | null>(null);
+  const [contributorAuditeeFilter, setContributorAuditeeFilter] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [minimizedRtlIds, setMinimizedRtlIds] = useState<Record<string, boolean>>({});
   const [isPending, startTransition] = useTransition();
@@ -707,6 +714,15 @@ export default function AuditorClient({
     return Boolean(savedRtlMap[indId] || verifiedRtlMap[indId]);
   };
 
+  const getEffectiveKlasifikasi = (indId: string): Klasifikasi | null => {
+    const indObj = indikator.find((i) => i.id === indId);
+    const hasSavedLapangan = Boolean(
+      savedLapanganMap[indId] || verifiedLapanganMap[indId] || indObj?.isian?.klasifikasi
+    );
+    if (!hasSavedLapangan) return null;
+    return savedValues[indId]?.klasifikasi ?? indObj?.isian?.klasifikasi ?? null;
+  };
+
   const lapanganTargetIds = indikator.filter((ind) => isLapanganTarget(ind.id)).map((ind) => ind.id);
   const rtlTargetIds = indikator.filter((ind) => isRtlTarget(ind.id)).map((ind) => ind.id);
   const lapanganCount = lapanganTargetIds.length;
@@ -717,11 +733,49 @@ export default function AuditorClient({
   let latestAuditorDbSave: { nama: string; kode: string; ts: number } | null = null;
   let totalAdaBuktiAuditee = 0;
   let totalSudahDicekMode = 0;
+  let myCheckedCountMode = 0;
+
+  const klasifikasiCounts: Record<Klasifikasi, number> = {
+    MELAMPAUI: 0,
+    MENCAPAI: 0,
+    OBSERVASI: 0,
+    KTS_MINOR: 0,
+    KTS_MAYOR: 0,
+  };
+
+  const auditorContribMap = new Map<string, { count: number; codes: string[] }>();
+  const auditeeContribMap = new Map<string, { count: number; codes: string[] }>();
 
   for (const ind of indikator) {
-    if (ind.isian?.linkDrive?.trim()) totalAdaBuktiAuditee++;
+    const hasBukti = Boolean(ind.isian?.linkDrive?.trim());
+    if (hasBukti) totalAdaBuktiAuditee++;
+
+    const effKlas = getEffectiveKlasifikasi(ind.id);
+    if (effKlas) {
+      klasifikasiCounts[effKlas]++;
+    }
+
+    const pemeriksa = diperiksaOlehMap[ind.id] ?? ind.isian?.diperiksaOleh ?? null;
+    const pengisi = ind.isian?.diisiOleh ?? null;
+
+    if (hasBukti && pengisi) {
+      const prev = auditeeContribMap.get(pengisi) ?? { count: 0, codes: [] };
+      prev.count++;
+      prev.codes.push(ind.kode);
+      auditeeContribMap.set(pengisi, prev);
+    }
+
     if (isTargetInMode(ind.id) && isItemCheckedInMode(ind.id)) {
       totalSudahDicekMode++;
+      if (currentUserName && pemeriksa === currentUserName) {
+        myCheckedCountMode++;
+      }
+      if (pemeriksa) {
+        const prev = auditorContribMap.get(pemeriksa) ?? { count: 0, codes: [] };
+        prev.count++;
+        prev.codes.push(ind.kode);
+        auditorContribMap.set(pemeriksa, prev);
+      }
     }
 
     const ts = ind.isian?.updatedAt ? new Date(ind.isian.updatedAt).getTime() : 1;
@@ -759,13 +813,31 @@ export default function AuditorClient({
   const matchesAuditorFilter = (ind: AuditorIndikatorItem, noUrut: number) => {
     const hasBukti = Boolean(ind.isian?.linkDrive?.trim());
     const sudahDicek = isItemCheckedInMode(ind.id);
+    const pemeriksa = diperiksaOlehMap[ind.id] ?? ind.isian?.diperiksaOleh ?? null;
+    const pengisi = ind.isian?.diisiOleh ?? null;
+    const effKlas = getEffectiveKlasifikasi(ind.id);
 
     if (activeMode !== "lapangan" && statusFilter === "ADA_BUKTI" && !hasBukti) return false;
     if (statusFilter === "BELUM_VERIF" && sudahDicek) return false;
     if (statusFilter === "SUDAH_VERIF" && !sudahDicek) return false;
+    if (statusFilter === "DICEK_SAYA" && (!sudahDicek || pemeriksa !== currentUserName)) {
+      return false;
+    }
+
+    if (klasifikasiFilter !== "ALL" && effKlas !== klasifikasiFilter) {
+      return false;
+    }
+
+    if (contributorAuditorFilter && (!sudahDicek || pemeriksa !== contributorAuditorFilter)) {
+      return false;
+    }
+
+    if (contributorAuditeeFilter && (!hasBukti || pengisi !== contributorAuditeeFilter)) {
+      return false;
+    }
 
     if (qNorm) {
-      const hay = `#${noUrut} ${ind.kode} ${ind.standar} ${ind.pernyataanStandar ?? ""} ${ind.pernyataan} ${ind.buktiDiminta ?? ""} ${ind.isian?.klaim ?? ""}`.toLowerCase();
+      const hay = `#${noUrut} ${ind.kode} ${ind.standar} ${ind.pernyataanStandar ?? ""} ${ind.pernyataan} ${ind.buktiDiminta ?? ""} ${ind.isian?.klaim ?? ""} ${pemeriksa ?? ""} ${pengisi ?? ""}`.toLowerCase();
       if (!hay.includes(qNorm)) return false;
     }
     return true;
@@ -1088,14 +1160,26 @@ export default function AuditorClient({
             </div>
           </div>
 
-          {/* 3. Filter Status Cepat + Kotak Cari Kata Kunci */}
+          {/* 3. Filter Status Cepat + Filter Klasifikasi Temuan + Kotak Cari Kata Kunci */}
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-black/15 pt-2.5">
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="font-black uppercase text-black">Filter Status:</span>
               <button
                 type="button"
-                onClick={() => setStatusFilter("ALL")}
-                className={statusFilter === "ALL" ? "btn px-2.5 py-1 text-xs" : "btn-secondary px-2.5 py-1 text-xs"}
+                onClick={() => {
+                  setStatusFilter("ALL");
+                  setKlasifikasiFilter("ALL");
+                  setContributorAuditorFilter(null);
+                  setContributorAuditeeFilter(null);
+                }}
+                className={
+                  statusFilter === "ALL" &&
+                  klasifikasiFilter === "ALL" &&
+                  !contributorAuditorFilter &&
+                  !contributorAuditeeFilter
+                    ? "btn px-2.5 py-1 text-xs"
+                    : "btn-secondary px-2.5 py-1 text-xs"
+                }
               >
                 Semua ({totalTargetMode})
               </button>
@@ -1122,6 +1206,63 @@ export default function AuditorClient({
               >
                 ✅ Sudah Dicek ({totalSudahDicekMode})
               </button>
+              {currentUserName && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setStatusFilter(statusFilter === "DICEK_SAYA" ? "ALL" : "DICEK_SAYA")
+                  }
+                  className={
+                    statusFilter === "DICEK_SAYA"
+                      ? "btn px-2.5 py-1 text-xs"
+                      : "btn-secondary px-2.5 py-1 text-xs"
+                  }
+                  title={`Tampilkan hanya indikator yang diperiksa oleh ${currentUserName}`}
+                >
+                  🕵️ Dicek Saya ({myCheckedCountMode})
+                </button>
+              )}
+
+              {/* Tombol Filter Klasifikasi Temuan tepat di samping Filter Sudah Dicek */}
+              <span className="mx-0.5 font-black text-black/30">|</span>
+              {(
+                [
+                  { key: "MELAMPAUI" as Klasifikasi, label: "🌟 Melampaui" },
+                  { key: "MENCAPAI" as Klasifikasi, label: "✅ Mencapai" },
+                  { key: "OBSERVASI" as Klasifikasi, label: "🔍 Observasi" },
+                  { key: "KTS_MINOR" as Klasifikasi, label: "⚠️ KTS Minor" },
+                  { key: "KTS_MAYOR" as Klasifikasi, label: "🚨 KTS Mayor" },
+                ]
+              ).map(({ key, label }) => {
+                const active = klasifikasiFilter === key;
+                const count = klasifikasiCounts[key];
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => {
+                      if (active) {
+                        setKlasifikasiFilter("ALL");
+                      } else {
+                        setKlasifikasiFilter(key);
+                        if (
+                          activeMode === "rtl" &&
+                          (key === "MELAMPAUI" || key === "MENCAPAI")
+                        ) {
+                          switchMode("lapangan");
+                        }
+                      }
+                    }}
+                    className={
+                      active
+                        ? "btn px-2.5 py-1 text-xs"
+                        : "btn-secondary px-2.5 py-1 text-xs"
+                    }
+                  >
+                    {label} ({count})
+                  </button>
+                );
+              })}
             </div>
 
             <div className="flex min-w-[220px] flex-1 items-center gap-1.5 sm:max-w-xs">
@@ -1143,11 +1284,84 @@ export default function AuditorClient({
               )}
             </div>
           </div>
+
+          {/* 4. Ringkasan & Filter Kontribusi per Akun (Auditor yang Mengecek & Auditee yang Mengupload) */}
+          {(auditorContribMap.size > 0 || auditeeContribMap.size > 0 || currentUserName) && (
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-black/15 pt-2.5">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="font-black uppercase text-black">🕵️ Dicek Auditor:</span>
+                {currentUserName && !auditorContribMap.has(currentUserName) && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setContributorAuditorFilter(
+                        contributorAuditorFilter === currentUserName ? null : currentUserName
+                      )
+                    }
+                    className={
+                      contributorAuditorFilter === currentUserName
+                        ? "btn px-2.5 py-0.5 text-xs"
+                        : "btn-secondary px-2.5 py-0.5 text-xs"
+                    }
+                  >
+                    ⭐ Saya ({currentUserName}): 0 Indikator
+                  </button>
+                )}
+                {Array.from(auditorContribMap.entries()).map(([nama, info]) => {
+                  const isMe = currentUserName === nama;
+                  const active = contributorAuditorFilter === nama;
+                  return (
+                    <button
+                      key={nama}
+                      type="button"
+                      onClick={() => setContributorAuditorFilter(active ? null : nama)}
+                      title={`Indikator yang dicek ${nama}: ${info.codes.join(", ")}`}
+                      className={
+                        active
+                          ? "btn px-2.5 py-0.5 text-xs"
+                          : "btn-secondary px-2.5 py-0.5 text-xs"
+                      }
+                    >
+                      {isMe ? `⭐ Saya (${nama})` : `🕵️ ${nama}`}: {info.count} Indikator
+                    </button>
+                  );
+                })}
+              </div>
+
+              {auditeeContribMap.size > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="font-black uppercase text-black">👤 Diupload Auditee:</span>
+                  {Array.from(auditeeContribMap.entries()).map(([nama, info]) => {
+                    const active = contributorAuditeeFilter === nama;
+                    return (
+                      <button
+                        key={nama}
+                        type="button"
+                        onClick={() => setContributorAuditeeFilter(active ? null : nama)}
+                        title={`Indikator yang diupload ${nama}: ${info.codes.join(", ")}`}
+                        className={
+                          active
+                            ? "btn px-2.5 py-0.5 text-xs"
+                            : "btn-secondary px-2.5 py-0.5 text-xs"
+                        }
+                      >
+                        👤 {nama}: {info.count} Indikator
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
       {visibleGroups.map((group) => {
-        const baseItems = group.items.filter((entry) => isTargetInMode(entry.item.id));
+        const baseItems = group.items.filter((entry) =>
+          klasifikasiFilter !== "ALL"
+            ? getEffectiveKlasifikasi(entry.item.id) === klasifikasiFilter
+            : isTargetInMode(entry.item.id)
+        );
         const groupItems = baseItems.filter(({ item, noUrut }) => matchesAuditorFilter(item, noUrut));
 
         if (groupItems.length === 0) return null;
@@ -1179,6 +1393,7 @@ export default function AuditorClient({
               const isCheckedInMode = isItemCheckedInMode(ind.id);
               const namaPemeriksa = diperiksaOlehMap[ind.id] ?? isian?.diperiksaOleh;
               const isVerifiedLapangan = Boolean(verifiedLapanganMap[ind.id]);
+              const effKlas = getEffectiveKlasifikasi(ind.id);
 
               return (
                 <div
@@ -1199,6 +1414,21 @@ export default function AuditorClient({
                       <span className="text-base font-black text-black">{ind.standar}</span>
                       {isian?.diisiOleh && <Badge tone="blue">👤 {isian.diisiOleh}</Badge>}
                       {namaPemeriksa && <Badge tone="purple">🕵️ {namaPemeriksa}</Badge>}
+                      {effKlas && (
+                        <Badge
+                          tone={
+                            effKlas === "MELAMPAUI" || effKlas === "MENCAPAI"
+                              ? "green"
+                              : effKlas === "OBSERVASI"
+                                ? "blue"
+                                : effKlas === "KTS_MINOR"
+                                  ? "amber"
+                                  : "red"
+                          }
+                        >
+                          {KLASIFIKASI_LABEL[effKlas]}
+                        </Badge>
+                      )}
                       {isCheckedInMode ? (
                         <Badge tone="green">✅ Sudah Dicek</Badge>
                       ) : (

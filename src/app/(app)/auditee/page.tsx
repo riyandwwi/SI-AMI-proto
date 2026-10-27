@@ -229,6 +229,7 @@ export default async function AuditeePage({ searchParams }: { searchParams: SP }
           unitId={user.unitId}
           buka={buka}
           arsipId={isReadOnlyArchive ? periode.id : undefined}
+          currentUserName={user.nama}
           indikator={clientItems}
         />
       )}

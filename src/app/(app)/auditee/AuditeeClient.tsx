@@ -57,12 +57,14 @@ export default function AuditeeClient({
   unitId,
   buka,
   arsipId,
+  currentUserName,
   indikator,
 }: {
   periodeId: string;
   unitId: string;
   buka: boolean;
   arsipId?: string;
+  currentUserName?: string;
   indikator: AuditeeIndikatorItem[];
 }) {
   const router = useRouter();
@@ -108,7 +110,12 @@ export default function AuditeeClient({
   const [notice, setNotice] = useState<{ ok?: string; err?: string } | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [standarFilter, setStandarFilter] = useState<string>("ALL");
-  const [statusFilter, setStatusFilter] = useState<"ALL" | "BELUM" | "SUDAH" | "RTL">("ALL");
+  const [statusFilter, setStatusFilter] = useState<
+    "ALL" | "BELUM" | "SUDAH" | "DIUPLOAD_SAYA" | "RTL"
+  >("ALL");
+  const [klasifikasiFilter, setKlasifikasiFilter] = useState<"ALL" | Klasifikasi>("ALL");
+  const [contributorAuditeeFilter, setContributorAuditeeFilter] = useState<string | null>(null);
+  const [contributorAuditorFilter, setContributorAuditorFilter] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [lastSavedManual, setLastSavedManual] = useState<{ nama: string; kode: string } | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -385,18 +392,58 @@ export default function AuditeeClient({
     });
   };
 
-  // Cari hanya 1 Save Terakhir (bukan daftar panjang semua indikator per orang)
+  // Cari hanya 1 Save Terakhir (bukan daftar panjang semua indikator per orang) + Statistik Klasifikasi & Kontribusi per Akun
   let totalTersimpan = 0;
   let totalWajibRtl = 0;
   let totalLockedAuditor = 0;
+  let myUploadedCount = 0;
   let latestDbEntry: { nama: string; kode: string; ts: number } | null = null;
+
+  const klasifikasiCounts: Record<Klasifikasi, number> = {
+    MELAMPAUI: 0,
+    MENCAPAI: 0,
+    OBSERVASI: 0,
+    KTS_MINOR: 0,
+    KTS_MAYOR: 0,
+  };
+
+  const auditeeContribMap = new Map<string, { count: number; codes: string[] }>();
+  const auditorContribMap = new Map<string, { count: number; codes: string[] }>();
 
   for (const ind of indikator) {
     const savDrive = (savedValues[ind.id]?.linkDrive ?? ind.isian?.linkDrive ?? "").trim();
-    if (savDrive) totalTersimpan++;
-    if (ind.isian?.klasifikasi && BUTUH_RTL.includes(ind.isian.klasifikasi)) totalWajibRtl++;
-    if (ind.isian?.terverifikasiAuditor || ind.isian?.terverifikasiLapangan) totalLockedAuditor++;
-    const namaPengisi = savedValues[ind.id]?.diisiOleh ?? ind.isian?.diisiOleh;
+    const namaPengisi = savedValues[ind.id]?.diisiOleh ?? ind.isian?.diisiOleh ?? null;
+    const namaPemeriksa = ind.isian?.diperiksaOleh ?? null;
+
+    if (savDrive) {
+      totalTersimpan++;
+      if (currentUserName && namaPengisi === currentUserName) {
+        myUploadedCount++;
+      }
+      if (namaPengisi) {
+        const prev = auditeeContribMap.get(namaPengisi) ?? { count: 0, codes: [] };
+        prev.count++;
+        prev.codes.push(ind.kode);
+        auditeeContribMap.set(namaPengisi, prev);
+      }
+    }
+
+    if (ind.isian?.klasifikasi) {
+      klasifikasiCounts[ind.isian.klasifikasi]++;
+      if (BUTUH_RTL.includes(ind.isian.klasifikasi)) totalWajibRtl++;
+    }
+
+    if (ind.isian?.terverifikasiAuditor || ind.isian?.terverifikasiLapangan) {
+      totalLockedAuditor++;
+    }
+
+    if (namaPemeriksa) {
+      const prev = auditorContribMap.get(namaPemeriksa) ?? { count: 0, codes: [] };
+      prev.count++;
+      prev.codes.push(ind.kode);
+      auditorContribMap.set(namaPemeriksa, prev);
+    }
+
     if (namaPengisi) {
       const ts = ind.isian?.updatedAt ? new Date(ind.isian.updatedAt).getTime() : 1;
       if (!latestDbEntry || ts >= latestDbEntry.ts) {
@@ -412,14 +459,31 @@ export default function AuditeeClient({
   const qNorm = searchQuery.trim().toLowerCase();
   const matchesFilterAndSearch = (ind: AuditeeIndikatorItem, noUrut: number) => {
     const savDrive = Boolean((savedValues[ind.id]?.linkDrive ?? ind.isian?.linkDrive ?? "").trim());
+    const namaPengisi = savedValues[ind.id]?.diisiOleh ?? ind.isian?.diisiOleh ?? null;
+    const namaPemeriksa = ind.isian?.diperiksaOleh ?? null;
     const perluRtl = Boolean(ind.isian?.klasifikasi && BUTUH_RTL.includes(ind.isian.klasifikasi));
 
     if (statusFilter === "BELUM" && savDrive) return false;
     if (statusFilter === "SUDAH" && !savDrive) return false;
+    if (statusFilter === "DIUPLOAD_SAYA" && (!savDrive || namaPengisi !== currentUserName)) {
+      return false;
+    }
     if (statusFilter === "RTL" && !perluRtl) return false;
 
+    if (klasifikasiFilter !== "ALL" && ind.isian?.klasifikasi !== klasifikasiFilter) {
+      return false;
+    }
+
+    if (contributorAuditeeFilter && (!savDrive || namaPengisi !== contributorAuditeeFilter)) {
+      return false;
+    }
+
+    if (contributorAuditorFilter && namaPemeriksa !== contributorAuditorFilter) {
+      return false;
+    }
+
     if (qNorm) {
-      const hay = `#${noUrut} ${ind.kode} ${ind.standar} ${ind.pernyataanStandar ?? ""} ${ind.pernyataan} ${ind.buktiDiminta ?? ""}`.toLowerCase();
+      const hay = `#${noUrut} ${ind.kode} ${ind.standar} ${ind.pernyataanStandar ?? ""} ${ind.pernyataan} ${ind.buktiDiminta ?? ""} ${namaPengisi ?? ""} ${namaPemeriksa ?? ""}`.toLowerCase();
       if (!hay.includes(qNorm)) return false;
     }
     return true;
@@ -579,14 +643,26 @@ export default function AuditeeClient({
           </div>
         </div>
 
-        {/* 3. Filter Status Cepat + Kotak Cari Kata Kunci */}
+        {/* 3. Filter Status Cepat + Filter Klasifikasi Temuan + Kotak Cari Kata Kunci */}
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-black/15 pt-2.5">
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="font-black uppercase text-black">Filter Status:</span>
             <button
               type="button"
-              onClick={() => setStatusFilter("ALL")}
-              className={statusFilter === "ALL" ? "btn px-2.5 py-1 text-xs" : "btn-secondary px-2.5 py-1 text-xs"}
+              onClick={() => {
+                setStatusFilter("ALL");
+                setKlasifikasiFilter("ALL");
+                setContributorAuditeeFilter(null);
+                setContributorAuditorFilter(null);
+              }}
+              className={
+                statusFilter === "ALL" &&
+                klasifikasiFilter === "ALL" &&
+                !contributorAuditeeFilter &&
+                !contributorAuditorFilter
+                  ? "btn px-2.5 py-1 text-xs"
+                  : "btn-secondary px-2.5 py-1 text-xs"
+              }
             >
               Semua ({indikator.length})
             </button>
@@ -604,6 +680,22 @@ export default function AuditeeClient({
             >
               ✅ Sudah Diisi ({totalTersimpan})
             </button>
+            {currentUserName && (
+              <button
+                type="button"
+                onClick={() =>
+                  setStatusFilter(statusFilter === "DIUPLOAD_SAYA" ? "ALL" : "DIUPLOAD_SAYA")
+                }
+                className={
+                  statusFilter === "DIUPLOAD_SAYA"
+                    ? "btn px-2.5 py-1 text-xs"
+                    : "btn-secondary px-2.5 py-1 text-xs"
+                }
+                title={`Tampilkan hanya indikator yang diupload oleh ${currentUserName}`}
+              >
+                👤 Diupload Saya ({myUploadedCount})
+              </button>
+            )}
             {totalWajibRtl > 0 && (
               <button
                 type="button"
@@ -634,6 +726,117 @@ export default function AuditeeClient({
             )}
           </div>
         </div>
+
+        {/* 4. Filter Klasifikasi Temuan (Rapi & Mudah Diakses) */}
+        <div className="flex flex-wrap items-center gap-1.5 border-t border-black/15 pt-2.5">
+          <span className="font-black uppercase text-black">🏷️ Klasifikasi Temuan:</span>
+          <button
+            type="button"
+            onClick={() => setKlasifikasiFilter("ALL")}
+            className={
+              klasifikasiFilter === "ALL"
+                ? "btn px-2.5 py-1 text-xs"
+                : "btn-secondary px-2.5 py-1 text-xs"
+            }
+          >
+            Semua Klasifikasi
+          </button>
+          {(
+            [
+              { key: "MELAMPAUI" as Klasifikasi, label: "🌟 Melampaui" },
+              { key: "MENCAPAI" as Klasifikasi, label: "✅ Mencapai" },
+              { key: "OBSERVASI" as Klasifikasi, label: "🔍 Observasi" },
+              { key: "KTS_MINOR" as Klasifikasi, label: "⚠️ KTS Minor" },
+              { key: "KTS_MAYOR" as Klasifikasi, label: "🚨 KTS Mayor" },
+            ]
+          ).map(({ key, label }) => {
+            const active = klasifikasiFilter === key;
+            const count = klasifikasiCounts[key];
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setKlasifikasiFilter(active ? "ALL" : key)}
+                className={
+                  active
+                    ? "btn px-2.5 py-1 text-xs"
+                    : "btn-secondary px-2.5 py-1 text-xs"
+                }
+              >
+                {label} ({count})
+              </button>
+            );
+          })}
+        </div>
+
+        {/* 5. Ringkasan & Filter Kontribusi per Akun (Auditee yang Upload & Auditor yang Mengecek) */}
+        {(auditeeContribMap.size > 0 || auditorContribMap.size > 0 || currentUserName) && (
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-black/15 pt-2.5">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="font-black uppercase text-black">👤 Diupload Auditee:</span>
+              {currentUserName && !auditeeContribMap.has(currentUserName) && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setContributorAuditeeFilter(
+                      contributorAuditeeFilter === currentUserName ? null : currentUserName
+                    )
+                  }
+                  className={
+                    contributorAuditeeFilter === currentUserName
+                      ? "btn px-2.5 py-0.5 text-xs"
+                      : "btn-secondary px-2.5 py-0.5 text-xs"
+                  }
+                >
+                  ⭐ Saya ({currentUserName}): 0 Indikator
+                </button>
+              )}
+              {Array.from(auditeeContribMap.entries()).map(([nama, info]) => {
+                const isMe = currentUserName === nama;
+                const active = contributorAuditeeFilter === nama;
+                return (
+                  <button
+                    key={nama}
+                    type="button"
+                    onClick={() => setContributorAuditeeFilter(active ? null : nama)}
+                    title={`Indikator yang diupload ${nama}: ${info.codes.join(", ")}`}
+                    className={
+                      active
+                        ? "btn px-2.5 py-0.5 text-xs"
+                        : "btn-secondary px-2.5 py-0.5 text-xs"
+                    }
+                  >
+                    {isMe ? `⭐ Saya (${nama})` : `👤 ${nama}`}: {info.count} Indikator
+                  </button>
+                );
+              })}
+            </div>
+
+            {auditorContribMap.size > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="font-black uppercase text-black">🕵️ Dicek Auditor:</span>
+                {Array.from(auditorContribMap.entries()).map(([nama, info]) => {
+                  const active = contributorAuditorFilter === nama;
+                  return (
+                    <button
+                      key={nama}
+                      type="button"
+                      onClick={() => setContributorAuditorFilter(active ? null : nama)}
+                      title={`Indikator yang dicek ${nama}: ${info.codes.join(", ")}`}
+                      className={
+                        active
+                          ? "btn px-2.5 py-0.5 text-xs"
+                          : "btn-secondary px-2.5 py-0.5 text-xs"
+                      }
+                    >
+                      🕵️ {nama}: {info.count} Indikator
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Tampilkan Hanya 1 Save Terakhir agar Ringkas & Tidak Merusak Tampilan */}
         {latestSavedDisplay && (
