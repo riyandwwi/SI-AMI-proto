@@ -830,7 +830,7 @@ export default function AuditorClient({
 
         <div className="flex flex-wrap items-center gap-2">
           <a
-            href={`/auditor/${unitId}/print?periodeId=${periodeId}`}
+            href={`/api/rekap-excel?periodeId=${encodeURIComponent(periodeId)}&print=1`}
             target="_blank"
             rel="noopener noreferrer"
             className="btn-secondary text-xs"
