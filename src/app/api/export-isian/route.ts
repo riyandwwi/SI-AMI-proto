@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { KLASIFIKASI_LABEL, STATUS_DOK_LABEL } from "@/lib/periode";
+import { KLASIFIKASI_LABEL, RTL_LABEL, STATUS_DOK_LABEL } from "@/lib/periode";
 
 export const dynamic = "force-dynamic";
 
@@ -113,6 +113,10 @@ export async function GET(req: NextRequest) {
           "Catatan Audit Lapangan": isian?.catatanLapangan ?? "",
           "Rekomendasi Auditor": isian?.rekomendasi ?? "",
           "Diperiksa Oleh (Auditor)": isian?.diperiksaOleh ?? "-",
+          "Rencana Tindak Lanjut (RTL Auditee)": isian?.rtlRencana ?? "",
+          "Link Bukti Drive RTL": isian?.rtlLinkBukti ?? "",
+          "Status Verifikasi RTL": isian ? RTL_LABEL[isian.rtlStatus] : "-",
+          "Catatan Verifikasi RTL Auditor": isian?.rtlCatatanAuditor ?? "",
           "Waktu Simpan Terakhir": isian?.updatedAt
             ? new Date(isian.updatedAt).toLocaleString("id-ID")
             : "-",
@@ -282,6 +286,9 @@ export async function GET(req: NextRequest) {
         "Evaluasi Diri Auditee": isian?.klaim ?? "",
         "Link Google Drive Bukti": isian?.linkDrive ?? "",
         "Diisi Oleh (Auditee)": isian?.diisiOleh ?? "-",
+        "Rencana Tindak Lanjut (RTL Auditee)": isian?.rtlRencana ?? "",
+        "Link Bukti Drive RTL": isian?.rtlLinkBukti ?? "",
+        "Status RTL": isian ? RTL_LABEL[isian.rtlStatus] : "-",
         "Waktu Simpan Terakhir": isian?.updatedAt
           ? new Date(isian.updatedAt).toLocaleString("id-ID")
           : "-",
@@ -309,6 +316,10 @@ export async function GET(req: NextRequest) {
         "Catatan Audit Lapangan": isian?.catatanLapangan ?? "",
         "Rekomendasi Auditor": isian?.rekomendasi ?? "",
         "Diperiksa Oleh (Auditor)": isian?.diperiksaOleh ?? "-",
+        "Rencana Tindak Lanjut (RTL Auditee)": isian?.rtlRencana ?? "",
+        "Link Bukti Drive RTL": isian?.rtlLinkBukti ?? "",
+        "Status Verifikasi RTL": isian ? RTL_LABEL[isian.rtlStatus] : "-",
+        "Catatan Verifikasi RTL Auditor": isian?.rtlCatatanAuditor ?? "",
         "Waktu Simpan Terakhir": isian?.updatedAt
           ? new Date(isian.updatedAt).toLocaleString("id-ID")
           : "-",
@@ -337,6 +348,10 @@ export async function GET(req: NextRequest) {
       "Catatan Audit Lapangan": isian?.catatanLapangan ?? "",
       "Rekomendasi Auditor": isian?.rekomendasi ?? "",
       "Diperiksa Oleh (Auditor)": isian?.diperiksaOleh ?? "-",
+      "Rencana Tindak Lanjut (RTL Auditee)": isian?.rtlRencana ?? "",
+      "Link Bukti Drive RTL": isian?.rtlLinkBukti ?? "",
+      "Status Verifikasi RTL": isian ? RTL_LABEL[isian.rtlStatus] : "-",
+      "Catatan Verifikasi RTL Auditor": isian?.rtlCatatanAuditor ?? "",
       "Waktu Simpan Terakhir": isian?.updatedAt
         ? new Date(isian.updatedAt).toLocaleString("id-ID")
         : "-",
