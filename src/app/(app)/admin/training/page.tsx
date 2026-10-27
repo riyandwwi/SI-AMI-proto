@@ -109,6 +109,10 @@ export default async function AdminTrainingPage({ searchParams }: { searchParams
           nama: tp.nama,
           semester: tp.semester,
           indikatorCount: tp.indikator.length,
+          ketuaAuditorId: tp.ketuaAuditorId,
+          ketuaAuditorNama: tp.ketuaAuditorNama,
+          ketuaAuditeeId: tp.ketuaAuditeeId,
+          ketuaAuditeeNama: tp.ketuaAuditeeNama,
         }))}
         allTrainingUsers={trainingUsers.map((u) => ({
           id: u.id,

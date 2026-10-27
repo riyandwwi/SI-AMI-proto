@@ -307,6 +307,8 @@ export async function pindahkanAkunTrainingClient(payload: {
     return { ok: false, error: "Akun training tidak ditemukan." };
   }
 
+  const oldPeriodeId = targetUser.trainingPeriodeId;
+
   if (!targetPeriodeId) {
     await prisma.user.update({
       where: { id: targetUser.id },
@@ -315,6 +317,21 @@ export async function pindahkanAkunTrainingClient(payload: {
         unitId: null,
       },
     });
+    if (oldPeriodeId) {
+      const oldPeriode = await prisma.periode.findUnique({ where: { id: oldPeriodeId } });
+      if (oldPeriode?.ketuaAuditorId === targetUser.id) {
+        await prisma.periode.update({
+          where: { id: oldPeriodeId },
+          data: { ketuaAuditorId: null, ketuaAuditorNama: null, ketuaAuditorNip: null },
+        });
+      }
+      if (oldPeriode?.ketuaAuditeeId === targetUser.id) {
+        await prisma.periode.update({
+          where: { id: oldPeriodeId },
+          data: { ketuaAuditeeId: null, ketuaAuditeeNama: null, ketuaAuditeeNip: null },
+        });
+      }
+    }
     revalidatePath("/admin/training");
     revalidatePath("/lpm");
     return { ok: true, message: `${targetUser.nama} dikeluarkan dari kelompok.` };
@@ -335,6 +352,23 @@ export async function pindahkanAkunTrainingClient(payload: {
       unitId: periode.unitId,
     },
   });
+
+  // Jika pindah role / kelompok, bersihkan jabatan ketua lama
+  if (oldPeriodeId) {
+    const oldPeriode = await prisma.periode.findUnique({ where: { id: oldPeriodeId } });
+    if (oldPeriode?.ketuaAuditorId === targetUser.id && (oldPeriodeId !== periode.id || role !== "AUDITOR")) {
+      await prisma.periode.update({
+        where: { id: oldPeriodeId },
+        data: { ketuaAuditorId: null, ketuaAuditorNama: null, ketuaAuditorNip: null },
+      });
+    }
+    if (oldPeriode?.ketuaAuditeeId === targetUser.id && (oldPeriodeId !== periode.id || role !== "AUDITEE")) {
+      await prisma.periode.update({
+        where: { id: oldPeriodeId },
+        data: { ketuaAuditeeId: null, ketuaAuditeeNama: null, ketuaAuditeeNip: null },
+      });
+    }
+  }
 
   if (role === "AUDITOR" && !periode.ketuaAuditorId) {
     await prisma.periode.update({
@@ -366,6 +400,63 @@ export async function pindahkanAkunTrainingClient(payload: {
   return {
     ok: true,
     message: `${targetUser.nama} dipindahkan ke ${periode.semester} sebagai ${role === "AUDITOR" ? "🕵️ Auditor (Kiri)" : "📝 Auditee (Kanan)"}.`,
+  };
+}
+
+export async function pilihKetuaTrainingClient(payload: {
+  periodeId: string;
+  tipe: "AUDITOR" | "AUDITEE";
+  userId: string;
+}): Promise<{ ok: boolean; message?: string; error?: string }> {
+  const admin = await requireUser("SUPER_ADMIN", "LPM");
+  const { periodeId, tipe, userId } = payload;
+
+  const [periode, targetUser] = await Promise.all([
+    prisma.periode.findUnique({ where: { id: periodeId } }),
+    prisma.user.findUnique({ where: { id: userId } }),
+  ]);
+
+  if (!periode || !periode.isTraining) {
+    return { ok: false, error: "Kelompok training tidak ditemukan." };
+  }
+  if (!targetUser || !targetUser.isTraining || targetUser.trainingPeriodeId !== periode.id) {
+    return { ok: false, error: "Peserta tidak ditemukan dalam kelompok ini." };
+  }
+
+  if (tipe === "AUDITOR") {
+    await prisma.periode.update({
+      where: { id: periode.id },
+      data: {
+        ketuaAuditorId: targetUser.id,
+        ketuaAuditorNama: targetUser.nama,
+        ketuaAuditorNip: targetUser.nimNuptk || null,
+      },
+    });
+  } else {
+    await prisma.periode.update({
+      where: { id: periode.id },
+      data: {
+        ketuaAuditeeId: targetUser.id,
+        ketuaAuditeeNama: targetUser.nama,
+        ketuaAuditeeNip: targetUser.nimNuptk || null,
+      },
+    });
+  }
+
+  await catat(
+    admin.id,
+    `PILIH_KETUA_TRAINING_${tipe}`,
+    `${targetUser.nama} -> ${periode.nama}`
+  );
+  revalidatePath("/admin/training");
+  revalidatePath("/lpm");
+  revalidatePath("/lpm/rekap");
+  revalidatePath("/auditor");
+  revalidatePath("/auditee");
+
+  return {
+    ok: true,
+    message: `⭐ Ketua ${tipe === "AUDITOR" ? "Auditor" : "Auditee"} (${periode.semester}) ditetapkan: ${targetUser.nama}`,
   };
 }
 

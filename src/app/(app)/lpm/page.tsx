@@ -290,21 +290,46 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                               {p.trainingUsers.filter((tu) => tu.role === "AUDITOR").length} Auditor
                             </Badge>
                           </div>
-                          <div className="flex flex-wrap gap-2">
+                          <ul className="space-y-1.5 text-xs">
                             {p.trainingUsers
                               .filter((tu) => tu.role === "AUDITOR")
-                              .map((tu) => (
-                                <span
-                                  key={tu.id}
-                                  className="inline-flex items-center gap-1.5 rounded-xl border border-black/20 bg-white px-3 py-1.5 text-xs font-bold text-black"
-                                >
-                                  🕵️ {tu.nama}{" "}
-                                  <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] text-slate-700">
-                                    {tu.username}
-                                  </code>
-                                </span>
-                              ))}
-                          </div>
+                              .map((tu) => {
+                                const isKetuaAuditor = p.ketuaAuditorId === tu.id;
+                                return (
+                                  <li
+                                    key={tu.id}
+                                    className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-black/15 bg-white px-3 py-2"
+                                  >
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                      <span className="font-bold text-black">🕵️ {tu.nama}</span>
+                                      {isKetuaAuditor && (
+                                        <Badge tone="amber">⭐ Ketua Auditor</Badge>
+                                      )}
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                      <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] font-bold text-slate-800">
+                                        {tu.username}
+                                      </code>
+                                      {!isKetuaAuditor && (
+                                        <form action={pilihKetuaSesiAmi}>
+                                          <input type="hidden" name="periodeId" value={p.id} />
+                                          <input type="hidden" name="tipe" value="AUDITOR" />
+                                          <input type="hidden" name="userId" value={tu.id} />
+                                          <input
+                                            type="hidden"
+                                            name="returnTo"
+                                            value={`/lpm?tab=sesi&prodi=${prodiFilter}`}
+                                          />
+                                          <button className="btn-secondary px-2 py-0.5 text-[11px]">
+                                            ⭐ Jadikan Ketua
+                                          </button>
+                                        </form>
+                                      )}
+                                    </div>
+                                  </li>
+                                );
+                              })}
+                          </ul>
                         </div>
 
                         <div className="rounded-2xl border border-black/15 bg-[#FAF7EE] p-4 space-y-2.5">
@@ -316,21 +341,46 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                               {p.trainingUsers.filter((tu) => tu.role === "AUDITEE").length} Auditee
                             </Badge>
                           </div>
-                          <div className="flex flex-wrap gap-2">
+                          <ul className="space-y-1.5 text-xs">
                             {p.trainingUsers
                               .filter((tu) => tu.role === "AUDITEE")
-                              .map((tu) => (
-                                <span
-                                  key={tu.id}
-                                  className="inline-flex items-center gap-1.5 rounded-xl border border-black/20 bg-white px-3 py-1.5 text-xs font-bold text-black"
-                                >
-                                  📝 {tu.nama}{" "}
-                                  <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] text-slate-700">
-                                    {tu.username}
-                                  </code>
-                                </span>
-                              ))}
-                          </div>
+                              .map((tu) => {
+                                const isKetuaAuditee = p.ketuaAuditeeId === tu.id;
+                                return (
+                                  <li
+                                    key={tu.id}
+                                    className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-black/15 bg-white px-3 py-2"
+                                  >
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                      <span className="font-bold text-black">📝 {tu.nama}</span>
+                                      {isKetuaAuditee && (
+                                        <Badge tone="amber">⭐ Ketua Auditee</Badge>
+                                      )}
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                      <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] font-bold text-slate-800">
+                                        {tu.username}
+                                      </code>
+                                      {!isKetuaAuditee && (
+                                        <form action={pilihKetuaSesiAmi}>
+                                          <input type="hidden" name="periodeId" value={p.id} />
+                                          <input type="hidden" name="tipe" value="AUDITEE" />
+                                          <input type="hidden" name="userId" value={tu.id} />
+                                          <input
+                                            type="hidden"
+                                            name="returnTo"
+                                            value={`/lpm?tab=sesi&prodi=${prodiFilter}`}
+                                          />
+                                          <button className="btn-secondary px-2 py-0.5 text-[11px]">
+                                            ⭐ Jadikan Ketua
+                                          </button>
+                                        </form>
+                                      )}
+                                    </div>
+                                  </li>
+                                );
+                              })}
+                          </ul>
                         </div>
                       </div>
                     ) : (

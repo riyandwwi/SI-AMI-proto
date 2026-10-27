@@ -872,7 +872,7 @@ export async function importBatchIndikatorExcel(
 // 5. PENGESAHAN LAPORAN AMI, PILIH KETUA & TEMPEL TTD
 // ====================================================
 export async function pilihKetuaSesiAmi(fd: FormData) {
-  const lpm = await requireUser("LPM");
+  const lpm = await requireUser("SUPER_ADMIN", "LPM");
   const returnTo = str(fd, "returnTo", 200) || "/lpm";
   const periodeId = str(fd, "periodeId", 64);
   const tipe = str(fd, "tipe", 16); // "AUDITEE" | "AUDITOR"
@@ -912,6 +912,7 @@ export async function pilihKetuaSesiAmi(fd: FormData) {
   }
 
   await catat(lpm.id, `PILIH_KETUA_${tipe}`, `${targetUser.nama} -> ${periode.nama}`);
+  revalidatePath("/admin/training");
   revalidatePath("/lpm");
   revalidatePath("/lpm/rekap");
   revalidatePath("/auditor");
@@ -947,73 +948,47 @@ export async function simpanTtdSesi(
   const now = ttdDataUrl ? new Date() : null;
 
   if (tipe === "AUDITEE") {
-    if (periode.isTraining && user.isTraining) {
-      await prisma.periode.update({
-        where: { id: periodeId },
-        data: {
-          ketuaAuditeeId: user.id,
-          ketuaAuditeeNama: user.nama,
-          ketuaAuditeeNip: user.nimNuptk || null,
-          ttdAuditee: ttdDataUrl,
-          ttdAuditeeAt: now,
-        },
-      });
-    } else {
-      if (user.role !== "AUDITEE" && user.role !== "LPM") {
-        return { ok: false, error: "Hanya Ketua Auditee yang dapat menempel TTD Auditee." };
-      }
-      if (user.role === "AUDITEE" && periode.ketuaAuditeeId && periode.ketuaAuditeeId !== user.id) {
-        return {
-          ok: false,
-          error: `Hanya Ketua Auditee (${periode.ketuaAuditeeNama}) yang ditunjuk LPM yang dapat menempel TTD pada sesi ini.`,
-        };
-      }
-
-      await prisma.periode.update({
-        where: { id: periodeId },
-        data: {
-          ketuaAuditeeId: periode.ketuaAuditeeId ?? user.id,
-          ketuaAuditeeNama: periode.ketuaAuditeeNama ?? user.nama,
-          ketuaAuditeeNip: periode.ketuaAuditeeNip ?? (user.nimNuptk || null),
-          ttdAuditee: ttdDataUrl,
-          ttdAuditeeAt: now,
-        },
-      });
+    if (user.role !== "AUDITEE" && user.role !== "LPM") {
+      return { ok: false, error: "Hanya Ketua Auditee yang dapat menempel TTD Auditee." };
     }
+    if (user.role === "AUDITEE" && periode.ketuaAuditeeId && periode.ketuaAuditeeId !== user.id) {
+      return {
+        ok: false,
+        error: `Hanya Ketua Auditee (${periode.ketuaAuditeeNama}) yang ditunjuk yang dapat menempel TTD pada sesi ini.`,
+      };
+    }
+
+    await prisma.periode.update({
+      where: { id: periodeId },
+      data: {
+        ketuaAuditeeId: periode.ketuaAuditeeId ?? user.id,
+        ketuaAuditeeNama: periode.ketuaAuditeeNama ?? user.nama,
+        ketuaAuditeeNip: periode.ketuaAuditeeNip ?? (user.nimNuptk || null),
+        ttdAuditee: ttdDataUrl,
+        ttdAuditeeAt: now,
+      },
+    });
   } else if (tipe === "AUDITOR") {
-    if (periode.isTraining && user.isTraining) {
-      await prisma.periode.update({
-        where: { id: periodeId },
-        data: {
-          ketuaAuditorId: user.id,
-          ketuaAuditorNama: user.nama,
-          ketuaAuditorNip: user.nimNuptk || null,
-          ttdAuditor: ttdDataUrl,
-          ttdAuditorAt: now,
-        },
-      });
-    } else {
-      if (user.role !== "AUDITOR" && user.role !== "LPM") {
-        return { ok: false, error: "Hanya Ketua Auditor yang dapat menempel TTD Auditor." };
-      }
-      if (user.role === "AUDITOR" && periode.ketuaAuditorId && periode.ketuaAuditorId !== user.id) {
-        return {
-          ok: false,
-          error: `Hanya Ketua Auditor (${periode.ketuaAuditorNama}) yang ditunjuk LPM yang dapat menempel TTD pada sesi ini.`,
-        };
-      }
-
-      await prisma.periode.update({
-        where: { id: periodeId },
-        data: {
-          ketuaAuditorId: periode.ketuaAuditorId ?? user.id,
-          ketuaAuditorNama: periode.ketuaAuditorNama ?? user.nama,
-          ketuaAuditorNip: periode.ketuaAuditorNip ?? (user.nimNuptk || null),
-          ttdAuditor: ttdDataUrl,
-          ttdAuditorAt: now,
-        },
-      });
+    if (user.role !== "AUDITOR" && user.role !== "LPM") {
+      return { ok: false, error: "Hanya Ketua Auditor yang dapat menempel TTD Auditor." };
     }
+    if (user.role === "AUDITOR" && periode.ketuaAuditorId && periode.ketuaAuditorId !== user.id) {
+      return {
+        ok: false,
+        error: `Hanya Ketua Auditor (${periode.ketuaAuditorNama}) yang ditunjuk yang dapat menempel TTD pada sesi ini.`,
+      };
+    }
+
+    await prisma.periode.update({
+      where: { id: periodeId },
+      data: {
+        ketuaAuditorId: periode.ketuaAuditorId ?? user.id,
+        ketuaAuditorNama: periode.ketuaAuditorNama ?? user.nama,
+        ketuaAuditorNip: periode.ketuaAuditorNip ?? (user.nimNuptk || null),
+        ttdAuditor: ttdDataUrl,
+        ttdAuditorAt: now,
+      },
+    });
   } else if (tipe === "LPM") {
     if (user.role !== "LPM") {
       return { ok: false, error: "Hanya Kepala LPM yang dapat menempel TTD LPM." };

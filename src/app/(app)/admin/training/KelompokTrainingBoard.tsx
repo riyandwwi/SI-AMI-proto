@@ -6,6 +6,7 @@ import { Badge, Empty } from "@/components/ui";
 import {
   hapusSatuAkunTraining,
   hapusSatuKelompokTraining,
+  pilihKetuaTrainingClient,
   pindahkanAkunTrainingClient,
 } from "./actions";
 
@@ -22,6 +23,10 @@ export interface TrainingGroupItem {
   nama: string;
   semester: string;
   indikatorCount: number;
+  ketuaAuditorId?: string | null;
+  ketuaAuditorNama?: string | null;
+  ketuaAuditeeId?: string | null;
+  ketuaAuditeeNama?: string | null;
 }
 
 export function KelompokTrainingBoard({
@@ -33,6 +38,16 @@ export function KelompokTrainingBoard({
 }) {
   const router = useRouter();
   const [users, setUsers] = useState<TrainingMemberItem[]>(allTrainingUsers);
+  const [ketuaAuditorMap, setKetuaAuditorMap] = useState<Record<string, string | null>>(() => {
+    const m: Record<string, string | null> = {};
+    for (const g of groups) m[g.id] = g.ketuaAuditorId ?? null;
+    return m;
+  });
+  const [ketuaAuditeeMap, setKetuaAuditeeMap] = useState<Record<string, string | null>>(() => {
+    const m: Record<string, string | null> = {};
+    for (const g of groups) m[g.id] = g.ketuaAuditeeId ?? null;
+    return m;
+  });
   const [draggedUserId, setDraggedUserId] = useState<string | null>(null);
   const [dragOverZone, setDragOverZone] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ ok?: string; err?: string } | null>(null);
@@ -41,6 +56,41 @@ export function KelompokTrainingBoard({
   useEffect(() => {
     setUsers(allTrainingUsers);
   }, [allTrainingUsers]);
+
+  useEffect(() => {
+    const mAud: Record<string, string | null> = {};
+    const mAde: Record<string, string | null> = {};
+    for (const g of groups) {
+      mAud[g.id] = g.ketuaAuditorId ?? null;
+      mAde[g.id] = g.ketuaAuditeeId ?? null;
+    }
+    setKetuaAuditorMap(mAud);
+    setKetuaAuditeeMap(mAde);
+  }, [groups]);
+
+  const handlePilihKetua = (
+    periodeId: string,
+    tipe: "AUDITOR" | "AUDITEE",
+    userId: string
+  ) => {
+    setNotice(null);
+    if (tipe === "AUDITOR") {
+      setKetuaAuditorMap((prev) => ({ ...prev, [periodeId]: userId }));
+    } else {
+      setKetuaAuditeeMap((prev) => ({ ...prev, [periodeId]: userId }));
+    }
+
+    startTransition(async () => {
+      const res = await pilihKetuaTrainingClient({ periodeId, tipe, userId });
+      if (!res.ok) {
+        setNotice({ err: res.error ?? "Gagal memilih ketua." });
+        router.refresh();
+        return;
+      }
+      setNotice({ ok: res.message ?? "Ketua kelompok diperbarui." });
+      router.refresh();
+    });
+  };
 
   const moveUser = (
     userId: string,
@@ -251,70 +301,87 @@ export function KelompokTrainingBoard({
                       </div>
                     ) : (
                       <ul className="space-y-2 text-xs">
-                        {groupAuditors.map((u) => (
-                          <li
-                            key={u.id}
-                            draggable
-                            onDragStart={(e) => {
-                              setDraggedUserId(u.id);
-                              e.dataTransfer.setData("text/plain", u.id);
-                            }}
-                            onDragEnd={() => {
-                              setDraggedUserId(null);
-                              setDragOverZone(null);
-                            }}
-                            className="flex cursor-grab active:cursor-grabbing flex-wrap items-center justify-between gap-2 rounded-xl border-2 border-black bg-white px-3 py-2 shadow-[2px_2px_0px_#000]"
-                            title="Tarik (Drag) untuk pindah ke Auditee (Kanan) atau ke Kelompok lain"
-                          >
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              <span className="font-black text-black">🖐️ {u.nama}</span>
-                              <code className="rounded border border-black bg-[#FEF08A] px-2 py-0.5 font-mono font-black text-black">
-                                {u.username}
-                              </code>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-1">
-                              <button
-                                type="button"
-                                disabled={isPending}
-                                onClick={() => moveUser(u.id, tp.id, "AUDITEE")}
-                                className="btn-secondary px-2 py-0.5 text-[11px]"
-                                title="Pindahkan ke Sisi Kanan (Jadi Auditee)"
-                              >
-                                ⇄ Jadi Auditee 👉
-                              </button>
-                              {groups.length > 1 && (
-                                <select
-                                  value={tp.id}
+                        {groupAuditors.map((u) => {
+                          const isKetuaAuditor = ketuaAuditorMap[tp.id] === u.id;
+                          return (
+                            <li
+                              key={u.id}
+                              draggable
+                              onDragStart={(e) => {
+                                setDraggedUserId(u.id);
+                                e.dataTransfer.setData("text/plain", u.id);
+                              }}
+                              onDragEnd={() => {
+                                setDraggedUserId(null);
+                                setDragOverZone(null);
+                              }}
+                              className="flex cursor-grab active:cursor-grabbing flex-wrap items-center justify-between gap-2 rounded-xl border-2 border-black bg-white px-3 py-2 shadow-[2px_2px_0px_#000]"
+                              title="Tarik (Drag) untuk pindah ke Auditee (Kanan) atau ke Kelompok lain"
+                            >
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <span className="font-black text-black">🖐️ {u.nama}</span>
+                                <code className="rounded border border-black bg-[#FEF08A] px-2 py-0.5 font-mono font-black text-black">
+                                  {u.username}
+                                </code>
+                                {isKetuaAuditor && (
+                                  <Badge tone="amber">⭐ Ketua Auditor</Badge>
+                                )}
+                              </div>
+                              <div className="flex flex-wrap items-center gap-1">
+                                {!isKetuaAuditor && (
+                                  <button
+                                    type="button"
+                                    disabled={isPending}
+                                    onClick={() => handlePilihKetua(tp.id, "AUDITOR", u.id)}
+                                    className="btn-secondary border border-amber-500 bg-amber-50 px-2 py-0.5 text-[11px] font-black text-amber-900 hover:bg-amber-100"
+                                    title="Tetapkan sebagai Ketua Auditor kelompok ini (penandatangan Berita Acara)"
+                                  >
+                                    ⭐ Jadikan Ketua
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
                                   disabled={isPending}
-                                  onChange={(e) => moveUser(u.id, e.target.value, "AUDITOR")}
-                                  className="rounded-lg border border-black bg-white px-1.5 py-0.5 text-[11px] font-bold text-black"
-                                  title="Pindah ke kelompok lain"
+                                  onClick={() => moveUser(u.id, tp.id, "AUDITEE")}
+                                  className="btn-secondary px-2 py-0.5 text-[11px]"
+                                  title="Pindahkan ke Sisi Kanan (Jadi Auditee)"
                                 >
-                                  {groups.map((g) => (
-                                    <option key={g.id} value={g.id}>
-                                      {g.semester}
-                                    </option>
-                                  ))}
-                                </select>
-                              )}
-                              <button
-                                type="button"
-                                disabled={isPending}
-                                onClick={() => moveUser(u.id, null, "AUDITEE")}
-                                className="btn-secondary px-2 py-0.5 text-[11px]"
-                                title="Keluarkan dari kelompok"
-                              >
-                                Lepas
-                              </button>
-                              <form action={hapusSatuAkunTraining}>
-                                <input type="hidden" name="userId" value={u.id} />
-                                <button className="btn-danger px-2 py-0.5 text-[11px]">
-                                  ✕
+                                  ⇄ Jadi Auditee 👉
                                 </button>
-                              </form>
-                            </div>
-                          </li>
-                        ))}
+                                {groups.length > 1 && (
+                                  <select
+                                    value={tp.id}
+                                    disabled={isPending}
+                                    onChange={(e) => moveUser(u.id, e.target.value, "AUDITOR")}
+                                    className="rounded-lg border border-black bg-white px-1.5 py-0.5 text-[11px] font-bold text-black"
+                                    title="Pindah ke kelompok lain"
+                                  >
+                                    {groups.map((g) => (
+                                      <option key={g.id} value={g.id}>
+                                        {g.semester}
+                                      </option>
+                                    ))}
+                                  </select>
+                                )}
+                                <button
+                                  type="button"
+                                  disabled={isPending}
+                                  onClick={() => moveUser(u.id, null, "AUDITEE")}
+                                  className="btn-secondary px-2 py-0.5 text-[11px]"
+                                  title="Keluarkan dari kelompok"
+                                >
+                                  Lepas
+                                </button>
+                                <form action={hapusSatuAkunTraining}>
+                                  <input type="hidden" name="userId" value={u.id} />
+                                  <button className="btn-danger px-2 py-0.5 text-[11px]">
+                                    ✕
+                                  </button>
+                                </form>
+                              </div>
+                            </li>
+                          );
+                        })}
                       </ul>
                     )}
 
@@ -370,70 +437,87 @@ export function KelompokTrainingBoard({
                       </div>
                     ) : (
                       <ul className="space-y-2 text-xs">
-                        {groupAuditees.map((u) => (
-                          <li
-                            key={u.id}
-                            draggable
-                            onDragStart={(e) => {
-                              setDraggedUserId(u.id);
-                              e.dataTransfer.setData("text/plain", u.id);
-                            }}
-                            onDragEnd={() => {
-                              setDraggedUserId(null);
-                              setDragOverZone(null);
-                            }}
-                            className="flex cursor-grab active:cursor-grabbing flex-wrap items-center justify-between gap-2 rounded-xl border-2 border-black bg-white px-3 py-2 shadow-[2px_2px_0px_#000]"
-                            title="Tarik (Drag) untuk pindah ke Auditor (Kiri) atau ke Kelompok lain"
-                          >
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              <span className="font-black text-black">🖐️ {u.nama}</span>
-                              <code className="rounded border border-black bg-[#FEF08A] px-2 py-0.5 font-mono font-black text-black">
-                                {u.username}
-                              </code>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-1">
-                              <button
-                                type="button"
-                                disabled={isPending}
-                                onClick={() => moveUser(u.id, tp.id, "AUDITOR")}
-                                className="btn-secondary px-2 py-0.5 text-[11px]"
-                                title="Pindahkan ke Sisi Kiri (Jadi Auditor)"
-                              >
-                                👈 Jadi Auditor ⇄
-                              </button>
-                              {groups.length > 1 && (
-                                <select
-                                  value={tp.id}
+                        {groupAuditees.map((u) => {
+                          const isKetuaAuditee = ketuaAuditeeMap[tp.id] === u.id;
+                          return (
+                            <li
+                              key={u.id}
+                              draggable
+                              onDragStart={(e) => {
+                                setDraggedUserId(u.id);
+                                e.dataTransfer.setData("text/plain", u.id);
+                              }}
+                              onDragEnd={() => {
+                                setDraggedUserId(null);
+                                setDragOverZone(null);
+                              }}
+                              className="flex cursor-grab active:cursor-grabbing flex-wrap items-center justify-between gap-2 rounded-xl border-2 border-black bg-white px-3 py-2 shadow-[2px_2px_0px_#000]"
+                              title="Tarik (Drag) untuk pindah ke Auditor (Kiri) atau ke Kelompok lain"
+                            >
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <span className="font-black text-black">🖐️ {u.nama}</span>
+                                <code className="rounded border border-black bg-[#FEF08A] px-2 py-0.5 font-mono font-black text-black">
+                                  {u.username}
+                                </code>
+                                {isKetuaAuditee && (
+                                  <Badge tone="amber">⭐ Ketua Auditee</Badge>
+                                )}
+                              </div>
+                              <div className="flex flex-wrap items-center gap-1">
+                                {!isKetuaAuditee && (
+                                  <button
+                                    type="button"
+                                    disabled={isPending}
+                                    onClick={() => handlePilihKetua(tp.id, "AUDITEE", u.id)}
+                                    className="btn-secondary border border-amber-500 bg-amber-50 px-2 py-0.5 text-[11px] font-black text-amber-900 hover:bg-amber-100"
+                                    title="Tetapkan sebagai Ketua Auditee kelompok ini (penandatangan Berita Acara)"
+                                  >
+                                    ⭐ Jadikan Ketua
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
                                   disabled={isPending}
-                                  onChange={(e) => moveUser(u.id, e.target.value, "AUDITEE")}
-                                  className="rounded-lg border border-black bg-white px-1.5 py-0.5 text-[11px] font-bold text-black"
-                                  title="Pindah ke kelompok lain"
+                                  onClick={() => moveUser(u.id, tp.id, "AUDITOR")}
+                                  className="btn-secondary px-2 py-0.5 text-[11px]"
+                                  title="Pindahkan ke Sisi Kiri (Jadi Auditor)"
                                 >
-                                  {groups.map((g) => (
-                                    <option key={g.id} value={g.id}>
-                                      {g.semester}
-                                    </option>
-                                  ))}
-                                </select>
-                              )}
-                              <button
-                                type="button"
-                                disabled={isPending}
-                                onClick={() => moveUser(u.id, null, "AUDITEE")}
-                                className="btn-secondary px-2 py-0.5 text-[11px]"
-                                title="Keluarkan dari kelompok"
-                              >
-                                Lepas
-                              </button>
-                              <form action={hapusSatuAkunTraining}>
-                                <input type="hidden" name="userId" value={u.id} />
-                                <button className="btn-danger px-2 py-0.5 text-[11px]">
-                                  ✕
+                                  👈 Jadi Auditor ⇄
                                 </button>
-                              </form>
-                            </div>
-                          </li>
-                        ))}
+                                {groups.length > 1 && (
+                                  <select
+                                    value={tp.id}
+                                    disabled={isPending}
+                                    onChange={(e) => moveUser(u.id, e.target.value, "AUDITEE")}
+                                    className="rounded-lg border border-black bg-white px-1.5 py-0.5 text-[11px] font-bold text-black"
+                                    title="Pindah ke kelompok lain"
+                                  >
+                                    {groups.map((g) => (
+                                      <option key={g.id} value={g.id}>
+                                        {g.semester}
+                                      </option>
+                                    ))}
+                                  </select>
+                                )}
+                                <button
+                                  type="button"
+                                  disabled={isPending}
+                                  onClick={() => moveUser(u.id, null, "AUDITEE")}
+                                  className="btn-secondary px-2 py-0.5 text-[11px]"
+                                  title="Keluarkan dari kelompok"
+                                >
+                                  Lepas
+                                </button>
+                                <form action={hapusSatuAkunTraining}>
+                                  <input type="hidden" name="userId" value={u.id} />
+                                  <button className="btn-danger px-2 py-0.5 text-[11px]">
+                                    ✕
+                                  </button>
+                                </form>
+                              </div>
+                            </li>
+                          );
+                        })}
                       </ul>
                     )}
 

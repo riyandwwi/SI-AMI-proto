@@ -101,17 +101,12 @@ export function SignaturePadCard({
   const [notice, setNotice] = useState<{ ok?: string; err?: string } | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const isTrainingMode =
-    Boolean(session.isTraining) ||
-    session.periodeNama.toLowerCase().includes("training") ||
-    session.periodeNama.toLowerCase().includes("kelompok");
-
   const canSignAsAuditee =
     currentRole === "AUDITEE" &&
-    (isTrainingMode || !session.ketuaAuditeeId || session.ketuaAuditeeId === currentUserId);
+    (!session.ketuaAuditeeId || session.ketuaAuditeeId === currentUserId);
   const canSignAsAuditor =
     currentRole === "AUDITOR" &&
-    (isTrainingMode || !session.ketuaAuditorId || session.ketuaAuditorId === currentUserId);
+    (!session.ketuaAuditorId || session.ketuaAuditorId === currentUserId);
   const canSignAsLpm = currentRole === "LPM";
 
   const canSign = canSignAsAuditee || canSignAsAuditor || canSignAsLpm;
