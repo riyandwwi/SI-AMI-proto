@@ -204,10 +204,16 @@ export function KelompokTrainingBoard({
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <a
-                      href={`/api/export-isian?periodeId=${encodeURIComponent(tp.id)}`}
+                      href={`/api/export-isian?periodeId=${encodeURIComponent(tp.id)}&role=auditee`}
                       className="btn-success text-xs"
                     >
-                      📥 Download Excel Isian Kelompok
+                      📥 Excel Isian Auditee
+                    </a>
+                    <a
+                      href={`/api/export-isian?periodeId=${encodeURIComponent(tp.id)}&role=auditor`}
+                      className="btn-secondary border-2 border-[#581C87] bg-[#F3E8FF] text-xs font-black text-[#581C87] hover:bg-[#E9D5FF]"
+                    >
+                      📥 Excel Hasil Auditor
                     </a>
                     <form action={hapusSatuKelompokTraining}>
                       <input type="hidden" name="periodeId" value={tp.id} />

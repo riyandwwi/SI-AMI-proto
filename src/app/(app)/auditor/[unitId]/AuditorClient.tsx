@@ -691,8 +691,8 @@ export default function AuditorClient({
 
   return (
     <div className="space-y-4">
-      {/* Bar Melayang (Floating Bottom-Right) agar munculnya notifikasi / tombol Simpan Semua TIDAK menggeser posisi layar */}
-      {(notice?.ok || notice?.err || (buka && dirtyIds.length > 0)) && (
+      {/* Notifikasi Melayang (Floating Bottom-Right) agar munculnya notifikasi TIDAK menggeser posisi layar */}
+      {(notice?.ok || notice?.err) && (
         <div className="fixed bottom-4 right-4 z-50 flex max-w-md flex-col items-end gap-2">
           {notice?.ok && (
             <div className="rounded-2xl border-2 border-black bg-[#D9F99D] px-4 py-2.5 text-sm font-black text-black shadow-[4px_4px_0px_#000]">
@@ -704,39 +704,12 @@ export default function AuditorClient({
               ⚠️ {notice.err}
             </div>
           )}
-          {buka && dirtyIds.length > 0 && (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-black bg-[#CBD5E1] px-4 py-2.5 text-xs shadow-[4px_4px_0px_#000]">
-              <div className="font-black text-[#0F172A]">
-                📝 {dirtyIds.length} indikator belum disimpan
-              </div>
-              <button
-                type="button"
-                disabled={isPending}
-                onClick={() => {
-                  if (mode === "dokumen") handleSaveDokumen(undefined);
-                  else if (mode === "lapangan") handleSaveLapangan(undefined);
-                  else handleSaveRtl(undefined);
-                }}
-                className="btn text-xs"
-              >
-                {isPending && savingId === "ALL"
-                  ? "..."
-                  : `💾 Simpan Semua (${dirtyIds.length})`}
-              </button>
-            </div>
-          )}
         </div>
       )}
 
-      {/* Bar Verifikasi & Kunci Semua + Ringkasan 1 Save Terakhir */}
+      {/* Bar Verifikasi, Kunci Semua & Simpan Semua + Ringkasan 1 Save Terakhir */}
       <div className="card flex flex-wrap items-center justify-between gap-3 py-3">
         <div className="flex flex-wrap items-center gap-2 text-xs">
-          <a
-            href={`/api/export-isian?periodeId=${encodeURIComponent(periodeId)}&unitId=${encodeURIComponent(unitId)}`}
-            className="btn-success px-3 py-1 text-xs"
-          >
-            📥 Download Excel Isian
-          </a>
           {latestAuditeeSave && (
             <>
               <span className="font-black uppercase text-[#0F172A]">🕒 Save Terakhir Auditee:</span>
@@ -773,6 +746,18 @@ export default function AuditorClient({
             >
               🔓 Buka Kunci Dokumen
             </button>
+            <button
+              type="button"
+              disabled={isPending || dirtyIds.length === 0}
+              onClick={() => handleSaveDokumen(undefined)}
+              className="btn-success text-xs disabled:opacity-50"
+            >
+              {isPending && savingId === "ALL"
+                ? "Menyimpan..."
+                : dirtyIds.length > 0
+                  ? `💾 Simpan Semua (${dirtyIds.length})`
+                  : "💾 Simpan Semua"}
+            </button>
           </div>
         )}
 
@@ -793,6 +778,18 @@ export default function AuditorClient({
               className="btn-secondary text-xs"
             >
               🔓 Buka Kunci Lapangan
+            </button>
+            <button
+              type="button"
+              disabled={isPending || dirtyIds.length === 0}
+              onClick={() => handleSaveLapangan(undefined)}
+              className="btn-success text-xs disabled:opacity-50"
+            >
+              {isPending && savingId === "ALL"
+                ? "Menyimpan..."
+                : dirtyIds.length > 0
+                  ? `💾 Simpan Semua (${dirtyIds.length})`
+                  : "💾 Simpan Semua"}
             </button>
           </div>
         )}
@@ -828,6 +825,18 @@ export default function AuditorClient({
               className="btn-secondary text-xs"
             >
               🔓 Buka Kunci RTL
+            </button>
+            <button
+              type="button"
+              disabled={isPending || dirtyIds.length === 0}
+              onClick={() => handleSaveRtl(undefined)}
+              className="btn-success text-xs disabled:opacity-50"
+            >
+              {isPending && savingId === "ALL"
+                ? "Menyimpan..."
+                : dirtyIds.length > 0
+                  ? `💾 Simpan Semua (${dirtyIds.length})`
+                  : "💾 Simpan Semua"}
             </button>
           </div>
         )}

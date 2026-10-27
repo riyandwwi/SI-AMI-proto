@@ -416,8 +416,8 @@ export default function AuditeeClient({
 
   return (
     <div className="space-y-4">
-      {/* Bar Melayang (Floating Bottom-Right) agar munculnya notifikasi / tombol Simpan Semua TIDAK menggeser posisi layar */}
-      {(notice?.ok || notice?.err || (buka && dirtyIds.length > 0)) && (
+      {/* Notifikasi Melayang (Floating Bottom-Right) agar munculnya notifikasi TIDAK menggeser posisi layar */}
+      {(notice?.ok || notice?.err) && (
         <div className="fixed bottom-4 right-4 z-50 flex max-w-md flex-col items-end gap-2">
           {notice?.ok && (
             <div className="rounded-2xl border-2 border-black bg-[#D9F99D] px-4 py-2.5 text-sm font-black text-black shadow-[4px_4px_0px_#000]">
@@ -427,21 +427,6 @@ export default function AuditeeClient({
           {notice?.err && (
             <div className="rounded-2xl border-2 border-black bg-[#FECDD3] px-4 py-2.5 text-sm font-black text-black shadow-[4px_4px_0px_#000]">
               ⚠️ {notice.err}
-            </div>
-          )}
-          {buka && dirtyIds.length > 0 && (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-black bg-[#CBD5E1] px-4 py-2.5 text-xs shadow-[4px_4px_0px_#000]">
-              <div className="font-black text-[#0F172A]">
-                📝 {dirtyIds.length} indikator belum disimpan
-              </div>
-              <button
-                type="button"
-                disabled={isPending}
-                onClick={() => handleSaveIndikator(undefined)}
-                className="btn text-xs"
-              >
-                {isPending && savingId === "ALL" ? "Menyimpan..." : `💾 Simpan Semua (${dirtyIds.length})`}
-              </button>
             </div>
           )}
         </div>
@@ -536,12 +521,6 @@ export default function AuditeeClient({
                 ⏭️ Buka Belum Diisi Berikutnya
               </button>
             )}
-            <a
-              href={`/api/export-isian?periodeId=${encodeURIComponent(periodeId)}&unitId=${encodeURIComponent(unitId)}`}
-              className="btn-success px-3 py-1 text-xs"
-            >
-              📥 Download Excel Isian
-            </a>
             <button
               type="button"
               onClick={() => {
@@ -555,6 +534,20 @@ export default function AuditeeClient({
             >
               {allVisibleExpanded ? "🔼 Minimize Semua" : "🔽 Buka Semua"}
             </button>
+            {buka && (
+              <button
+                type="button"
+                disabled={isPending || dirtyIds.length === 0}
+                onClick={() => handleSaveIndikator(undefined)}
+                className="btn-success px-3 py-1 text-xs disabled:opacity-50"
+              >
+                {isPending && savingId === "ALL"
+                  ? "Menyimpan..."
+                  : dirtyIds.length > 0
+                    ? `💾 Simpan Semua (${dirtyIds.length})`
+                    : "💾 Simpan Semua"}
+              </button>
+            )}
           </div>
         </div>
 

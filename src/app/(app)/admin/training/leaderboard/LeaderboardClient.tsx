@@ -336,10 +336,10 @@ export default function LeaderboardClient({
                         </span>
                       )}
                       <a
-                        href={`/api/export-isian?periodeId=${encodeURIComponent(team.periodeId)}`}
+                        href={`/api/export-isian?periodeId=${encodeURIComponent(team.periodeId)}&role=${mode}`}
                         className="rounded-xl border-2 border-[#065F46] bg-[#D1FAE5] px-3 py-1 text-xs font-black text-[#065F46] hover:bg-[#A7F3D0]"
                       >
-                        📥 Excel Kelompok
+                        📥 Excel {mode === "auditee" ? "Auditee" : "Auditor"}
                       </a>
                       <span className="rounded-xl border-2 border-[#0F172A] bg-[#0F172A] px-3.5 py-1 text-lg font-black text-white">
                         {pct}% ({doneCount}/{team.totalIndikator})

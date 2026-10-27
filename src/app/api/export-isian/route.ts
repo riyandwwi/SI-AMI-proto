@@ -36,18 +36,19 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  if (user.role !== "SUPER_ADMIN" && user.role !== "LPM") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const { searchParams } = new URL(req.url);
   const periodeId = searchParams.get("periodeId");
   const unitIdParam = searchParams.get("unitId");
   const trainingAll = searchParams.get("training") === "all";
+  const roleFilter = searchParams.get("role"); // "auditee" | "auditor" | null (semua)
 
   const wb = XLSX.utils.book_new();
 
   if (trainingAll) {
-    if (user.role !== "SUPER_ADMIN" && user.role !== "LPM") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
     const trainingPeriodes = await prisma.periode.findMany({
       where: { isTraining: true },
       include: {
@@ -137,7 +138,7 @@ export async function GET(req: NextRequest) {
         "Total Indikator": totalInd,
         "Indikator Diisi Auditee": filledCount,
         "Progres Auditee (%)": `${pctAuditee}%`,
-        "Indikator Diperiksa Auditor": checkedCount,
+        "Indikator Dicek Auditor": checkedCount,
         "Progres Auditor (%)": `${pctAuditor}%`,
       });
 
@@ -191,7 +192,6 @@ export async function GET(req: NextRequest) {
       { wch: 18 },
     ];
 
-    // Taruh sheet Rekap di urutan paling depan
     wb.SheetNames.unshift("Rekap Semua Kelompok");
     wb.Sheets["Rekap Semua Kelompok"] = summarySheet;
 
@@ -211,16 +211,6 @@ export async function GET(req: NextRequest) {
       { error: "Parameter periodeId wajib diisi" },
       { status: 400 },
     );
-  }
-
-  // Isolasi keamanan untuk akun peserta training
-  if (
-    user.isTraining &&
-    user.role !== "SUPER_ADMIN" &&
-    user.role !== "LPM" &&
-    user.trainingPeriodeId !== periodeId
-  ) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const periode = await prisma.periode.findUnique({
@@ -266,11 +256,63 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    if (isian?.diperiksaOleh) {
+    const isChecked = Boolean(
+      isian?.diperiksaOleh?.trim() ||
+        (isian && isian.statusDokumen !== "BELUM_DICEK") ||
+        isian?.klasifikasi ||
+        isian?.terverifikasiAuditor,
+    );
+    if (isChecked && isian?.diperiksaOleh) {
       kontributorAuditor.set(
         isian.diperiksaOleh,
         (kontributorAuditor.get(isian.diperiksaOleh) ?? 0) + 1,
       );
+    }
+
+    if (roleFilter === "auditee") {
+      return {
+        No: idx + 1,
+        "Sesi / Kelompok": periode.nama,
+        "Standar SPMI": ind.standar,
+        "Kode Indikator": ind.kode,
+        "Pernyataan Standar": ind.pernyataanStandar ?? "-",
+        "Indikator Kinerja": ind.pernyataan,
+        "Dokumen Bukti yang Diminta": ind.buktiDiminta ?? "-",
+        "Status Isian Auditee": isFilled ? "SUDAH DIISI" : "BELUM DIISI",
+        "Evaluasi Diri Auditee": isian?.klaim ?? "",
+        "Link Google Drive Bukti": isian?.linkDrive ?? "",
+        "Diisi Oleh (Auditee)": isian?.diisiOleh ?? "-",
+        "Waktu Simpan Terakhir": isian?.updatedAt
+          ? new Date(isian.updatedAt).toLocaleString("id-ID")
+          : "-",
+      };
+    }
+
+    if (roleFilter === "auditor") {
+      return {
+        No: idx + 1,
+        "Sesi / Kelompok": periode.nama,
+        "Standar SPMI": ind.standar,
+        "Kode Indikator": ind.kode,
+        "Indikator Kinerja": ind.pernyataan,
+        "Evaluasi Diri Auditee": isian?.klaim ?? "",
+        "Link Google Drive Bukti": isian?.linkDrive ?? "",
+        "Diisi Oleh (Auditee)": isian?.diisiOleh ?? "-",
+        "Status Pengecekan Auditor": isChecked ? "SUDAH DICEK" : "BELUM DICEK",
+        "Status Dokumen (Auditor)": isian
+          ? STATUS_DOK_LABEL[isian.statusDokumen]
+          : "Belum Diperiksa",
+        "Catatan Audit Dokumen": isian?.catatanDokumen ?? "",
+        "Klasifikasi Temuan": isian?.klasifikasi
+          ? KLASIFIKASI_LABEL[isian.klasifikasi]
+          : "-",
+        "Catatan Audit Lapangan": isian?.catatanLapangan ?? "",
+        "Rekomendasi Auditor": isian?.rekomendasi ?? "",
+        "Diperiksa Oleh (Auditor)": isian?.diperiksaOleh ?? "-",
+        "Waktu Simpan Terakhir": isian?.updatedAt
+          ? new Date(isian.updatedAt).toLocaleString("id-ID")
+          : "-",
+      };
     }
 
     return {
@@ -301,6 +343,13 @@ export async function GET(req: NextRequest) {
     };
   });
 
+  const sheetTitle =
+    roleFilter === "auditee"
+      ? "Hasil Isian Auditee"
+      : roleFilter === "auditor"
+        ? "Hasil Pengecekan Auditor"
+        : "Hasil Isian & Audit";
+
   const wsMain = XLSX.utils.json_to_sheet(
     rows.length > 0 ? rows : [{ Info: "Belum ada indikator" }],
   );
@@ -312,7 +361,7 @@ export async function GET(req: NextRequest) {
     { wch: 40 },
     { wch: 45 },
     { wch: 35 },
-    { wch: 16 },
+    { wch: 18 },
     { wch: 45 },
     { wch: 40 },
     { wch: 26 },
@@ -324,31 +373,35 @@ export async function GET(req: NextRequest) {
     { wch: 26 },
     { wch: 22 },
   ];
-  XLSX.utils.book_append_sheet(wb, wsMain, "Hasil Isian Indikator");
+  XLSX.utils.book_append_sheet(wb, wsMain, sheetTitle);
 
   // Sheet ke-2: Rekap Kontribusi Per Orang di Kelompok Ini
   const rekapOrangRows: Record<string, string | number>[] = [];
-  Array.from(kontributorAuditee.entries())
-    .sort((a, b) => b[1] - a[1])
-    .forEach(([nama, jml], i) => {
-      rekapOrangRows.push({
-        No: i + 1,
-        "Nama Peserta": nama,
-        Peran: "AUDITEE (Pengisi Instrumen)",
-        "Jumlah Indikator Disimpan": jml,
+  if (roleFilter !== "auditor") {
+    Array.from(kontributorAuditee.entries())
+      .sort((a, b) => b[1] - a[1])
+      .forEach(([nama, jml], i) => {
+        rekapOrangRows.push({
+          No: i + 1,
+          "Nama Peserta": nama,
+          Peran: "AUDITEE (Pengisi Instrumen)",
+          "Jumlah Indikator Disimpan": jml,
+        });
       });
-    });
+  }
 
-  Array.from(kontributorAuditor.entries())
-    .sort((a, b) => b[1] - a[1])
-    .forEach(([nama, jml], i) => {
-      rekapOrangRows.push({
-        No: i + 1,
-        "Nama Peserta": nama,
-        Peran: "AUDITOR (Pemeriksa)",
-        "Jumlah Indikator Disimpan": jml,
+  if (roleFilter !== "auditee") {
+    Array.from(kontributorAuditor.entries())
+      .sort((a, b) => b[1] - a[1])
+      .forEach(([nama, jml], i) => {
+        rekapOrangRows.push({
+          No: i + 1,
+          "Nama Peserta": nama,
+          Peran: "AUDITOR (Pemeriksa)",
+          "Jumlah Indikator Disimpan": jml,
+        });
       });
-    });
+  }
 
   if (rekapOrangRows.length > 0) {
     const wsRekap = XLSX.utils.json_to_sheet(rekapOrangRows);
@@ -358,13 +411,19 @@ export async function GET(req: NextRequest) {
 
   const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
   const safeName = sanitizeFileName(periode.nama) || "Kelompok";
+  const rolePrefix =
+    roleFilter === "auditee"
+      ? "Isian_Auditee_"
+      : roleFilter === "auditor"
+        ? "Pengecekan_Auditor_"
+        : "Hasil_Lengkap_";
 
   return new NextResponse(buffer, {
     status: 200,
     headers: {
       "Content-Type":
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "Content-Disposition": `attachment; filename="Hasil_Isian_${safeName}.xlsx"`,
+      "Content-Disposition": `attachment; filename="${rolePrefix}${safeName}.xlsx"`,
     },
   });
 }
