@@ -481,7 +481,7 @@ export default function AuditeeClient({
     <div className="space-y-4">
       {/* Notifikasi Melayang (Floating Bottom-Right) agar munculnya notifikasi TIDAK menggeser posisi layar */}
       {(notice?.ok || notice?.err) && (
-        <div className="fixed bottom-4 right-4 z-50 flex max-w-md flex-col items-end gap-2">
+        <div className="fixed bottom-20 right-5 z-50 flex max-w-md flex-col items-end gap-2">
           {notice?.ok && (
             <div className="rounded-2xl border-2 border-black bg-[#D9F99D] px-4 py-2.5 text-sm font-black text-black shadow-[4px_4px_0px_#000]">
               ✓ {notice.ok}
@@ -492,6 +492,34 @@ export default function AuditeeClient({
               ⚠️ {notice.err}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Floating Tombol Angka Indikator yang Diupload Akun Auditee Ini */}
+      {currentUserName && (
+        <div className="fixed bottom-5 right-5 z-40 flex items-center gap-2">
+          {statusFilter === "DIUPLOAD_SAYA" && (
+            <button
+              type="button"
+              onClick={() => setStatusFilter("ALL")}
+              className="rounded-2xl border-2 border-black bg-[#FEF08A] px-3 py-1.5 text-xs font-black text-black shadow-[3px_3px_0px_#000]"
+            >
+              👤 Diupload {currentUserName} ({myUploadedCount}) ✕
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              setKlasifikasiFilter("ALL");
+              setStatusFilter(statusFilter === "DIUPLOAD_SAYA" ? "ALL" : "DIUPLOAD_SAYA");
+            }}
+            title={`Klik untuk melihat ${myUploadedCount} indikator yang diupload oleh ${currentUserName}`}
+            className={`flex h-13 min-w-13 items-center justify-center rounded-full border-2 border-black px-3 text-base font-black text-black shadow-[4px_4px_0px_#000] transition hover:-translate-y-0.5 ${
+              statusFilter === "DIUPLOAD_SAYA" ? "bg-[#4ADE80] ring-4 ring-black/20" : "bg-[#FDE047]"
+            }`}
+          >
+            {myUploadedCount}
+          </button>
         </div>
       )}
 
@@ -671,23 +699,6 @@ export default function AuditeeClient({
                 className={statusFilter === "RTL" ? "btn px-2.5 py-1 text-xs" : "btn-secondary px-2.5 py-1 text-xs"}
               >
                 🛠️ Wajib RTL ({totalWajibRtl})
-              </button>
-            )}
-            {currentUserName && (
-              <button
-                type="button"
-                onClick={() => {
-                  setKlasifikasiFilter("ALL");
-                  setStatusFilter(statusFilter === "DIUPLOAD_SAYA" ? "ALL" : "DIUPLOAD_SAYA");
-                }}
-                className={
-                  statusFilter === "DIUPLOAD_SAYA"
-                    ? "btn px-2.5 py-1 text-xs"
-                    : "btn-secondary px-2.5 py-1 text-xs"
-                }
-                title={`Tampilkan hanya indikator yang diupload oleh ${currentUserName}`}
-              >
-                👤 Diupload Saya ({myUploadedCount})
               </button>
             )}
           </div>
