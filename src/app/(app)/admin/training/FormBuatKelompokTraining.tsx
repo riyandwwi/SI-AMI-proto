@@ -9,20 +9,24 @@ export interface UnassignedTrainingUser {
   id: string;
   nama: string;
   username: string;
+  role?: string;
 }
 
 export function FormBuatKelompokTraining({
   nextGroupNumber,
   masterIndikatorCount,
   unassignedUsers,
+  lpmOptions = [],
 }: {
   nextGroupNumber: number;
   masterIndikatorCount: number;
   unassignedUsers: UnassignedTrainingUser[];
+  lpmOptions?: UnassignedTrainingUser[];
 }) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(true);
   const [namaKelompok, setNamaKelompok] = useState(`Kelompok ${nextGroupNumber}`);
+  const [lpmUserId, setLpmUserId] = useState("");
 
   // Setiap baris di Sisi Kiri (Auditor) dan Sisi Kanan (Auditee) adalah Dropdown pilih akun
   const [auditorSelects, setAuditorSelects] = useState<string[]>(["", ""]);
@@ -66,6 +70,7 @@ export function FormBuatKelompokTraining({
         auditees: [],
         existingAuditorIds: pickedAuditorIds,
         existingAuditeeIds: pickedAuditeeIds,
+        lpmUserId: lpmUserId || undefined,
       });
 
       if (!res.ok) {
@@ -75,6 +80,7 @@ export function FormBuatKelompokTraining({
 
       setNotice({ ok: res.message ?? "Kelompok berhasil disimpan." });
       setNamaKelompok(`Kelompok ${nextGroupNumber + 1}`);
+      setLpmUserId("");
       setAuditorSelects(["", ""]);
       setAuditeeSelects(["", ""]);
       router.refresh();
@@ -113,18 +119,38 @@ export function FormBuatKelompokTraining({
 
       {isOpen && (
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Nama Kelompok */}
-          <div className="max-w-md space-y-1">
-            <label className="text-xs font-black uppercase text-black">
-              Nama Grup / Kelompok Training
-            </label>
-            <input
-              value={namaKelompok}
-              onChange={(e) => setNamaKelompok(e.target.value)}
-              required
-              placeholder="Contoh: Kelompok 1 / Kelompok A"
-              className="w-full text-sm font-black"
-            />
+          {/* Nama Kelompok & Pilih LPM Penandatangan Rekap */}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="space-y-1">
+              <label className="text-xs font-black uppercase text-black">
+                Nama Grup / Kelompok Training
+              </label>
+              <input
+                value={namaKelompok}
+                onChange={(e) => setNamaKelompok(e.target.value)}
+                required
+                placeholder="Contoh: Kelompok 1 / Kelompok A"
+                className="w-full text-sm font-black"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-black uppercase text-black">
+                🏛️ Pilih LPM Kelompok Ini (Yang TTD di Rekap)
+              </label>
+              <select
+                value={lpmUserId}
+                onChange={(e) => setLpmUserId(e.target.value)}
+                className="w-full bg-white text-xs font-bold text-black"
+              >
+                <option value="">-- Default LPM Kampus (Bisa diubah nanti) --</option>
+                {(lpmOptions.length > 0 ? lpmOptions : unassignedUsers).map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.nama} ({u.username}){u.role === "LPM" ? " — Akun LPM" : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {unassignedUsers.length === 0 && (

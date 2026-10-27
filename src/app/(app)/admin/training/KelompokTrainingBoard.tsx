@@ -27,14 +27,17 @@ export interface TrainingGroupItem {
   ketuaAuditorNama?: string | null;
   ketuaAuditeeId?: string | null;
   ketuaAuditeeNama?: string | null;
+  kepalaLpmNama?: string | null;
 }
 
 export function KelompokTrainingBoard({
   groups,
   allTrainingUsers,
+  lpmAccounts = [],
 }: {
   groups: TrainingGroupItem[];
   allTrainingUsers: TrainingMemberItem[];
+  lpmAccounts?: TrainingMemberItem[];
 }) {
   const router = useRouter();
   const [users, setUsers] = useState<TrainingMemberItem[]>(allTrainingUsers);
@@ -46,6 +49,11 @@ export function KelompokTrainingBoard({
   const [ketuaAuditeeMap, setKetuaAuditeeMap] = useState<Record<string, string | null>>(() => {
     const m: Record<string, string | null> = {};
     for (const g of groups) m[g.id] = g.ketuaAuditeeId ?? null;
+    return m;
+  });
+  const [kepalaLpmNamaMap, setKepalaLpmNamaMap] = useState<Record<string, string | null>>(() => {
+    const m: Record<string, string | null> = {};
+    for (const g of groups) m[g.id] = g.kepalaLpmNama ?? null;
     return m;
   });
   const [draggedUserId, setDraggedUserId] = useState<string | null>(null);
@@ -60,34 +68,44 @@ export function KelompokTrainingBoard({
   useEffect(() => {
     const mAud: Record<string, string | null> = {};
     const mAde: Record<string, string | null> = {};
+    const mLpm: Record<string, string | null> = {};
     for (const g of groups) {
       mAud[g.id] = g.ketuaAuditorId ?? null;
       mAde[g.id] = g.ketuaAuditeeId ?? null;
+      mLpm[g.id] = g.kepalaLpmNama ?? null;
     }
     setKetuaAuditorMap(mAud);
     setKetuaAuditeeMap(mAde);
+    setKepalaLpmNamaMap(mLpm);
   }, [groups]);
 
   const handlePilihKetua = (
     periodeId: string,
-    tipe: "AUDITOR" | "AUDITEE",
+    tipe: "AUDITOR" | "AUDITEE" | "LPM",
     userId: string
   ) => {
     setNotice(null);
     if (tipe === "AUDITOR") {
       setKetuaAuditorMap((prev) => ({ ...prev, [periodeId]: userId }));
-    } else {
+    } else if (tipe === "AUDITEE") {
       setKetuaAuditeeMap((prev) => ({ ...prev, [periodeId]: userId }));
+    } else {
+      const targetUser =
+        lpmAccounts.find((u) => u.id === userId) ??
+        users.find((u) => u.id === userId);
+      if (targetUser) {
+        setKepalaLpmNamaMap((prev) => ({ ...prev, [periodeId]: targetUser.nama }));
+      }
     }
 
     startTransition(async () => {
       const res = await pilihKetuaTrainingClient({ periodeId, tipe, userId });
       if (!res.ok) {
-        setNotice({ err: res.error ?? "Gagal memilih ketua." });
+        setNotice({ err: res.error ?? "Gagal memilih pejabat penandatangan." });
         router.refresh();
         return;
       }
-      setNotice({ ok: res.message ?? "Ketua kelompok diperbarui." });
+      setNotice({ ok: res.message ?? "Pejabat penandatangan diperbarui." });
       router.refresh();
     });
   };
@@ -254,6 +272,14 @@ export function KelompokTrainingBoard({
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <a
+                      href={`/api/rekap-excel?periodeId=${encodeURIComponent(tp.id)}&print=1`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn-secondary text-xs"
+                    >
+                      🖨️ Print Rekap Audit
+                    </a>
+                    <a
                       href={`/api/export-isian?periodeId=${encodeURIComponent(tp.id)}&role=auditee`}
                       className="btn-success text-xs"
                     >
@@ -269,6 +295,50 @@ export function KelompokTrainingBoard({
                       <input type="hidden" name="periodeId" value={tp.id} />
                       <button className="btn-danger text-xs">🗑️ Hapus Kelompok</button>
                     </form>
+                  </div>
+                </div>
+
+                {/* Baris Pilih LPM yang TTD di Rekap untuk Kelompok Training Ini */}
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border-2 border-black bg-[#EDE9FE] px-3.5 py-2.5 text-xs">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-black uppercase text-black">
+                      🏛️ Kepala LPM (Penandatangan di Rekap):
+                    </span>
+                    <Badge tone="purple">
+                      {kepalaLpmNamaMap[tp.id] ?? "Belum dipilih (Default LPM)"}
+                    </Badge>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <select
+                      value={
+                        [...lpmAccounts, ...users].find(
+                          (u) => u.nama === kepalaLpmNamaMap[tp.id]
+                        )?.id ?? ""
+                      }
+                      disabled={isPending}
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          handlePilihKetua(tp.id, "LPM", e.target.value);
+                        }
+                      }}
+                      className="rounded-lg border-2 border-black bg-white px-2.5 py-1 text-xs font-bold text-black"
+                    >
+                      <option value="">-- Pilih / Ganti LPM yang TTD di Rekap --</option>
+                      {Array.from(
+                        new Map(
+                          [
+                            ...groupAuditors,
+                            ...groupAuditees,
+                            ...lpmAccounts,
+                            ...users,
+                          ].map((u) => [u.id, u])
+                        ).values()
+                      ).map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.nama} ({u.username}){u.role === "LPM" ? " — LPM" : ""}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 
@@ -326,6 +396,9 @@ export function KelompokTrainingBoard({
                                 {isKetuaAuditor && (
                                   <Badge tone="amber">⭐ Ketua Auditor</Badge>
                                 )}
+                                {kepalaLpmNamaMap[tp.id] === u.nama && (
+                                  <Badge tone="purple">🏛️ LPM Rekap</Badge>
+                                )}
                               </div>
                               <div className="flex flex-wrap items-center gap-1">
                                 {!isKetuaAuditor && (
@@ -337,6 +410,17 @@ export function KelompokTrainingBoard({
                                     title="Tetapkan sebagai Ketua Auditor kelompok ini (penandatangan Berita Acara)"
                                   >
                                     ⭐ Jadikan Ketua
+                                  </button>
+                                )}
+                                {kepalaLpmNamaMap[tp.id] !== u.nama && (
+                                  <button
+                                    type="button"
+                                    disabled={isPending}
+                                    onClick={() => handlePilihKetua(tp.id, "LPM", u.id)}
+                                    className="btn-secondary border border-purple-600 bg-purple-50 px-2 py-0.5 text-[11px] font-black text-purple-900 hover:bg-purple-100"
+                                    title="Tetapkan sebagai Kepala LPM penandatangan Rekap kelompok ini"
+                                  >
+                                    🏛️ Jadikan LPM
                                   </button>
                                 )}
                                 <button
@@ -462,6 +546,9 @@ export function KelompokTrainingBoard({
                                 {isKetuaAuditee && (
                                   <Badge tone="amber">⭐ Ketua Auditee</Badge>
                                 )}
+                                {kepalaLpmNamaMap[tp.id] === u.nama && (
+                                  <Badge tone="purple">🏛️ LPM Rekap</Badge>
+                                )}
                               </div>
                               <div className="flex flex-wrap items-center gap-1">
                                 {!isKetuaAuditee && (
@@ -473,6 +560,17 @@ export function KelompokTrainingBoard({
                                     title="Tetapkan sebagai Ketua Auditee kelompok ini (penandatangan Berita Acara)"
                                   >
                                     ⭐ Jadikan Ketua
+                                  </button>
+                                )}
+                                {kepalaLpmNamaMap[tp.id] !== u.nama && (
+                                  <button
+                                    type="button"
+                                    disabled={isPending}
+                                    onClick={() => handlePilihKetua(tp.id, "LPM", u.id)}
+                                    className="btn-secondary border border-purple-600 bg-purple-50 px-2 py-0.5 text-[11px] font-black text-purple-900 hover:bg-purple-100"
+                                    title="Tetapkan sebagai Kepala LPM penandatangan Rekap kelompok ini"
+                                  >
+                                    🏛️ Jadikan LPM
                                   </button>
                                 )}
                                 <button

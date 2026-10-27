@@ -79,6 +79,7 @@ export async function simpanKelompokTrainingLengkap(payload: {
   auditees: NewGroupMemberInput[];
   existingAuditorIds?: string[];
   existingAuditeeIds?: string[];
+  lpmUserId?: string;
 }): Promise<{ ok: boolean; message?: string; error?: string }> {
   const admin = await requireUser("SUPER_ADMIN", "LPM");
   const rawName = (payload.namaKelompok ?? "").trim().slice(0, 100);
@@ -257,13 +258,17 @@ export async function simpanKelompokTrainingLengkap(payload: {
     });
   }
 
-  // Set default Ketua Auditor & Ketua Auditee kelompok ini
+  // Set default Ketua Auditor, Ketua Auditee & Kepala LPM kelompok ini
   const groupMembers = await prisma.user.findMany({
     where: { trainingPeriodeId: newPeriode.id, isTraining: true },
     orderBy: { createdAt: "asc" },
   });
   const firstAuditor = groupMembers.find((m) => m.role === "AUDITOR");
   const firstAuditee = groupMembers.find((m) => m.role === "AUDITEE");
+
+  const pickedLpmUser = payload.lpmUserId
+    ? await prisma.user.findUnique({ where: { id: payload.lpmUserId } })
+    : null;
 
   await prisma.periode.update({
     where: { id: newPeriode.id },
@@ -274,6 +279,13 @@ export async function simpanKelompokTrainingLengkap(payload: {
       ketuaAuditeeId: firstAuditee?.id ?? null,
       ketuaAuditeeNama: firstAuditee?.nama ?? null,
       ketuaAuditeeNip: firstAuditee?.nimNuptk ?? null,
+      ...(pickedLpmUser
+        ? {
+            kepalaLpmNama: pickedLpmUser.nama,
+            kepalaLpmNip: pickedLpmUser.nimNuptk || "-",
+            disahkanOleh: pickedLpmUser.nama,
+          }
+        : {}),
     },
   });
 
@@ -405,10 +417,10 @@ export async function pindahkanAkunTrainingClient(payload: {
 
 export async function pilihKetuaTrainingClient(payload: {
   periodeId: string;
-  tipe: "AUDITOR" | "AUDITEE";
+  tipe: "AUDITOR" | "AUDITEE" | "LPM";
   userId: string;
 }): Promise<{ ok: boolean; message?: string; error?: string }> {
-  const admin = await requireUser("SUPER_ADMIN", "LPM");
+  const actor = await requireUser("SUPER_ADMIN", "LPM", "AUDITOR", "AUDITEE");
   const { periodeId, tipe, userId } = payload;
 
   const [periode, targetUser] = await Promise.all([
@@ -416,11 +428,15 @@ export async function pilihKetuaTrainingClient(payload: {
     prisma.user.findUnique({ where: { id: userId } }),
   ]);
 
-  if (!periode || !periode.isTraining) {
-    return { ok: false, error: "Kelompok training tidak ditemukan." };
+  if (!periode) {
+    return { ok: false, error: "Sesi atau kelompok tidak ditemukan." };
   }
-  if (!targetUser || !targetUser.isTraining || targetUser.trainingPeriodeId !== periode.id) {
-    return { ok: false, error: "Peserta tidak ditemukan dalam kelompok ini." };
+  if (!targetUser) {
+    return { ok: false, error: "Akun pengguna tidak ditemukan." };
+  }
+
+  if (actor.isTraining && actor.trainingPeriodeId !== periode.id) {
+    return { ok: false, error: "Akun training hanya dapat mengatur kelompoknya sendiri." };
   }
 
   if (tipe === "AUDITOR") {
@@ -432,7 +448,7 @@ export async function pilihKetuaTrainingClient(payload: {
         ketuaAuditorNip: targetUser.nimNuptk || null,
       },
     });
-  } else {
+  } else if (tipe === "AUDITEE") {
     await prisma.periode.update({
       where: { id: periode.id },
       data: {
@@ -441,10 +457,19 @@ export async function pilihKetuaTrainingClient(payload: {
         ketuaAuditeeNip: targetUser.nimNuptk || null,
       },
     });
+  } else if (tipe === "LPM") {
+    await prisma.periode.update({
+      where: { id: periode.id },
+      data: {
+        kepalaLpmNama: targetUser.nama,
+        kepalaLpmNip: targetUser.nimNuptk || "-",
+        disahkanOleh: targetUser.nama,
+      },
+    });
   }
 
   await catat(
-    admin.id,
+    actor.id,
     `PILIH_KETUA_TRAINING_${tipe}`,
     `${targetUser.nama} -> ${periode.nama}`
   );
@@ -452,11 +477,17 @@ export async function pilihKetuaTrainingClient(payload: {
   revalidatePath("/lpm");
   revalidatePath("/lpm/rekap");
   revalidatePath("/auditor");
+  revalidatePath(`/auditor/${periode.id}`);
+  revalidatePath(`/auditor/${periode.id}/ttd`);
   revalidatePath("/auditee");
+  revalidatePath("/auditee/ttd");
 
   return {
     ok: true,
-    message: `⭐ Ketua ${tipe === "AUDITOR" ? "Auditor" : "Auditee"} (${periode.semester}) ditetapkan: ${targetUser.nama}`,
+    message:
+      tipe === "LPM"
+        ? `🏛️ Kepala LPM Penandatangan Rekap (${periode.semester}) ditetapkan: ${targetUser.nama}`
+        : `⭐ Ketua ${tipe === "AUDITOR" ? "Auditor" : "Auditee"} (${periode.semester}) ditetapkan: ${targetUser.nama}`,
   };
 }
 

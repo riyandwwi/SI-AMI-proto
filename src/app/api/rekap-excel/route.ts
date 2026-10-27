@@ -60,9 +60,12 @@ export async function GET(req: NextRequest) {
       `;
       for (const { item: ind } of grp.items) {
         const isian = ind.isian.find((i) => !p.unitId || i.unitId === p.unitId) ?? ind.isian[0];
+        const namaLpmRow = p.kepalaLpmNama || p.disahkanOleh || "LPM";
         const statusSah = p.disahkanAt
-          ? `Disahkan oleh ${p.disahkanOleh ?? "LPM"} (${fmtWaktu(p.disahkanAt)})`
-          : "Belum Disahkan";
+          ? `Disahkan oleh ${namaLpmRow} (${fmtWaktu(p.disahkanAt)})`
+          : p.kepalaLpmNama
+            ? `Kepala LPM: ${p.kepalaLpmNama}`
+            : "Belum Disahkan";
 
         rowsHtml += `
           <tr>
@@ -108,7 +111,7 @@ export async function GET(req: NextRequest) {
   let lpmNuptk = targetSignPeriode?.kepalaLpmNip ?? "";
 
   if (isPrint && targetSignPeriode) {
-    const [ketuaAuditeeUser, ketuaAuditorUser, lpmUser] = await Promise.all([
+    const [ketuaAuditeeUser, ketuaAuditorUser, lpmUser, chosenLpmUser] = await Promise.all([
       targetSignPeriode.ketuaAuditeeId
         ? prisma.user.findUnique({ where: { id: targetSignPeriode.ketuaAuditeeId } })
         : targetSignPeriode.unitId
@@ -124,14 +127,23 @@ export async function GET(req: NextRequest) {
         where: { role: "LPM", aktif: true },
         orderBy: { createdAt: "asc" },
       }),
+      lpmNama
+        ? prisma.user.findFirst({
+            where: { nama: lpmNama },
+          })
+        : null,
     ]);
 
     if (!auditeeNama && ketuaAuditeeUser) auditeeNama = ketuaAuditeeUser.nama;
     if (!auditeeNuptk && ketuaAuditeeUser) auditeeNuptk = ketuaAuditeeUser.nimNuptk;
     if (!auditorNama && ketuaAuditorUser) auditorNama = ketuaAuditorUser.nama;
     if (!auditorNuptk && ketuaAuditorUser) auditorNuptk = ketuaAuditorUser.nimNuptk;
-    if (!lpmNama && lpmUser) lpmNama = lpmUser.nama;
-    if (!lpmNuptk && lpmUser) lpmNuptk = lpmUser.nimNuptk;
+    if (lpmNama) {
+      if (!lpmNuptk && chosenLpmUser) lpmNuptk = chosenLpmUser.nimNuptk;
+    } else if (lpmUser) {
+      lpmNama = lpmUser.nama;
+      if (!lpmNuptk) lpmNuptk = lpmUser.nimNuptk;
+    }
   }
 
   const signatureHtml =

@@ -20,7 +20,7 @@ export default async function LpmRekapPage({ searchParams }: { searchParams: SP 
   const sp = await searchParams;
   const prodiFilter = one(sp.prodi) ?? "ALL";
 
-  const [rawPeriodes, daftarTemuan] = await Promise.all([
+  const [rawPeriodes, daftarTemuan, rawLpmCandidates] = await Promise.all([
     prisma.periode.findMany({
       include: {
         unit: true,
@@ -35,7 +35,22 @@ export default async function LpmRekapPage({ searchParams }: { searchParams: SP 
       include: { unit: true, indikator: { include: { periode: true } } },
       orderBy: { updatedAt: "desc" },
     }),
+    prisma.user.findMany({
+      where: {
+        aktif: true,
+        OR: [{ role: "LPM" }, { isTraining: true }],
+      },
+      orderBy: [{ role: "asc" }, { nama: "asc" }],
+    }),
   ]);
+
+  const lpmCandidates = rawLpmCandidates.map((u) => ({
+    id: u.id,
+    nama: u.nama,
+    username: u.username,
+    nimNuptk: u.nimNuptk,
+    role: u.role,
+  }));
 
   if (rawPeriodes.length === 0) return <Empty>Belum ada Sesi AMI.</Empty>;
 
@@ -268,6 +283,7 @@ export default async function LpmRekapPage({ searchParams }: { searchParams: SP 
                 session={{
                   periodeId: p.id,
                   periodeNama: p.nama,
+                  isTraining: p.isTraining,
                   ketuaAuditeeId: p.ketuaAuditeeId,
                   ketuaAuditeeNama: p.ketuaAuditeeNama,
                   ketuaAuditeeNip: p.ketuaAuditeeNip,
@@ -278,13 +294,14 @@ export default async function LpmRekapPage({ searchParams }: { searchParams: SP 
                   ketuaAuditorNip: p.ketuaAuditorNip,
                   hasTtdAuditor: Boolean(p.ttdAuditor),
                   ttdAuditorPreview: p.ttdAuditor,
-                  kepalaLpmNama: p.kepalaLpmNama ?? user.nama,
-                  kepalaLpmNip: p.kepalaLpmNip ?? user.nimNuptk,
+                  kepalaLpmNama: p.kepalaLpmNama ?? p.disahkanOleh ?? user.nama,
+                  kepalaLpmNip: p.kepalaLpmNip ?? (p.kepalaLpmNama ? null : user.nimNuptk),
                   hasTtdLpm: Boolean(p.ttdLpm),
                   ttdLpmPreview: p.ttdLpm,
                 }}
                 currentUserId={user.id}
                 currentRole="LPM"
+                lpmCandidates={p.isTraining ? lpmCandidates : []}
               />
 
               <TabelInstrumenDanRekap

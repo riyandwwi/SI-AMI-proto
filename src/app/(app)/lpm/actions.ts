@@ -875,10 +875,10 @@ export async function pilihKetuaSesiAmi(fd: FormData) {
   const lpm = await requireUser("SUPER_ADMIN", "LPM");
   const returnTo = str(fd, "returnTo", 200) || "/lpm";
   const periodeId = str(fd, "periodeId", 64);
-  const tipe = str(fd, "tipe", 16); // "AUDITEE" | "AUDITOR"
+  const tipe = str(fd, "tipe", 16); // "AUDITEE" | "AUDITOR" | "LPM"
   const userId = str(fd, "userId", 64);
 
-  if (!periodeId || !userId || (tipe !== "AUDITEE" && tipe !== "AUDITOR")) {
+  if (!periodeId || !userId || (tipe !== "AUDITEE" && tipe !== "AUDITOR" && tipe !== "LPM")) {
     fail(returnTo, "Data pemilihan ketua tidak lengkap.");
   }
 
@@ -900,13 +900,22 @@ export async function pilihKetuaSesiAmi(fd: FormData) {
         ketuaAuditeeNip: targetUser.nimNuptk || null,
       },
     });
-  } else {
+  } else if (tipe === "AUDITOR") {
     await prisma.periode.update({
       where: { id: periodeId },
       data: {
         ketuaAuditorId: targetUser.id,
         ketuaAuditorNama: targetUser.nama,
         ketuaAuditorNip: targetUser.nimNuptk || null,
+      },
+    });
+  } else if (tipe === "LPM") {
+    await prisma.periode.update({
+      where: { id: periodeId },
+      data: {
+        kepalaLpmNama: targetUser.nama,
+        kepalaLpmNip: targetUser.nimNuptk || "-",
+        disahkanOleh: targetUser.nama,
       },
     });
   }
@@ -917,8 +926,15 @@ export async function pilihKetuaSesiAmi(fd: FormData) {
   revalidatePath("/lpm/rekap");
   revalidatePath("/auditor");
   revalidatePath(`/auditor/${periodeId}`);
+  revalidatePath(`/auditor/${periodeId}/ttd`);
   revalidatePath("/auditee");
-  ok(returnTo, `Ketua ${tipe === "AUDITEE" ? "Auditee" : "Auditor"} ditetapkan: ${targetUser.nama}.`);
+  revalidatePath("/auditee/ttd");
+  ok(
+    returnTo,
+    tipe === "LPM"
+      ? `Kepala LPM Penandatangan Rekap ditetapkan: ${targetUser.nama}.`
+      : `Ketua ${tipe === "AUDITEE" ? "Auditee" : "Auditor"} ditetapkan: ${targetUser.nama}.`
+  );
 }
 
 export async function simpanTtdSesi(
@@ -926,7 +942,7 @@ export async function simpanTtdSesi(
   tipe: "AUDITEE" | "AUDITOR" | "LPM",
   ttdDataUrl: string | null
 ): Promise<{ ok: boolean; message?: string; error?: string }> {
-  const user = await requireUser("LPM", "AUDITOR", "AUDITEE");
+  const user = await requireUser("SUPER_ADMIN", "LPM", "AUDITOR", "AUDITEE");
   if (!periodeId) return { ok: false, error: "Sesi AMI tidak ditemukan." };
 
   await cleanupExpiredSignatures();
@@ -948,10 +964,10 @@ export async function simpanTtdSesi(
   const now = ttdDataUrl ? new Date() : null;
 
   if (tipe === "AUDITEE") {
-    if (user.role !== "AUDITEE" && user.role !== "LPM") {
+    if (!periode.isTraining && user.role !== "AUDITEE" && user.role !== "LPM") {
       return { ok: false, error: "Hanya Ketua Auditee yang dapat menempel TTD Auditee." };
     }
-    if (user.role === "AUDITEE" && periode.ketuaAuditeeId && periode.ketuaAuditeeId !== user.id) {
+    if (!periode.isTraining && user.role === "AUDITEE" && periode.ketuaAuditeeId && periode.ketuaAuditeeId !== user.id) {
       return {
         ok: false,
         error: `Hanya Ketua Auditee (${periode.ketuaAuditeeNama}) yang ditunjuk yang dapat menempel TTD pada sesi ini.`,
@@ -969,10 +985,10 @@ export async function simpanTtdSesi(
       },
     });
   } else if (tipe === "AUDITOR") {
-    if (user.role !== "AUDITOR" && user.role !== "LPM") {
+    if (!periode.isTraining && user.role !== "AUDITOR" && user.role !== "LPM") {
       return { ok: false, error: "Hanya Ketua Auditor yang dapat menempel TTD Auditor." };
     }
-    if (user.role === "AUDITOR" && periode.ketuaAuditorId && periode.ketuaAuditorId !== user.id) {
+    if (!periode.isTraining && user.role === "AUDITOR" && periode.ketuaAuditorId && periode.ketuaAuditorId !== user.id) {
       return {
         ok: false,
         error: `Hanya Ketua Auditor (${periode.ketuaAuditorNama}) yang ditunjuk yang dapat menempel TTD pada sesi ini.`,
@@ -990,19 +1006,26 @@ export async function simpanTtdSesi(
       },
     });
   } else if (tipe === "LPM") {
-    if (user.role !== "LPM") {
+    if (!periode.isTraining && user.role !== "LPM" && user.role !== "SUPER_ADMIN") {
       return { ok: false, error: "Hanya Kepala LPM yang dapat menempel TTD LPM." };
     }
+
+    const finalLpmNama =
+      periode.isTraining && periode.kepalaLpmNama ? periode.kepalaLpmNama : user.nama;
+    const finalLpmNip =
+      periode.isTraining && periode.kepalaLpmNama
+        ? periode.kepalaLpmNip
+        : user.nimNuptk || null;
 
     await prisma.periode.update({
       where: { id: periodeId },
       data: {
-        kepalaLpmNama: user.nama,
-        kepalaLpmNip: user.nimNuptk || null,
+        kepalaLpmNama: finalLpmNama,
+        kepalaLpmNip: finalLpmNip,
         ttdLpm: ttdDataUrl,
         ttdLpmAt: now,
         ...(ttdDataUrl
-          ? { disahkanAt: periode.disahkanAt ?? now, disahkanOleh: user.nama }
+          ? { disahkanAt: periode.disahkanAt ?? now, disahkanOleh: finalLpmNama }
           : {}),
       },
     });
@@ -1017,13 +1040,15 @@ export async function simpanTtdSesi(
   revalidatePath("/lpm/rekap");
   revalidatePath("/auditor");
   revalidatePath(`/auditor/${periodeId}`);
+  revalidatePath(`/auditor/${periodeId}/ttd`);
   revalidatePath("/auditee");
+  revalidatePath("/auditee/ttd");
   revalidatePath("/auditee/detail");
 
   return {
     ok: true,
     message: ttdDataUrl
-      ? `Tanda tangan ${tipe} berhasil ditempel oleh ${user.nama} (otomatis tersimpan maks. 3 menit).`
+      ? `Tanda tangan ${tipe} berhasil ditempel (otomatis tersimpan maks. 3 menit).`
       : `Tanda tangan ${tipe} dihapus.`,
   };
 }

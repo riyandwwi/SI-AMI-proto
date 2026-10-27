@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Klasifikasi, StatusDokumen, StatusRtl } from "@prisma/client";
 import {
@@ -1363,30 +1364,16 @@ export default function AuditorClient({
                 rel="noopener noreferrer"
                 className="btn-secondary w-full justify-center py-1.5 text-xs"
               >
-                🖨️ Print Rekap Unit
+                🖨️ Print Rekap Audit
               </a>
-            </div>
 
-            {(latestAuditeeSave || latestAuditorSave) && (
-              <div className="space-y-1 border-t border-black/15 pt-2 text-[11px]">
-                {latestAuditeeSave && (
-                  <div className="flex flex-wrap items-center justify-between gap-1">
-                    <span className="font-bold text-slate-700">Save Auditee:</span>
-                    <Badge tone="blue">
-                      👤 {latestAuditeeSave.nama} ({latestAuditeeSave.kode})
-                    </Badge>
-                  </div>
-                )}
-                {latestAuditorSave && (
-                  <div className="flex flex-wrap items-center justify-between gap-1">
-                    <span className="font-bold text-slate-700">Save Auditor:</span>
-                    <Badge tone="purple">
-                      🕵️ {latestAuditorSave.nama} ({latestAuditorSave.kode})
-                    </Badge>
-                  </div>
-                )}
-              </div>
-            )}
+              <Link
+                href={`/auditor/${encodeURIComponent(periodeId)}/ttd`}
+                className="btn w-full justify-center py-1.5 text-xs"
+              >
+                ✍️ Halaman Tanda Tangan
+              </Link>
+            </div>
           </div>
         </aside>
 

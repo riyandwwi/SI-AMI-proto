@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Klasifikasi, StatusDokumen, StatusRtl } from "@prisma/client";
 import {
@@ -729,7 +730,7 @@ export default function AuditeeClient({
             </div>
           </div>
 
-          {/* Card 3: Aksi Cepat & Save Terakhir */}
+          {/* Card 3: Aksi Cepat */}
           <div className="card space-y-2 p-3.5 text-xs">
             <div className="text-[11px] font-black uppercase text-black">⚡ Aksi Cepat</div>
             <div className="grid grid-cols-1 gap-1.5">
@@ -777,16 +778,23 @@ export default function AuditeeClient({
                       : "💾 Simpan Semua"}
                 </button>
               )}
-            </div>
 
-            {latestSavedDisplay && (
-              <div className="flex flex-wrap items-center justify-between gap-1 border-t border-black/15 pt-2 text-[11px]">
-                <span className="font-bold text-slate-700">Save Terakhir:</span>
-                <Badge tone="blue">
-                  👤 {latestSavedDisplay.nama} ({latestSavedDisplay.kode})
-                </Badge>
-              </div>
-            )}
+              <a
+                href={`/api/rekap-excel?periodeId=${encodeURIComponent(periodeId)}&print=1`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-secondary w-full justify-center py-1.5 text-xs"
+              >
+                🖨️ Print Rekap Audit
+              </a>
+
+              <Link
+                href={arsipId ? `/auditee/ttd?arsipId=${encodeURIComponent(arsipId)}` : "/auditee/ttd"}
+                className="btn w-full justify-center py-1.5 text-xs"
+              >
+                ✍️ Halaman Tanda Tangan
+              </Link>
+            </div>
           </div>
         </aside>
 

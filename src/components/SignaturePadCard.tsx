@@ -4,6 +4,14 @@ import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui";
 import { simpanTtdSesi } from "@/app/(app)/lpm/actions";
+import { pilihKetuaTrainingClient } from "@/app/(app)/admin/training/actions";
+
+export interface LpmCandidateItem {
+  id: string;
+  nama: string;
+  username: string;
+  role?: string;
+}
 
 export interface SignatureSessionInfo {
   periodeId: string;
@@ -87,43 +95,66 @@ export function SignaturePadCard({
   session,
   currentUserId,
   currentRole,
+  lpmCandidates = [],
 }: {
   session: SignatureSessionInfo;
   currentUserId: string;
   currentRole: "AUDITEE" | "AUDITOR" | "LPM";
+  lpmCandidates?: LpmCandidateItem[];
 }) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const isDrawingRef = useRef(false);
 
+  const [activeSignRole, setActiveSignRole] = useState<"AUDITEE" | "AUDITOR" | "LPM">(currentRole);
   const [showCanvas, setShowCanvas] = useState(false);
   const [notice, setNotice] = useState<{ ok?: string; err?: string } | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  const targetSignRole = session.isTraining ? activeSignRole : currentRole;
+
   const canSignAsAuditee =
-    currentRole === "AUDITEE" &&
-    (!session.ketuaAuditeeId || session.ketuaAuditeeId === currentUserId);
+    targetSignRole === "AUDITEE" &&
+    (session.isTraining || !session.ketuaAuditeeId || session.ketuaAuditeeId === currentUserId);
   const canSignAsAuditor =
-    currentRole === "AUDITOR" &&
-    (!session.ketuaAuditorId || session.ketuaAuditorId === currentUserId);
-  const canSignAsLpm = currentRole === "LPM";
+    targetSignRole === "AUDITOR" &&
+    (session.isTraining || !session.ketuaAuditorId || session.ketuaAuditorId === currentUserId);
+  const canSignAsLpm = targetSignRole === "LPM" && (session.isTraining || currentRole === "LPM");
 
   const canSign = canSignAsAuditee || canSignAsAuditor || canSignAsLpm;
 
   const myCurrentTtd =
-    currentRole === "AUDITEE"
+    targetSignRole === "AUDITEE"
       ? session.ttdAuditeePreview
-      : currentRole === "AUDITOR"
+      : targetSignRole === "AUDITOR"
         ? session.ttdAuditorPreview
         : session.ttdLpmPreview;
 
   const myHasTtd =
-    currentRole === "AUDITEE"
+    targetSignRole === "AUDITEE"
       ? session.hasTtdAuditee
-      : currentRole === "AUDITOR"
+      : targetSignRole === "AUDITOR"
         ? session.hasTtdAuditor
         : session.hasTtdLpm;
+
+  const handlePilihLpm = (userId: string) => {
+    if (!userId) return;
+    setNotice(null);
+    startTransition(async () => {
+      const res = await pilihKetuaTrainingClient({
+        periodeId: session.periodeId,
+        tipe: "LPM",
+        userId,
+      });
+      if (!res.ok) {
+        setNotice({ err: res.error ?? "Gagal memilih Kepala LPM." });
+        return;
+      }
+      setNotice({ ok: res.message ?? "Kepala LPM diperbarui." });
+      router.refresh();
+    });
+  };
 
   const handleUploadFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -133,7 +164,7 @@ export function SignaturePadCard({
     try {
       const dataUrl = await processImageToTransparentPng(file);
       startTransition(async () => {
-        const res = await simpanTtdSesi(session.periodeId, currentRole, dataUrl);
+        const res = await simpanTtdSesi(session.periodeId, targetSignRole, dataUrl);
         if (fileRef.current) fileRef.current.value = "";
         if (!res.ok) {
           setNotice({ err: res.error ?? "Gagal menempel tanda tangan." });
@@ -193,7 +224,7 @@ export function SignaturePadCard({
     const dataUrl = canvas.toDataURL("image/png");
     setNotice(null);
     startTransition(async () => {
-      const res = await simpanTtdSesi(session.periodeId, currentRole, dataUrl);
+      const res = await simpanTtdSesi(session.periodeId, targetSignRole, dataUrl);
       if (!res.ok) {
         setNotice({ err: res.error ?? "Gagal menyimpan tanda tangan." });
         return;
@@ -207,7 +238,7 @@ export function SignaturePadCard({
   const handleDeleteTtd = () => {
     setNotice(null);
     startTransition(async () => {
-      const res = await simpanTtdSesi(session.periodeId, currentRole, null);
+      const res = await simpanTtdSesi(session.periodeId, targetSignRole, null);
       if (!res.ok) {
         setNotice({ err: res.error ?? "Gagal menghapus tanda tangan." });
         return;
@@ -216,6 +247,10 @@ export function SignaturePadCard({
       router.refresh();
     });
   };
+
+  const selectedLpmCandidate = lpmCandidates.find(
+    (c) => c.nama === session.kepalaLpmNama
+  );
 
   return (
     <div className="card space-y-3">
@@ -249,7 +284,7 @@ export function SignaturePadCard({
 
       {/* Status 3 Pihak (Kiri: Auditee, Kanan: Auditor, Tengah Bawah: LPM) */}
       <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3 text-xs">
-        <div className="rounded-xl border border-black/15 bg-[#FAF7EE] p-3 space-y-1">
+        <div className="rounded-xl border border-black/15 bg-[#FAF7EE] p-3 space-y-1.5">
           <div className="flex items-center justify-between gap-1">
             <span className="font-black uppercase text-slate-700">1. Ketua Auditee (Kiri)</span>
             <Badge tone={session.hasTtdAuditee ? "green" : "amber"}>
@@ -259,9 +294,15 @@ export function SignaturePadCard({
           <div className="font-bold text-black">
             {session.ketuaAuditeeNama ?? "Belum ditentukan LPM"}
           </div>
+          {session.ttdAuditeePreview && (
+            <div className="mt-1 inline-block rounded border border-black/15 bg-white px-2 py-1">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={session.ttdAuditeePreview} alt="TTD Auditee" className="h-9 w-auto object-contain" />
+            </div>
+          )}
         </div>
 
-        <div className="rounded-xl border border-black/15 bg-[#FAF7EE] p-3 space-y-1">
+        <div className="rounded-xl border border-black/15 bg-[#FAF7EE] p-3 space-y-1.5">
           <div className="flex items-center justify-between gap-1">
             <span className="font-black uppercase text-slate-700">2. Ketua Auditor (Kanan)</span>
             <Badge tone={session.hasTtdAuditor ? "green" : "amber"}>
@@ -271,9 +312,15 @@ export function SignaturePadCard({
           <div className="font-bold text-black">
             {session.ketuaAuditorNama ?? "Belum ditentukan LPM"}
           </div>
+          {session.ttdAuditorPreview && (
+            <div className="mt-1 inline-block rounded border border-black/15 bg-white px-2 py-1">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={session.ttdAuditorPreview} alt="TTD Auditor" className="h-9 w-auto object-contain" />
+            </div>
+          )}
         </div>
 
-        <div className="rounded-xl border border-black/15 bg-[#FAF7EE] p-3 space-y-1">
+        <div className="rounded-xl border border-black/15 bg-[#FAF7EE] p-3 space-y-1.5">
           <div className="flex items-center justify-between gap-1">
             <span className="font-black uppercase text-slate-700">3. Kepala LPM (Tengah Bawah)</span>
             <Badge tone={session.hasTtdLpm ? "green" : "amber"}>
@@ -283,8 +330,64 @@ export function SignaturePadCard({
           <div className="font-bold text-black">
             {session.kepalaLpmNama ?? "Kepala LPM ITBMP"}
           </div>
+
+          {/* Di Sesi Training: Bisa pilih LPM penandatangan Rekap langsung dari dropdown */}
+          {session.isTraining && lpmCandidates.length > 0 && (
+            <div className="pt-1 space-y-1">
+              <label className="block text-[11px] font-black uppercase text-[#581C87]">
+                🏛️ Pilih LPM yang TTD di Rekap:
+              </label>
+              <select
+                value={selectedLpmCandidate?.id ?? ""}
+                disabled={isPending}
+                onChange={(e) => handlePilihLpm(e.target.value)}
+                className="w-full rounded-lg border-2 border-black bg-white px-2 py-1 text-xs font-bold text-black"
+              >
+                <option value="">
+                  {session.kepalaLpmNama
+                    ? `Aktif: ${session.kepalaLpmNama} (Klik untuk ganti)`
+                    : "-- Pilih Akun LPM Penandatangan --"}
+                </option>
+                {lpmCandidates.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nama} ({c.username})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {session.ttdLpmPreview && (
+            <div className="mt-1 inline-block rounded border border-black/15 bg-white px-2 py-1">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={session.ttdLpmPreview} alt="TTD LPM" className="h-9 w-auto object-contain" />
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Di Sesi Training: Bisa pilih ingin menempel TTD sebagai Peran Anda atau Kepala LPM */}
+      {session.isTraining && (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-black/15 bg-[#FEF9C3] px-3 py-2 text-xs">
+          <span className="font-black text-black">🎓 Mode Training — Pilih Posisi TTD yang Ingin Diisi:</span>
+          <button
+            type="button"
+            onClick={() => setActiveSignRole(currentRole)}
+            className={targetSignRole === currentRole ? "btn px-2.5 py-1 text-xs" : "btn-secondary px-2.5 py-1 text-xs"}
+          >
+            {currentRole === "AUDITEE" ? "1. Ketua Auditee" : currentRole === "AUDITOR" ? "2. Ketua Auditor" : "3. Kepala LPM"}
+          </button>
+          {currentRole !== "LPM" && (
+            <button
+              type="button"
+              onClick={() => setActiveSignRole("LPM")}
+              className={targetSignRole === "LPM" ? "btn px-2.5 py-1 text-xs" : "btn-secondary px-2.5 py-1 text-xs"}
+            >
+              🏛️ 3. Kepala LPM ({session.kepalaLpmNama ?? "LPM"})
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Panel Tempel TTD untuk Ketua yang Sedang Login */}
       {canSign ? (
@@ -302,7 +405,7 @@ export function SignaturePadCard({
             )}
             <div>
               <div className="font-black text-black">
-                Tempel Tanda Tangan Anda ({currentRole === "AUDITEE" ? "Ketua Auditee" : currentRole === "AUDITOR" ? "Ketua Auditor" : "Kepala LPM"}):
+                Tempel Tanda Tangan ({targetSignRole === "AUDITEE" ? "Ketua Auditee" : targetSignRole === "AUDITOR" ? "Ketua Auditor" : `Kepala LPM — ${session.kepalaLpmNama ?? "LPM"}`}):
               </div>
               <input
                 ref={fileRef}
@@ -338,8 +441,8 @@ export function SignaturePadCard({
         </div>
       ) : (
         <div className="text-xs font-bold text-slate-700">
-          ℹ️ Penempelan TTD {currentRole === "AUDITEE" ? "Auditee" : "Auditor"} pada sesi ini diwakili oleh Ketua yang ditunjuk LPM (
-          {currentRole === "AUDITEE" ? session.ketuaAuditeeNama : session.ketuaAuditorNama}).
+          ℹ️ Penempelan TTD {targetSignRole === "AUDITEE" ? "Auditee" : "Auditor"} pada sesi ini diwakili oleh Ketua yang ditunjuk LPM (
+          {targetSignRole === "AUDITEE" ? session.ketuaAuditeeNama : session.ketuaAuditorNama}).
         </div>
       )}
 

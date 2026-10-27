@@ -280,7 +280,47 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                     </div>
 
                     {p.isTraining ? (
-                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border-2 border-black bg-[#EDE9FE] px-3.5 py-2.5 text-xs">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-black uppercase text-black">
+                              🏛️ Kepala LPM (Penandatangan di Rekap):
+                            </span>
+                            <Badge tone="purple">
+                              {p.kepalaLpmNama ?? p.disahkanOleh ?? "Default LPM"}
+                            </Badge>
+                          </div>
+                          <form action={pilihKetuaSesiAmi} className="flex flex-wrap items-center gap-1.5">
+                            <input type="hidden" name="periodeId" value={p.id} />
+                            <input type="hidden" name="tipe" value="LPM" />
+                            <input
+                              type="hidden"
+                              name="returnTo"
+                              value={`/lpm?tab=sesi&prodi=${prodiFilter}`}
+                            />
+                            <select
+                              name="userId"
+                              required
+                              defaultValue=""
+                              className="rounded-lg border-2 border-black bg-white px-2.5 py-1 text-xs font-bold text-black"
+                            >
+                              <option value="">-- Pilih / Ganti LPM Rekap --</option>
+                              {[
+                                ...p.trainingUsers,
+                                ...allUsers.filter((u) => u.role === "LPM"),
+                              ].map((u) => (
+                                <option key={u.id} value={u.id}>
+                                  {u.nama} ({u.username})
+                                </option>
+                              ))}
+                            </select>
+                            <button className="btn px-2.5 py-1 text-xs">
+                              🏛️ Simpan LPM
+                            </button>
+                          </form>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <div className="rounded-2xl border border-black/15 bg-[#FAF7EE] p-4 space-y-2.5">
                           <div className="flex items-center justify-between">
                             <span className="text-xs font-black uppercase text-black">
@@ -295,6 +335,7 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                               .filter((tu) => tu.role === "AUDITOR")
                               .map((tu) => {
                                 const isKetuaAuditor = p.ketuaAuditorId === tu.id;
+                                const isKepalaLpm = p.kepalaLpmNama === tu.nama;
                                 return (
                                   <li
                                     key={tu.id}
@@ -304,6 +345,9 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                                       <span className="font-bold text-black">🕵️ {tu.nama}</span>
                                       {isKetuaAuditor && (
                                         <Badge tone="amber">⭐ Ketua Auditor</Badge>
+                                      )}
+                                      {isKepalaLpm && (
+                                        <Badge tone="purple">🏛️ LPM Rekap</Badge>
                                       )}
                                     </div>
                                     <div className="flex flex-wrap items-center gap-1.5">
@@ -322,6 +366,21 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                                           />
                                           <button className="btn-secondary px-2 py-0.5 text-[11px]">
                                             ⭐ Jadikan Ketua
+                                          </button>
+                                        </form>
+                                      )}
+                                      {!isKepalaLpm && (
+                                        <form action={pilihKetuaSesiAmi}>
+                                          <input type="hidden" name="periodeId" value={p.id} />
+                                          <input type="hidden" name="tipe" value="LPM" />
+                                          <input type="hidden" name="userId" value={tu.id} />
+                                          <input
+                                            type="hidden"
+                                            name="returnTo"
+                                            value={`/lpm?tab=sesi&prodi=${prodiFilter}`}
+                                          />
+                                          <button className="btn-secondary px-2 py-0.5 text-[11px]">
+                                            🏛️ Jadikan LPM
                                           </button>
                                         </form>
                                       )}
@@ -346,6 +405,7 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                               .filter((tu) => tu.role === "AUDITEE")
                               .map((tu) => {
                                 const isKetuaAuditee = p.ketuaAuditeeId === tu.id;
+                                const isKepalaLpm = p.kepalaLpmNama === tu.nama;
                                 return (
                                   <li
                                     key={tu.id}
@@ -355,6 +415,9 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                                       <span className="font-bold text-black">📝 {tu.nama}</span>
                                       {isKetuaAuditee && (
                                         <Badge tone="amber">⭐ Ketua Auditee</Badge>
+                                      )}
+                                      {isKepalaLpm && (
+                                        <Badge tone="purple">🏛️ LPM Rekap</Badge>
                                       )}
                                     </div>
                                     <div className="flex flex-wrap items-center gap-1.5">
@@ -376,11 +439,27 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                                           </button>
                                         </form>
                                       )}
+                                      {!isKepalaLpm && (
+                                        <form action={pilihKetuaSesiAmi}>
+                                          <input type="hidden" name="periodeId" value={p.id} />
+                                          <input type="hidden" name="tipe" value="LPM" />
+                                          <input type="hidden" name="userId" value={tu.id} />
+                                          <input
+                                            type="hidden"
+                                            name="returnTo"
+                                            value={`/lpm?tab=sesi&prodi=${prodiFilter}`}
+                                          />
+                                          <button className="btn-secondary px-2 py-0.5 text-[11px]">
+                                            🏛️ Jadikan LPM
+                                          </button>
+                                        </form>
+                                      )}
                                     </div>
                                   </li>
                                 );
                               })}
                           </ul>
+                        </div>
                         </div>
                       </div>
                     ) : (

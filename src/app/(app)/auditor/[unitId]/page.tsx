@@ -4,7 +4,6 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { cleanupExpiredSignatures } from "@/lib/ttd-cleanup";
 import { Badge, Empty, Flash, PageHeader, one, type SP } from "@/components/ui";
-import { SignaturePadCard } from "@/components/SignaturePadCard";
 import AuditorClient, { type AuditorIndikatorItem } from "./AuditorClient";
 
 export default async function AuditorUnitWorkspacePage({
@@ -141,30 +140,6 @@ export default async function AuditorUnitWorkspacePage({
           indikator={clientItems}
         />
       )}
-
-      {/* Panel Tanda Tangan Ketua Auditor */}
-      <SignaturePadCard
-        session={{
-          periodeId: periode.id,
-          periodeNama: periode.nama,
-          ketuaAuditeeId: periode.ketuaAuditeeId,
-          ketuaAuditeeNama: periode.ketuaAuditeeNama,
-          ketuaAuditeeNip: periode.ketuaAuditeeNip,
-          hasTtdAuditee: Boolean(periode.ttdAuditee),
-          ttdAuditeePreview: periode.ttdAuditee,
-          ketuaAuditorId: periode.isTraining ? user.id : periode.ketuaAuditorId,
-          ketuaAuditorNama: periode.ketuaAuditorNama ?? (periode.isTraining ? user.nama : null),
-          ketuaAuditorNip: periode.ketuaAuditorNip ?? (periode.isTraining ? user.nimNuptk : null),
-          hasTtdAuditor: Boolean(periode.ttdAuditor),
-          ttdAuditorPreview: periode.ttdAuditor,
-          kepalaLpmNama: periode.kepalaLpmNama ?? periode.disahkanOleh,
-          kepalaLpmNip: periode.kepalaLpmNip,
-          hasTtdLpm: Boolean(periode.ttdLpm),
-          ttdLpmPreview: periode.ttdLpm,
-        }}
-        currentUserId={user.id}
-        currentRole="AUDITOR"
-      />
     </>
   );
 }

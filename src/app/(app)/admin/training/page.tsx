@@ -17,7 +17,7 @@ export default async function AdminTrainingPage({ searchParams }: { searchParams
   await requireUser("SUPER_ADMIN", "LPM");
   const sp = await searchParams;
 
-  const [trainingPeriodes, trainingUsers, masterPeriodes] = await Promise.all([
+  const [trainingPeriodes, trainingUsers, masterPeriodes, lpmUsers] = await Promise.all([
     prisma.periode.findMany({
       where: { isTraining: true },
       include: {
@@ -37,6 +37,10 @@ export default async function AdminTrainingPage({ searchParams }: { searchParams
       where: { isTraining: false },
       include: { indikator: { select: { kode: true, standar: true } } },
     }),
+    prisma.user.findMany({
+      where: { role: "LPM", aktif: true },
+      orderBy: { nama: "asc" },
+    }),
   ]);
 
   const masterIndikatorSet = new Set<string>();
@@ -48,7 +52,22 @@ export default async function AdminTrainingPage({ searchParams }: { searchParams
 
   const unassignedUsers = trainingUsers
     .filter((u) => !u.trainingPeriodeId)
-    .map((u) => ({ id: u.id, nama: u.nama, username: u.username }));
+    .map((u) => ({ id: u.id, nama: u.nama, username: u.username, role: u.role }));
+
+  const lpmOptions = Array.from(
+    new Map(
+      [...lpmUsers, ...trainingUsers].map((u) => [
+        u.id,
+        {
+          id: u.id,
+          nama: u.nama,
+          username: u.username,
+          role: u.role,
+          trainingPeriodeId: u.trainingPeriodeId,
+        },
+      ])
+    ).values()
+  );
 
   return (
     <>
@@ -100,6 +119,7 @@ export default async function AdminTrainingPage({ searchParams }: { searchParams
         nextGroupNumber={trainingPeriodes.length + 1}
         masterIndikatorCount={masterIndikatorSet.size}
         unassignedUsers={unassignedUsers}
+        lpmOptions={lpmOptions}
       />
 
       {/* 2. Board Drag & Drop Kelompok Training (Sisi Kiri: Auditor ⇄ Sisi Kanan: Auditee & Pindah Kelompok) */}
@@ -113,6 +133,7 @@ export default async function AdminTrainingPage({ searchParams }: { searchParams
           ketuaAuditorNama: tp.ketuaAuditorNama,
           ketuaAuditeeId: tp.ketuaAuditeeId,
           ketuaAuditeeNama: tp.ketuaAuditeeNama,
+          kepalaLpmNama: tp.kepalaLpmNama ?? tp.disahkanOleh,
         }))}
         allTrainingUsers={trainingUsers.map((u) => ({
           id: u.id,
@@ -121,6 +142,7 @@ export default async function AdminTrainingPage({ searchParams }: { searchParams
           role: u.role,
           trainingPeriodeId: u.trainingPeriodeId,
         }))}
+        lpmAccounts={lpmOptions}
       />
 
       {/* 3. Opsi Tambahan: Import Excel / Copy-Paste / Generate Instan Akun Dummy */}
