@@ -110,7 +110,7 @@ export async function GET(req: NextRequest) {
   let lpmNama = targetSignPeriode?.kepalaLpmNama || targetSignPeriode?.disahkanOleh || "";
   let lpmNuptk = targetSignPeriode?.kepalaLpmNip ?? "";
 
-  if (isPrint && targetSignPeriode) {
+  if (targetSignPeriode) {
     const [ketuaAuditeeUser, ketuaAuditorUser, lpmUser, chosenLpmUser] = await Promise.all([
       targetSignPeriode.ketuaAuditeeId
         ? prisma.user.findUnique({ where: { id: targetSignPeriode.ketuaAuditeeId } })
@@ -147,7 +147,7 @@ export async function GET(req: NextRequest) {
   }
 
   const signatureHtml =
-    isPrint && targetSignPeriode
+    targetSignPeriode
       ? `
       <div class="sig-wrapper">
         <div class="sig-top-row">
@@ -159,7 +159,7 @@ export async function GET(req: NextRequest) {
               ${
                 targetSignPeriode.ttdAuditee
                   ? `<img src="${targetSignPeriode.ttdAuditee}" alt="TTD Auditee" class="sig-img" />`
-                  : `<div class="sig-empty">( Belum TTD )</div>`
+                  : ""
               }
             </div>
             <div class="sig-name">${esc(auditeeNama || "........................................")}</div>
@@ -174,7 +174,7 @@ export async function GET(req: NextRequest) {
               ${
                 targetSignPeriode.ttdAuditor
                   ? `<img src="${targetSignPeriode.ttdAuditor}" alt="TTD Auditor" class="sig-img" />`
-                  : `<div class="sig-empty">( Belum TTD )</div>`
+                  : ""
               }
             </div>
             <div class="sig-name">${esc(auditorNama || "........................................")}</div>
@@ -191,7 +191,7 @@ export async function GET(req: NextRequest) {
               ${
                 targetSignPeriode.ttdLpm
                   ? `<img src="${targetSignPeriode.ttdLpm}" alt="TTD Kepala LPM" class="sig-img" />`
-                  : `<div class="sig-empty">( Belum TTD )</div>`
+                  : ""
               }
             </div>
             <div class="sig-name">${esc(lpmNama || "........................................")}</div>
