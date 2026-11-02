@@ -146,8 +146,9 @@ export async function buatSesiAmi(fd: FormData) {
 export async function toggleStatusSesi(fd: FormData) {
   const user = await requireUser("LPM");
   const periodeId = str(fd, "periodeId", 64);
+  const returnTo = str(fd, "returnTo", 200) || "/lpm";
   const p = await prisma.periode.findUnique({ where: { id: periodeId } });
-  if (!p) fail("/lpm", "Sesi AMI tidak ditemukan.");
+  if (!p) fail(returnTo, "Sesi AMI tidak ditemukan.");
 
   const nextAktif = !p.aktif;
   await prisma.periode.update({
@@ -155,26 +156,34 @@ export async function toggleStatusSesi(fd: FormData) {
     data: { aktif: nextAktif },
   });
 
-  await catat(user.id, nextAktif ? "BUKA_SESI_AMI" : "KUNCI_SESI_AMI", p.nama);
+  await catat(user.id, nextAktif ? "BUKA_SESI_AMI" : "KUNCI_ARSIP_SESI_AMI", p.nama);
   revalidatePath("/lpm");
+  revalidatePath("/lpm/rekap");
   revalidatePath("/auditor");
   revalidatePath("/auditee");
-  ok("/lpm", `Sesi "${p.nama}" ${nextAktif ? "DIBUKA" : "DIKUNCI"}.`);
+  ok(
+    returnTo,
+    nextAktif
+      ? `Sesi "${p.nama}" dibuka kembali & dipindahkan ke Sesi AMI Aktif.`
+      : `Sesi "${p.nama}" dikunci & dipindahkan ke halaman Archive.`
+  );
 }
 
 export async function hapusSesiAmi(fd: FormData) {
   const user = await requireUser("LPM");
   const periodeId = str(fd, "periodeId", 64);
+  const returnTo = str(fd, "returnTo", 200) || "/lpm";
   const p = await prisma.periode.findUnique({ where: { id: periodeId } });
-  if (!p) fail("/lpm", "Sesi AMI tidak ditemukan.");
+  if (!p) fail(returnTo, "Sesi AMI tidak ditemukan.");
 
   await prisma.periode.delete({ where: { id: periodeId } });
   await catat(user.id, "HAPUS_SESI_AMI", p.nama);
   revalidatePath("/lpm");
   revalidatePath("/lpm/indikator");
+  revalidatePath("/lpm/rekap");
   revalidatePath("/auditor");
   revalidatePath("/auditee");
-  ok("/lpm", `Sesi "${p.nama}" dihapus.`);
+  ok(returnTo, `Sesi "${p.nama}" dihapus.`);
 }
 
 // ====================================================

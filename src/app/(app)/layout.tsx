@@ -13,11 +13,15 @@ const NAV = {
   ],
   LPM: [
     { href: "/lpm", label: "Sesi AMI" },
+    { href: "/lpm?tab=archive", label: "📦 Archive" },
     { href: "/lpm/indikator", label: "Indikator" },
     { href: "/lpm/rekap", label: "Rekap & Excel" },
     { href: "/lpm/log", label: "Log" },
   ],
-  AUDITOR: [{ href: "/auditor", label: "Sesi Audit" }],
+  AUDITOR: [
+    { href: "/auditor", label: "Sesi Audit" },
+    { href: "/auditor?view=archive", label: "📦 Archive" },
+  ],
   AUDITEE: [{ href: "/auditee", label: "Evaluasi Diri" }],
 } as const;
 
@@ -35,6 +39,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     user.role === "LPM"
       ? [
           { href: "/lpm", label: "Sesi AMI", icon: "📋", bg: "bg-[#E9D5FF]" },
+          { href: "/lpm?tab=archive", label: "Archive", icon: "📦", bg: "bg-[#FDE68A]" },
           { href: "/lpm/indikator", label: "Indikator", icon: "📑", bg: "bg-[#FEF08A]" },
           { href: "/lpm/rekap", label: "Rekap", icon: "📊", bg: "bg-[#D9F99D]" },
           { href: "/lpm/log", label: "Log", icon: "📜", bg: "bg-[#BAE6FD]" },
@@ -42,6 +47,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       : user.role === "AUDITOR"
         ? [
             { href: "/auditor", label: "Sesi Audit", icon: "🏛️", bg: "bg-[#E9D5FF]" },
+            { href: "/auditor?view=archive", label: "Archive", icon: "📦", bg: "bg-[#FDE68A]" },
             { href: `${auditorBaseHref}?mode=dokumen`, label: "Dokumen", icon: "📂", bg: "bg-[#FEF08A]" },
             { href: `${auditorBaseHref}?mode=lapangan`, label: "Lapangan", icon: "🔍", bg: "bg-[#D9F99D]" },
             { href: `${auditorBaseHref}?mode=rtl`, label: "Verifikasi RTL", icon: "🔒", bg: "bg-[#BAE6FD]" },

@@ -11,6 +11,8 @@ export default async function AuditorListPage({ searchParams }: { searchParams: 
   const user = await requireUser("AUDITOR");
   const sp = await searchParams;
   const prodiFilter = one(sp.prodi) ?? "ALL";
+  const viewMode = one(sp.view) ?? "active";
+  const isArchiveView = viewMode === "archive";
 
   await cleanupExpiredSignatures();
 
@@ -53,10 +55,14 @@ export default async function AuditorListPage({ searchParams }: { searchParams: 
   });
 
   const basePeriodes = periodes.length > 0 ? periodes : allPeriodes;
+  const activePool = basePeriodes.filter((p) => p.aktif);
+  const archivePool = basePeriodes.filter((p) => !p.aktif);
+  const currentPool = isArchiveView ? archivePool : activePool;
+
   const filteredPeriodes =
     prodiFilter === "ALL"
-      ? basePeriodes
-      : basePeriodes.filter((p) => p.unit?.kode === prodiFilter);
+      ? currentPool
+      : currentPool.filter((p) => p.unit?.kode === prodiFilter);
 
   // Urutkan per Tahun Akademik & Semester (2025/2026 Ganjil -> 2025/2026 Genap -> 2026/2027 Ganjil -> dst)
   const displayPeriodes = sortPeriodesChronological(filteredPeriodes);
@@ -68,28 +74,48 @@ export default async function AuditorListPage({ searchParams }: { searchParams: 
       </PageHeader>
       <Flash ok={one(sp.ok)} err={one(sp.err)} />
 
+      {/* Navigasi Sesi Audit Aktif vs Archive Sesi Selesai */}
+      <div className="flex flex-wrap gap-2 border-b-2 border-black pb-3">
+        <Link
+          href={`/auditor?prodi=${prodiFilter}`}
+          className={!isArchiveView ? "btn text-xs" : "btn-secondary text-xs"}
+        >
+          🟢 Sesi Audit Aktif ({activePool.length})
+        </Link>
+        <Link
+          href={`/auditor?view=archive&prodi=${prodiFilter}`}
+          className={isArchiveView ? "btn text-xs" : "btn-secondary text-xs"}
+        >
+          📦 Archive Sesi Selesai / Terkunci ({archivePool.length})
+        </Link>
+      </div>
+
       {/* Filter Sesi per Program Studi */}
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs font-black uppercase text-black">Filter Prodi:</span>
         <Link
-          href="/auditor?prodi=ALL"
+          href={`/auditor?${isArchiveView ? "view=archive&" : ""}prodi=ALL`}
           className={prodiFilter === "ALL" ? "btn text-xs" : "btn-secondary text-xs"}
         >
-          Semua Prodi ({basePeriodes.length})
+          Semua Prodi ({currentPool.length})
         </Link>
         {PRODI_LIST.map((pr) => (
           <Link
             key={pr.kode}
-            href={`/auditor?prodi=${pr.kode}`}
+            href={`/auditor?${isArchiveView ? "view=archive&" : ""}prodi=${pr.kode}`}
             className={prodiFilter === pr.kode ? "btn text-xs" : "btn-secondary text-xs"}
           >
-            {pr.nama}
+            {pr.nama} ({currentPool.filter((p) => p.unit?.kode === pr.kode).length})
           </Link>
         ))}
       </div>
 
       {displayPeriodes.length === 0 ? (
-        <Empty>Belum ada Sesi AMI lintas prodi yang ditugaskan kepada Anda.</Empty>
+        <Empty>
+          {isArchiveView
+            ? "Belum ada Sesi Audit yang diarsipkan / dikunci pada filter ini."
+            : "Tidak ada Sesi Audit aktif pada filter ini (Cek tombol 📦 Archive jika sesi sudah selesai/dikunci)."}
+        </Empty>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {displayPeriodes.map((p) => {

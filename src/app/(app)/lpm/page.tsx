@@ -70,12 +70,18 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
 
   // Urutkan sesi berdasarkan Tahun Akademik & Semester (2025/2026 Ganjil -> 2025/2026 Genap -> 2026/2027 Ganjil -> dst)
   const periodes = sortPeriodesChronological(rawPeriodes);
+  const activeOnlyPeriodes = periodes.filter((p) => p.aktif);
+  const archivedOnlyPeriodes = periodes.filter((p) => !p.aktif);
+
+  const isArchiveTab = tab === "archive";
+  const baseSessionPool = isArchiveTab ? archivedOnlyPeriodes : activeOnlyPeriodes;
+
   const filteredPeriodes =
     prodiFilter === "ALL"
-      ? periodes
+      ? baseSessionPool
       : prodiFilter === "TRAINING"
-        ? periodes.filter((p) => p.isTraining)
-        : periodes.filter((p) => !p.isTraining && p.unit?.kode === prodiFilter);
+        ? baseSessionPool.filter((p) => p.isTraining)
+        : baseSessionPool.filter((p) => !p.isTraining && p.unit?.kode === prodiFilter);
 
   const activePeriodeForPantau =
     periodes.find((p) => p.id === selectedPeriodeId) ?? periodes[0] ?? null;
@@ -85,13 +91,19 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
       <PageHeader title="Sesi AMI & Pantau Pekerjaan" />
       <Flash ok={one(sp.ok)} err={one(sp.err)} />
 
-      {/* Navigasi Tab */}
+      {/* Navigasi Tab: Sesi AMI Aktif, Archive Sesi (di samping Sesi AMI), dan Pantau Pekerjaan */}
       <div className="flex flex-wrap gap-2 border-b-2 border-black pb-3">
         <Link
-          href="/lpm?tab=sesi"
+          href={`/lpm?tab=sesi&prodi=${prodiFilter}`}
           className={tab === "sesi" ? "btn text-xs" : "btn-secondary text-xs"}
         >
-          📅 1. Sesi AMI, Auditor &amp; Auditee
+          📅 1. Sesi AMI Aktif ({activeOnlyPeriodes.length})
+        </Link>
+        <Link
+          href={`/lpm?tab=archive&prodi=${prodiFilter}`}
+          className={tab === "archive" ? "btn text-xs" : "btn-secondary text-xs"}
+        >
+          📦 Archive Sesi Selesai / Terkunci ({archivedOnlyPeriodes.length})
         </Link>
         <Link
           href={`/lpm?tab=pantau${activePeriodeForPantau ? `&periodeId=${activePeriodeForPantau.id}` : ""}`}
@@ -101,108 +113,121 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
         </Link>
       </div>
 
-      {tab === "sesi" ? (
+      {tab === "sesi" || tab === "archive" ? (
         <>
-          {/* Form Buat Sesi AMI */}
-          <form action={buatSesiAmi} className="card space-y-4">
-            <h2 className="border-b border-black/15 pb-2 text-base font-black text-black">
-              + Buat Sesi AMI
-            </h2>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <div className="space-y-1">
-                <label>Tahun Akademik</label>
-                <input name="tahun" required defaultValue="2026/2027" placeholder="2026/2027" className="w-full" />
-              </div>
-              <div className="space-y-1">
-                <label>Semester</label>
-                <select name="semester" required defaultValue="Ganjil" className="w-full">
-                  <option value="Ganjil">Ganjil</option>
-                  <option value="Genap">Genap</option>
-                </select>
-              </div>
-              <div className="space-y-1">
-                <label>Program Studi</label>
-                <div className="flex gap-2">
-                  <select name="prodiKode" required defaultValue="PRODI-BD" className="w-full">
-                    {PRODI_LIST.map((p) => (
-                      <option key={p.kode} value={p.kode}>
-                        {p.nama}
-                      </option>
-                    ))}
-                  </select>
-                  <button className="btn shrink-0">+ Buat Sesi</button>
-                </div>
-              </div>
+          {isArchiveTab ? (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border-2 border-black bg-[#FEF08A] px-4 py-3 text-xs font-black text-black shadow-[3px_3px_0px_#000]">
+              <span>
+                📦 Halaman Archive Sesi AMI — Menampilkan sesi yang sudah selesai dan dikunci ({archivedOnlyPeriodes.length} Sesi) agar tidak menumpuk di halaman Sesi AMI Aktif.
+              </span>
+              <Link href={`/lpm?tab=sesi&prodi=${prodiFilter}`} className="btn-secondary text-xs">
+                ← Kembali ke Sesi AMI Aktif ({activeOnlyPeriodes.length})
+              </Link>
             </div>
-          </form>
+          ) : (
+            <>
+              {/* Form Buat Sesi AMI */}
+              <form action={buatSesiAmi} className="card space-y-4">
+                <h2 className="border-b border-black/15 pb-2 text-base font-black text-black">
+                  + Buat Sesi AMI
+                </h2>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div className="space-y-1">
+                    <label>Tahun Akademik</label>
+                    <input name="tahun" required defaultValue="2026/2027" placeholder="2026/2027" className="w-full" />
+                  </div>
+                  <div className="space-y-1">
+                    <label>Semester</label>
+                    <select name="semester" required defaultValue="Ganjil" className="w-full">
+                      <option value="Ganjil">Ganjil</option>
+                      <option value="Genap">Genap</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label>Program Studi</label>
+                    <div className="flex gap-2">
+                      <select name="prodiKode" required defaultValue="PRODI-BD" className="w-full">
+                        {PRODI_LIST.map((p) => (
+                          <option key={p.kode} value={p.kode}>
+                            {p.nama}
+                          </option>
+                        ))}
+                      </select>
+                      <button className="btn shrink-0">+ Buat Sesi</button>
+                    </div>
+                  </div>
+                </div>
+              </form>
 
-          {/* Form Emergency LPM: Tambah Akun Auditor / Auditee */}
-          <form action={tambahUserEmergencyOlehLpm} className="card space-y-4">
-            <input type="hidden" name="returnTo" value="/lpm?tab=sesi" />
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/15 pb-2">
-              <h2 className="text-base font-black text-black">🚨 Emergency: + Buat Akun Auditor / Auditee</h2>
-              <Badge tone="amber">🔑 Password Default: 123</Badge>
-            </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-              <div className="space-y-1">
-                <label>Role</label>
-                <select name="role" required defaultValue="AUDITOR" className="w-full font-bold">
-                  <option value="AUDITOR">Auditor (Lintas Prodi)</option>
-                  <option value="AUDITEE">Auditee (Satu Prodi)</option>
-                </select>
-              </div>
-              <div className="space-y-1">
-                <label>Nama Lengkap</label>
-                <input name="nama" required placeholder="Nama..." className="w-full" />
-              </div>
-              <div className="space-y-1">
-                <label>NIDN / NUPTK</label>
-                <input name="nimNuptk" required placeholder="NIDN / NUPTK..." className="w-full font-mono" />
-              </div>
-              <div className="space-y-1">
-                <label>Homebase / Prodi</label>
-                <select name="prodiKode" required defaultValue="PRODI-BD" className="w-full">
-                  {HOMEBASE_LIST.map((p) => (
-                    <option key={p.kode} value={p.kode}>
-                      {p.nama}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-1">
-                <label>Username</label>
-                <div className="flex gap-2">
-                  <input name="username" required placeholder="Username..." className="w-full font-mono" />
-                  <button className="btn shrink-0">+ Tambah</button>
+              {/* Form Emergency LPM: Tambah Akun Auditor / Auditee */}
+              <form action={tambahUserEmergencyOlehLpm} className="card space-y-4">
+                <input type="hidden" name="returnTo" value="/lpm?tab=sesi" />
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/15 pb-2">
+                  <h2 className="text-base font-black text-black">🚨 Emergency: + Buat Akun Auditor / Auditee</h2>
+                  <Badge tone="amber">🔑 Password Default: 123</Badge>
                 </div>
-              </div>
-            </div>
-          </form>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                  <div className="space-y-1">
+                    <label>Role</label>
+                    <select name="role" required defaultValue="AUDITOR" className="w-full font-bold">
+                      <option value="AUDITOR">Auditor (Lintas Prodi)</option>
+                      <option value="AUDITEE">Auditee (Satu Prodi)</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label>Nama Lengkap</label>
+                    <input name="nama" required placeholder="Nama..." className="w-full" />
+                  </div>
+                  <div className="space-y-1">
+                    <label>NIDN / NUPTK</label>
+                    <input name="nimNuptk" required placeholder="NIDN / NUPTK..." className="w-full font-mono" />
+                  </div>
+                  <div className="space-y-1">
+                    <label>Homebase / Prodi</label>
+                    <select name="prodiKode" required defaultValue="PRODI-BD" className="w-full">
+                      {HOMEBASE_LIST.map((p) => (
+                        <option key={p.kode} value={p.kode}>
+                          {p.nama}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label>Username</label>
+                    <div className="flex gap-2">
+                      <input name="username" required placeholder="Username..." className="w-full font-mono" />
+                      <button className="btn shrink-0">+ Tambah</button>
+                    </div>
+                  </div>
+                </div>
+              </form>
+            </>
+          )}
 
           {/* Filter Sesi per Program Studi (Urut Kronologis TA & Semester) */}
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs font-black uppercase text-black">Filter Prodi:</span>
               <Link
-                href="/lpm?tab=sesi&prodi=ALL"
+                href={`/lpm?tab=${isArchiveTab ? "archive" : "sesi"}&prodi=ALL`}
                 className={prodiFilter === "ALL" ? "btn text-xs" : "btn-secondary text-xs"}
               >
-                Semua Prodi ({periodes.length})
+                Semua Prodi ({baseSessionPool.length})
               </Link>
               {PRODI_LIST.map((pr) => (
                 <Link
                   key={pr.kode}
-                  href={`/lpm?tab=sesi&prodi=${pr.kode}`}
+                  href={`/lpm?tab=${isArchiveTab ? "archive" : "sesi"}&prodi=${pr.kode}`}
                   className={prodiFilter === pr.kode ? "btn text-xs" : "btn-secondary text-xs"}
                 >
-                  {pr.nama} ({periodes.filter((p) => !p.isTraining && p.unit?.kode === pr.kode).length})
+                  {pr.nama} ({baseSessionPool.filter((p) => !p.isTraining && p.unit?.kode === pr.kode).length})
                 </Link>
               ))}
               <Link
-                href="/lpm?tab=sesi&prodi=TRAINING"
+                href={`/lpm?tab=${isArchiveTab ? "archive" : "sesi"}&prodi=TRAINING`}
                 className={prodiFilter === "TRAINING" ? "btn text-xs" : "btn-secondary text-xs"}
               >
-                🎓 Sesi Training ({periodes.filter((p) => p.isTraining).length})
+                🎓 Sesi Training ({baseSessionPool.filter((p) => p.isTraining).length})
               </Link>
             </div>
             <Badge tone="slate">📅 Urutan: Tahun Akademik &amp; Semester (Ganjil ➔ Genap)</Badge>
@@ -210,7 +235,11 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
 
           {/* Daftar Sesi AMI */}
           {filteredPeriodes.length === 0 ? (
-            <Empty>Belum ada Sesi AMI.</Empty>
+            <Empty>
+              {isArchiveTab
+                ? "Belum ada Sesi AMI yang diarsipkan / dikunci pada filter ini."
+                : "Tidak ada Sesi AMI aktif pada filter ini (Cek tombol 📦 Archive Sesi jika sesi sudah dikunci)."}
+            </Empty>
           ) : (
             <div className="space-y-4">
               {filteredPeriodes.map((p) => {
@@ -267,10 +296,33 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                         >
                           👀 Pantau &amp; Indikator
                         </Link>
+                        {!p.aktif && (
+                          <>
+                            <a
+                              href={`/api/rekap-excel?periodeId=${p.id}&print=1`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="btn-secondary text-xs"
+                            >
+                              🖨️ Print Rekap
+                            </a>
+                            <a
+                              href={`/api/rekap-excel?periodeId=${p.id}`}
+                              className="btn-success text-xs"
+                            >
+                              📥 Excel
+                            </a>
+                          </>
+                        )}
                         <form action={toggleStatusSesi}>
                           <input type="hidden" name="periodeId" value={p.id} />
+                          <input
+                            type="hidden"
+                            name="returnTo"
+                            value={`/lpm?tab=${isArchiveTab ? "archive" : "sesi"}&prodi=${prodiFilter}`}
+                          />
                           <button className="btn-secondary text-xs">
-                            {p.aktif ? "🔒 Kunci Sesi" : "🔓 Buka Sesi"}
+                            {p.aktif ? "📦 Kunci & Arsipkan" : "🔓 Kembalikan ke Sesi Aktif"}
                           </button>
                         </form>
                         {(p.ttdAuditee || p.ttdAuditor || p.ttdLpm) && (
@@ -279,7 +331,7 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                             <input
                               type="hidden"
                               name="returnTo"
-                              value={`/lpm?tab=sesi&prodi=${prodiFilter}`}
+                              value={`/lpm?tab=${isArchiveTab ? "archive" : "sesi"}&prodi=${prodiFilter}`}
                             />
                             <button className="btn-secondary text-xs">
                               🧹 Kosongkan TTD
@@ -288,6 +340,11 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                         )}
                         <form action={hapusSesiAmi}>
                           <input type="hidden" name="periodeId" value={p.id} />
+                          <input
+                            type="hidden"
+                            name="returnTo"
+                            value={`/lpm?tab=${isArchiveTab ? "archive" : "sesi"}&prodi=${prodiFilter}`}
+                          />
                           <button className="btn-danger text-xs">Hapus</button>
                         </form>
                       </div>
