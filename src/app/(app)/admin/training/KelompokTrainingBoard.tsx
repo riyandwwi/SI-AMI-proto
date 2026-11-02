@@ -9,6 +9,7 @@ import {
   pilihKetuaTrainingClient,
   pindahkanAkunTrainingClient,
 } from "./actions";
+import { hapusSemuaTtdSesi } from "@/app/(app)/lpm/actions";
 
 export interface TrainingMemberItem {
   id: string;
@@ -291,6 +292,13 @@ export function KelompokTrainingBoard({
                     >
                       📥 Excel Hasil Auditor
                     </a>
+                    <form action={hapusSemuaTtdSesi}>
+                      <input type="hidden" name="periodeId" value={tp.id} />
+                      <input type="hidden" name="returnTo" value="/admin/training" />
+                      <button className="btn-secondary text-xs" title="Kosongkan tanda tangan kelompok ini">
+                        🧹 Kosongkan TTD
+                      </button>
+                    </form>
                     <form action={hapusSatuKelompokTraining}>
                       <input type="hidden" name="periodeId" value={tp.id} />
                       <button className="btn-danger text-xs">🗑️ Hapus Kelompok</button>

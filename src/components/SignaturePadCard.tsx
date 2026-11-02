@@ -270,10 +270,11 @@ export function SignaturePadCard({
     });
   };
 
-  const handleDeleteTtd = () => {
+  const handleDeleteTtd = (roleToClear?: "AUDITEE" | "AUDITOR" | "LPM" | "ALL") => {
     setNotice(null);
+    const target = roleToClear ?? targetSignRole;
     startTransition(async () => {
-      const res = await simpanTtdSesi(session.periodeId, targetSignRole, null);
+      const res = await simpanTtdSesi(session.periodeId, target, null);
       if (!res.ok) {
         setNotice({ err: res.error ?? "Gagal menghapus tanda tangan." });
         return;
@@ -387,9 +388,17 @@ export function SignaturePadCard({
             </div>
           </div>
           {session.ttdAuditeePreview && (
-            <div className="mt-1 inline-block rounded border border-black/15 bg-white px-2 py-1">
+            <div className="mt-1 flex items-center justify-between gap-2 rounded border border-black/15 bg-white px-2 py-1">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={session.ttdAuditeePreview} alt="TTD Auditee" className="h-9 w-auto object-contain" />
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={() => handleDeleteTtd("AUDITEE")}
+                className="btn-danger px-2 py-0.5 text-[10px]"
+              >
+                🗑️ Hapus
+              </button>
             </div>
           )}
         </div>
@@ -427,9 +436,17 @@ export function SignaturePadCard({
             </div>
           </div>
           {session.ttdAuditorPreview && (
-            <div className="mt-1 inline-block rounded border border-black/15 bg-white px-2 py-1">
+            <div className="mt-1 flex items-center justify-between gap-2 rounded border border-black/15 bg-white px-2 py-1">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={session.ttdAuditorPreview} alt="TTD Auditor" className="h-9 w-auto object-contain" />
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={() => handleDeleteTtd("AUDITOR")}
+                className="btn-danger px-2 py-0.5 text-[10px]"
+              >
+                🗑️ Hapus
+              </button>
             </div>
           )}
         </div>
@@ -495,9 +512,17 @@ export function SignaturePadCard({
           </div>
 
           {session.ttdLpmPreview && (
-            <div className="mt-1 inline-block rounded border border-black/15 bg-white px-2 py-1">
+            <div className="mt-1 flex items-center justify-between gap-2 rounded border border-black/15 bg-white px-2 py-1">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={session.ttdLpmPreview} alt="TTD LPM" className="h-9 w-auto object-contain" />
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={() => handleDeleteTtd("LPM")}
+                className="btn-danger px-2 py-0.5 text-[10px]"
+              >
+                🗑️ Hapus
+              </button>
             </div>
           )}
         </div>
@@ -591,7 +616,7 @@ export function SignaturePadCard({
               <button
                 type="button"
                 disabled={isPending}
-                onClick={handleDeleteTtd}
+                onClick={() => handleDeleteTtd()}
                 className="btn-danger text-xs"
               >
                 🗑️ Hapus TTD

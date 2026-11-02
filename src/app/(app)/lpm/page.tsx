@@ -18,6 +18,7 @@ import {
   buatSesiAmi,
   hapusIndikator,
   hapusSemuaIndikator,
+  hapusSemuaTtdSesi,
   hapusSesiAmi,
   hapusStandarEmergency,
   hapusUserEmergencyOlehLpm,
@@ -272,6 +273,19 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                             {p.aktif ? "🔒 Kunci Sesi" : "🔓 Buka Sesi"}
                           </button>
                         </form>
+                        {(p.ttdAuditee || p.ttdAuditor || p.ttdLpm) && (
+                          <form action={hapusSemuaTtdSesi}>
+                            <input type="hidden" name="periodeId" value={p.id} />
+                            <input
+                              type="hidden"
+                              name="returnTo"
+                              value={`/lpm?tab=sesi&prodi=${prodiFilter}`}
+                            />
+                            <button className="btn-secondary text-xs">
+                              🧹 Kosongkan TTD
+                            </button>
+                          </form>
+                        )}
                         <form action={hapusSesiAmi}>
                           <input type="hidden" name="periodeId" value={p.id} />
                           <button className="btn-danger text-xs">Hapus</button>

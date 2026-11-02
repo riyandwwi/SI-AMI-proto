@@ -939,7 +939,7 @@ export async function pilihKetuaSesiAmi(fd: FormData) {
 
 export async function simpanTtdSesi(
   periodeId: string,
-  tipe: "AUDITEE" | "AUDITOR" | "LPM",
+  tipe: "AUDITEE" | "AUDITOR" | "LPM" | "ALL",
   ttdDataUrl: string | null
 ): Promise<{ ok: boolean; message?: string; error?: string }> {
   const user = await requireUser("SUPER_ADMIN", "LPM", "AUDITOR", "AUDITEE");
@@ -962,9 +962,25 @@ export async function simpanTtdSesi(
   }
 
   const now = ttdDataUrl ? new Date() : null;
+  const isAdminOrLpm = user.role === "SUPER_ADMIN" || user.role === "LPM";
 
-  if (tipe === "AUDITEE") {
-    if (!periode.isTraining && user.role !== "AUDITEE" && user.role !== "LPM") {
+  if (tipe === "ALL") {
+    if (!periode.isTraining && !isAdminOrLpm) {
+      return { ok: false, error: "Hanya Super Admin atau LPM yang dapat mereset seluruh tanda tangan." };
+    }
+    await prisma.periode.update({
+      where: { id: periodeId },
+      data: {
+        ttdAuditee: null,
+        ttdAuditeeAt: null,
+        ttdAuditor: null,
+        ttdAuditorAt: null,
+        ttdLpm: null,
+        ttdLpmAt: null,
+      },
+    });
+  } else if (tipe === "AUDITEE") {
+    if (!periode.isTraining && user.role !== "AUDITEE" && !isAdminOrLpm) {
       return { ok: false, error: "Hanya Ketua Auditee yang dapat menempel TTD Auditee." };
     }
     if (!periode.isTraining && user.role === "AUDITEE" && periode.ketuaAuditeeId && periode.ketuaAuditeeId !== user.id) {
@@ -985,7 +1001,7 @@ export async function simpanTtdSesi(
       },
     });
   } else if (tipe === "AUDITOR") {
-    if (!periode.isTraining && user.role !== "AUDITOR" && user.role !== "LPM") {
+    if (!periode.isTraining && user.role !== "AUDITOR" && !isAdminOrLpm) {
       return { ok: false, error: "Hanya Ketua Auditor yang dapat menempel TTD Auditor." };
     }
     if (!periode.isTraining && user.role === "AUDITOR" && periode.ketuaAuditorId && periode.ketuaAuditorId !== user.id) {
@@ -1048,8 +1064,42 @@ export async function simpanTtdSesi(
     ok: true,
     message: ttdDataUrl
       ? `Tanda tangan ${tipe} berhasil disimpan.`
-      : `Tanda tangan ${tipe} dihapus.`,
+      : tipe === "ALL"
+        ? "Seluruh tanda tangan pada sesi ini berhasil dihapus."
+        : `Tanda tangan ${tipe} dihapus.`,
   };
+}
+
+export async function hapusSemuaTtdSesi(fd: FormData) {
+  const user = await requireUser("SUPER_ADMIN", "LPM");
+  const periodeId = str(fd, "periodeId", 64);
+  const returnTo = str(fd, "returnTo", 200) || "/admin/training";
+
+  if (!periodeId) fail(returnTo, "Sesi AMI tidak ditemukan.");
+
+  const periode = await prisma.periode.findUnique({ where: { id: periodeId } });
+  if (!periode) fail(returnTo, "Sesi AMI tidak ditemukan.");
+
+  await prisma.periode.update({
+    where: { id: periodeId },
+    data: {
+      ttdAuditee: null,
+      ttdAuditeeAt: null,
+      ttdAuditor: null,
+      ttdAuditorAt: null,
+      ttdLpm: null,
+      ttdLpmAt: null,
+    },
+  });
+
+  await catat(user.id, "HAPUS_SEMUA_TTD_SESI", `Reset semua TTD pada ${periode.nama}`);
+  revalidatePath("/admin/training");
+  revalidatePath("/lpm");
+  revalidatePath("/lpm/rekap");
+  revalidatePath("/auditor");
+  revalidatePath(`/auditor/${periodeId}/ttd`);
+  revalidatePath("/auditee/ttd");
+  ok(returnTo, `Seluruh tanda tangan pada "${periode.nama}" berhasil dihapus.`);
 }
 
 export async function simpanIdentitasPenandatanganSesi(input: {
