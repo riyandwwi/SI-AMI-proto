@@ -175,8 +175,8 @@ export function KelompokTrainingBoard({
             🖐️ Bisa Drag &amp; Drop Peserta Antar Sisi (Auditor ⇄ Auditee) atau Antar Kelompok
           </Badge>
         </div>
-        <Badge tone="purple">
-          ⏱️ Tanda Tangan Otomatis Reset 3 Menit
+        <Badge tone="green">
+          ✍️ TTD Digital Tersimpan / Bisa Kosong untuk TTD Basah
         </Badge>
       </div>
 

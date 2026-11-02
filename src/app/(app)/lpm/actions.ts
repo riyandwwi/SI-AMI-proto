@@ -1010,10 +1010,9 @@ export async function simpanTtdSesi(
       return { ok: false, error: "Hanya Kepala LPM yang dapat menempel TTD LPM." };
     }
 
-    const finalLpmNama =
-      periode.isTraining && periode.kepalaLpmNama ? periode.kepalaLpmNama : user.nama;
+    const finalLpmNama = periode.kepalaLpmNama || user.nama;
     const finalLpmNip =
-      periode.isTraining && periode.kepalaLpmNama
+      periode.kepalaLpmNama
         ? periode.kepalaLpmNip
         : user.nimNuptk || null;
 
@@ -1048,8 +1047,71 @@ export async function simpanTtdSesi(
   return {
     ok: true,
     message: ttdDataUrl
-      ? `Tanda tangan ${tipe} berhasil ditempel (otomatis tersimpan maks. 3 menit).`
+      ? `Tanda tangan ${tipe} berhasil disimpan.`
       : `Tanda tangan ${tipe} dihapus.`,
+  };
+}
+
+export async function simpanIdentitasPenandatanganSesi(input: {
+  periodeId: string;
+  ketuaAuditeeNama: string;
+  ketuaAuditeeNip: string;
+  ketuaAuditorNama: string;
+  ketuaAuditorNip: string;
+  kepalaLpmNama: string;
+  kepalaLpmNip: string;
+}): Promise<{ ok: boolean; message?: string; error?: string }> {
+  const user = await requireUser("LPM", "SUPER_ADMIN", "AUDITOR", "AUDITEE");
+  const periodeId = (input.periodeId ?? "").trim();
+  if (!periodeId) return { ok: false, error: "Sesi AMI tidak valid." };
+
+  const periode = await prisma.periode.findUnique({ where: { id: periodeId } });
+  if (!periode) return { ok: false, error: "Sesi AMI tidak ditemukan." };
+
+  if (user.isTraining && (!periode.isTraining || user.trainingPeriodeId !== periode.id)) {
+    return {
+      ok: false,
+      error: "Akun pelatihan hanya dapat mengubah penandatangan kelompok pelatihannya sendiri.",
+    };
+  }
+
+  const auditeeNama = (input.ketuaAuditeeNama ?? "").trim().slice(0, 120) || null;
+  const auditeeNip = (input.ketuaAuditeeNip ?? "").trim().slice(0, 60) || null;
+  const auditorNama = (input.ketuaAuditorNama ?? "").trim().slice(0, 120) || null;
+  const auditorNip = (input.ketuaAuditorNip ?? "").trim().slice(0, 60) || null;
+  const lpmNama = (input.kepalaLpmNama ?? "").trim().slice(0, 120) || null;
+  const lpmNip = (input.kepalaLpmNip ?? "").trim().slice(0, 60) || null;
+
+  await prisma.periode.update({
+    where: { id: periodeId },
+    data: {
+      ketuaAuditeeNama: auditeeNama,
+      ketuaAuditeeNip: auditeeNip,
+      ketuaAuditorNama: auditorNama,
+      ketuaAuditorNip: auditorNip,
+      kepalaLpmNama: lpmNama,
+      kepalaLpmNip: lpmNip,
+      ...(lpmNama ? { disahkanOleh: lpmNama } : {}),
+    },
+  });
+
+  await catat(
+    user.id,
+    "UBAH_IDENTITAS_PENANDATANGAN",
+    `${periode.nama}: Auditee=${auditeeNama ?? "-"}, Auditor=${auditorNama ?? "-"}, LPM=${lpmNama ?? "-"}`
+  );
+
+  revalidatePath("/lpm");
+  revalidatePath("/lpm/rekap");
+  revalidatePath("/auditor");
+  revalidatePath(`/auditor/${periodeId}`);
+  revalidatePath(`/auditor/${periodeId}/ttd`);
+  revalidatePath("/auditee");
+  revalidatePath("/auditee/ttd");
+
+  return {
+    ok: true,
+    message: "Nama, Gelar & NUPTK penandatangan berhasil disimpan dan diperbarui di Rekap!",
   };
 }
 

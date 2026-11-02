@@ -1,9 +1,12 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui";
-import { simpanTtdSesi } from "@/app/(app)/lpm/actions";
+import {
+  simpanIdentitasPenandatanganSesi,
+  simpanTtdSesi,
+} from "@/app/(app)/lpm/actions";
 import { pilihKetuaTrainingClient } from "@/app/(app)/admin/training/actions";
 
 export interface LpmCandidateItem {
@@ -111,6 +114,38 @@ export function SignaturePadCard({
   const [showCanvas, setShowCanvas] = useState(false);
   const [notice, setNotice] = useState<{ ok?: string; err?: string } | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  // State input langsung Nama, Gelar & NUPTK 3 Penandatangan + Kota/Tanggal Cetak
+  const [auditeeNamaInput, setAuditeeNamaInput] = useState(session.ketuaAuditeeNama ?? "");
+  const [auditeeNipInput, setAuditeeNipInput] = useState(session.ketuaAuditeeNip ?? "");
+  const [auditorNamaInput, setAuditorNamaInput] = useState(session.ketuaAuditorNama ?? "");
+  const [auditorNipInput, setAuditorNipInput] = useState(session.ketuaAuditorNip ?? "");
+  const [lpmNamaInput, setLpmNamaInput] = useState(session.kepalaLpmNama ?? "");
+  const [lpmNipInput, setLpmNipInput] = useState(session.kepalaLpmNip ?? "");
+  const [tglCetak, setTglCetak] = useState(() => {
+    const d = new Date().toLocaleDateString("id-ID", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+    return `Banyuwangi, ${d}`;
+  });
+
+  useEffect(() => {
+    setAuditeeNamaInput(session.ketuaAuditeeNama ?? "");
+    setAuditeeNipInput(session.ketuaAuditeeNip ?? "");
+    setAuditorNamaInput(session.ketuaAuditorNama ?? "");
+    setAuditorNipInput(session.ketuaAuditorNip ?? "");
+    setLpmNamaInput(session.kepalaLpmNama ?? "");
+    setLpmNipInput(session.kepalaLpmNip ?? "");
+  }, [
+    session.ketuaAuditeeNama,
+    session.ketuaAuditeeNip,
+    session.ketuaAuditorNama,
+    session.ketuaAuditorNip,
+    session.kepalaLpmNama,
+    session.kepalaLpmNip,
+  ]);
 
   const targetSignRole = session.isTraining ? activeSignRole : currentRole;
 
@@ -248,27 +283,62 @@ export function SignaturePadCard({
     });
   };
 
+  const handleSaveIdentitas = () => {
+    setNotice(null);
+    startTransition(async () => {
+      const res = await simpanIdentitasPenandatanganSesi({
+        periodeId: session.periodeId,
+        ketuaAuditeeNama: auditeeNamaInput,
+        ketuaAuditeeNip: auditeeNipInput,
+        ketuaAuditorNama: auditorNamaInput,
+        ketuaAuditorNip: auditorNipInput,
+        kepalaLpmNama: lpmNamaInput,
+        kepalaLpmNip: lpmNipInput,
+      });
+      if (!res.ok) {
+        setNotice({ err: res.error ?? "Gagal menyimpan identitas penandatangan." });
+        return;
+      }
+      setNotice({ ok: res.message ?? "Identitas penandatangan berhasil disimpan." });
+      router.refresh();
+    });
+  };
+
   const selectedLpmCandidate = lpmCandidates.find(
     (c) => c.nama === session.kepalaLpmNama
   );
 
+  const printRekapHref = `/api/rekap-excel?periodeId=${encodeURIComponent(session.periodeId)}&print=1${
+    tglCetak.trim() ? `&tgl=${encodeURIComponent(tglCetak.trim())}` : ""
+  }`;
+  const excelRekapHref = `/api/rekap-excel?periodeId=${encodeURIComponent(session.periodeId)}${
+    tglCetak.trim() ? `&tgl=${encodeURIComponent(tglCetak.trim())}` : ""
+  }`;
+
   return (
-    <div className="card space-y-3">
+    <div className="card space-y-3.5">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/15 pb-2.5">
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="text-sm font-black text-black">
-            ✍️ Status Tanda Tangan Laporan ({session.periodeNama})
+            ✍️ Pengaturan &amp; Tanda Tangan Lembar Pengesahan ({session.periodeNama})
           </h3>
-          <Badge tone="amber">⏱️ Batas Simpan TTD: Maks. 3 Menit</Badge>
+          <Badge tone="green">
+            ✓ Tersimpan Permanen (Bisa TTD Digital atau Kosongkan untuk TTD Basah)
+          </Badge>
         </div>
-        <a
-          href={`/api/rekap-excel?periodeId=${session.periodeId}&print=1`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="btn-secondary text-xs"
-        >
-          🖨️ Lihat &amp; Print Lembar Pengesahan
-        </a>
+        <div className="flex flex-wrap items-center gap-2">
+          <a
+            href={printRekapHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn text-xs"
+          >
+            🖨️ Lihat &amp; Print Lembar Pengesahan
+          </a>
+          <a href={excelRekapHref} className="btn-secondary text-xs">
+            📥 Download Excel
+          </a>
+        </div>
       </div>
 
       {notice?.ok && (
@@ -282,17 +352,39 @@ export function SignaturePadCard({
         </div>
       )}
 
-      {/* Status 3 Pihak (Kiri: Auditee, Kanan: Auditor, Tengah Bawah: LPM) */}
-      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3 text-xs">
-        <div className="rounded-xl border border-black/15 bg-[#FAF7EE] p-3 space-y-1.5">
+      {/* Status & Edit Cepat Nama/Gelar & NUPTK 3 Pihak (Kiri: Auditee, Kanan: Auditor, Tengah Bawah: LPM) */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 text-xs">
+        {/* 1. KETUA AUDITEE */}
+        <div className="rounded-xl border border-black/20 bg-[#FAF7EE] p-3 space-y-2">
           <div className="flex items-center justify-between gap-1">
-            <span className="font-black uppercase text-slate-700">1. Ketua Auditee (Kiri)</span>
-            <Badge tone={session.hasTtdAuditee ? "green" : "amber"}>
-              {session.hasTtdAuditee ? "✅ Sudah TTD" : "⏳ Belum TTD"}
+            <span className="font-black uppercase text-slate-800">1. Ketua Auditee (Kiri)</span>
+            <Badge tone={session.hasTtdAuditee ? "green" : "slate"}>
+              {session.hasTtdAuditee ? "✅ TTD Digital" : "📝 TTD Manual / Kosong"}
             </Badge>
           </div>
-          <div className="font-bold text-black">
-            {session.ketuaAuditeeNama ?? "Belum ditentukan LPM"}
+          <div className="space-y-1.5">
+            <div>
+              <label className="mb-0.5 block text-[10px] font-bold uppercase text-slate-600">
+                Nama &amp; Gelar Ketua Auditee
+              </label>
+              <input
+                value={auditeeNamaInput}
+                onChange={(e) => setAuditeeNamaInput(e.target.value)}
+                placeholder="Nama lengkap & gelar..."
+                className="w-full rounded-lg border border-black/30 bg-white px-2.5 py-1 text-xs font-bold text-black"
+              />
+            </div>
+            <div>
+              <label className="mb-0.5 block text-[10px] font-bold uppercase text-slate-600">
+                NUPTK / NIP Ketua Auditee
+              </label>
+              <input
+                value={auditeeNipInput}
+                onChange={(e) => setAuditeeNipInput(e.target.value)}
+                placeholder="Contoh: 198801..."
+                className="w-full rounded-lg border border-black/30 bg-white px-2.5 py-1 font-mono text-xs font-bold text-black"
+              />
+            </div>
           </div>
           {session.ttdAuditeePreview && (
             <div className="mt-1 inline-block rounded border border-black/15 bg-white px-2 py-1">
@@ -302,15 +394,37 @@ export function SignaturePadCard({
           )}
         </div>
 
-        <div className="rounded-xl border border-black/15 bg-[#FAF7EE] p-3 space-y-1.5">
+        {/* 2. KETUA AUDITOR */}
+        <div className="rounded-xl border border-black/20 bg-[#FAF7EE] p-3 space-y-2">
           <div className="flex items-center justify-between gap-1">
-            <span className="font-black uppercase text-slate-700">2. Ketua Auditor (Kanan)</span>
-            <Badge tone={session.hasTtdAuditor ? "green" : "amber"}>
-              {session.hasTtdAuditor ? "✅ Sudah TTD" : "⏳ Belum TTD"}
+            <span className="font-black uppercase text-slate-800">2. Ketua Auditor (Kanan)</span>
+            <Badge tone={session.hasTtdAuditor ? "green" : "slate"}>
+              {session.hasTtdAuditor ? "✅ TTD Digital" : "📝 TTD Manual / Kosong"}
             </Badge>
           </div>
-          <div className="font-bold text-black">
-            {session.ketuaAuditorNama ?? "Belum ditentukan LPM"}
+          <div className="space-y-1.5">
+            <div>
+              <label className="mb-0.5 block text-[10px] font-bold uppercase text-slate-600">
+                Nama &amp; Gelar Ketua Auditor
+              </label>
+              <input
+                value={auditorNamaInput}
+                onChange={(e) => setAuditorNamaInput(e.target.value)}
+                placeholder="Nama lengkap & gelar..."
+                className="w-full rounded-lg border border-black/30 bg-white px-2.5 py-1 text-xs font-bold text-black"
+              />
+            </div>
+            <div>
+              <label className="mb-0.5 block text-[10px] font-bold uppercase text-slate-600">
+                NUPTK / NIP Ketua Auditor
+              </label>
+              <input
+                value={auditorNipInput}
+                onChange={(e) => setAuditorNipInput(e.target.value)}
+                placeholder="Contoh: 198504..."
+                className="w-full rounded-lg border border-black/30 bg-white px-2.5 py-1 font-mono text-xs font-bold text-black"
+              />
+            </div>
           </div>
           {session.ttdAuditorPreview && (
             <div className="mt-1 inline-block rounded border border-black/15 bg-white px-2 py-1">
@@ -320,32 +434,30 @@ export function SignaturePadCard({
           )}
         </div>
 
-        <div className="rounded-xl border border-black/15 bg-[#FAF7EE] p-3 space-y-1.5">
+        {/* 3. KEPALA LPM */}
+        <div className="rounded-xl border border-black/20 bg-[#FAF7EE] p-3 space-y-2">
           <div className="flex items-center justify-between gap-1">
-            <span className="font-black uppercase text-slate-700">3. Kepala LPM (Tengah Bawah)</span>
-            <Badge tone={session.hasTtdLpm ? "green" : "amber"}>
-              {session.hasTtdLpm ? "✅ Sudah TTD" : "⏳ Belum TTD"}
+            <span className="font-black uppercase text-slate-800">3. Kepala LPM (Tengah Bawah)</span>
+            <Badge tone={session.hasTtdLpm ? "green" : "slate"}>
+              {session.hasTtdLpm ? "✅ TTD Digital" : "📝 TTD Manual / Kosong"}
             </Badge>
-          </div>
-          <div className="font-bold text-black">
-            {session.kepalaLpmNama ?? "Kepala LPM ITBMP"}
           </div>
 
           {/* Di Sesi Training: Bisa pilih LPM penandatangan Rekap langsung dari dropdown */}
           {session.isTraining && lpmCandidates.length > 0 && (
-            <div className="pt-1 space-y-1">
-              <label className="block text-[11px] font-black uppercase text-[#581C87]">
-                🏛️ Pilih LPM yang TTD di Rekap:
+            <div className="space-y-1">
+              <label className="block text-[10px] font-black uppercase text-[#581C87]">
+                🏛️ Pilih Cepat dari Akun:
               </label>
               <select
                 value={selectedLpmCandidate?.id ?? ""}
                 disabled={isPending}
                 onChange={(e) => handlePilihLpm(e.target.value)}
-                className="w-full rounded-lg border-2 border-black bg-white px-2 py-1 text-xs font-bold text-black"
+                className="w-full rounded-lg border border-black/40 bg-white px-2 py-1 text-xs font-bold text-black"
               >
                 <option value="">
                   {session.kepalaLpmNama
-                    ? `Aktif: ${session.kepalaLpmNama} (Klik untuk ganti)`
+                    ? `Pilih akun lain (${session.kepalaLpmNama})`
                     : "-- Pilih Akun LPM Penandatangan --"}
                 </option>
                 {lpmCandidates.map((c) => (
@@ -357,6 +469,31 @@ export function SignaturePadCard({
             </div>
           )}
 
+          <div className="space-y-1.5">
+            <div>
+              <label className="mb-0.5 block text-[10px] font-bold uppercase text-slate-600">
+                Nama &amp; Gelar Kepala LPM
+              </label>
+              <input
+                value={lpmNamaInput}
+                onChange={(e) => setLpmNamaInput(e.target.value)}
+                placeholder="Nama lengkap & gelar Kepala LPM..."
+                className="w-full rounded-lg border border-black/30 bg-white px-2.5 py-1 text-xs font-bold text-black"
+              />
+            </div>
+            <div>
+              <label className="mb-0.5 block text-[10px] font-bold uppercase text-slate-600">
+                NUPTK / NIP Kepala LPM
+              </label>
+              <input
+                value={lpmNipInput}
+                onChange={(e) => setLpmNipInput(e.target.value)}
+                placeholder="Contoh: 197908..."
+                className="w-full rounded-lg border border-black/30 bg-white px-2.5 py-1 font-mono text-xs font-bold text-black"
+              />
+            </div>
+          </div>
+
           {session.ttdLpmPreview && (
             <div className="mt-1 inline-block rounded border border-black/15 bg-white px-2 py-1">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -364,6 +501,29 @@ export function SignaturePadCard({
             </div>
           )}
         </div>
+      </div>
+
+      {/* Baris Kota & Tanggal Cetak + Tombol Simpan Nama/Gelar/NUPTK */}
+      <div className="flex flex-wrap items-end justify-between gap-3 rounded-xl border border-black/20 bg-white p-3 text-xs">
+        <div className="min-w-[240px] flex-1 space-y-1">
+          <label className="block text-[11px] font-black uppercase text-slate-700">
+            📅 Kota &amp; Tanggal Cetak di Lembar Pengesahan Rekap:
+          </label>
+          <input
+            value={tglCetak}
+            onChange={(e) => setTglCetak(e.target.value)}
+            placeholder="Contoh: Banyuwangi, 2 November 2026"
+            className="w-full max-w-md rounded-lg border border-black/30 bg-[#FAF7EE] px-3 py-1.5 text-xs font-bold text-black"
+          />
+        </div>
+        <button
+          type="button"
+          disabled={isPending}
+          onClick={handleSaveIdentitas}
+          className="btn-success text-xs"
+        >
+          {isPending ? "Menyimpan..." : "💾 Simpan Nama, Gelar & NUPTK Penandatangan"}
+        </button>
       </div>
 
       {/* Di Sesi Training: Bisa pilih ingin menempel TTD sebagai Peran Anda atau Kepala LPM */}

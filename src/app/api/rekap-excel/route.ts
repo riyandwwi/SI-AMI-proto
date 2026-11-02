@@ -26,6 +26,7 @@ export async function GET(req: NextRequest) {
 
   const periodeId = req.nextUrl.searchParams.get("periodeId");
   const isPrint = req.nextUrl.searchParams.get("print") === "1";
+  const tglParam = req.nextUrl.searchParams.get("tgl")?.trim() ?? "";
 
   const rawPeriodes = await prisma.periode.findMany({
     where: user.isTraining
@@ -146,10 +147,19 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  const tanggalCetakDisplay =
+    tglParam ||
+    `Banyuwangi, ${new Date().toLocaleDateString("id-ID", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    })}`;
+
   const signatureHtml =
     targetSignPeriode
       ? `
       <div class="sig-wrapper">
+        <div class="sig-date-row">${esc(tanggalCetakDisplay)}</div>
         <div class="sig-top-row">
           <!-- KIRI: KETUA AUDITEE -->
           <div class="sig-box">
@@ -202,7 +212,10 @@ export async function GET(req: NextRequest) {
       `
       : "";
 
-  const excelHref = `/api/rekap-excel${periodeId ? `?periodeId=${encodeURIComponent(periodeId)}` : ""}`;
+  const excelQuery = new URLSearchParams();
+  if (periodeId) excelQuery.set("periodeId", periodeId);
+  if (tglParam) excelQuery.set("tgl", tglParam);
+  const excelHref = `/api/rekap-excel${excelQuery.toString() ? `?${excelQuery.toString()}` : ""}`;
 
   const html = `
     <!DOCTYPE html>
@@ -221,6 +234,7 @@ export async function GET(req: NextRequest) {
           th { background-color: #FEF08A; color: #000000; font-weight: bold; border: 1px solid #000000; padding: 6px; text-align: left; }
           td { border: 1px solid #000000; padding: 5px; vertical-align: top; word-break: break-word; }
           .sig-wrapper { margin-top: 28px; page-break-inside: avoid; width: 100%; }
+          .sig-date-row { text-align: right; padding: 0 50px 10px 50px; font-size: 10pt; font-weight: bold; }
           .sig-top-row { display: flex; justify-content: space-between; align-items: flex-start; padding: 0 40px; }
           .sig-bottom-center { display: flex; justify-content: center; margin-top: 18px; }
           .sig-box { width: 280px; text-align: center; font-size: 10pt; }
