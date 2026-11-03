@@ -153,15 +153,15 @@ export function TabelInstrumenDanRekap({
 
       {/* Filter Standar Top-Down (Dropdown 1 Baris Minimalis + 1 Tombol Toggle Buka/Minimize Semua Standar) */}
       {standarGroups.length > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-black/20 bg-[#FAF7EE] px-3 py-2 text-xs">
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-            <label className="shrink-0 font-black uppercase text-black">
+            <label className="shrink-0 font-bold uppercase text-slate-700">
               📂 Pilih Standar:
             </label>
             <select
               value={filterStandar}
               onChange={(e) => handleChangeFilterStandar(e.target.value)}
-              className="min-w-[240px] max-w-full flex-1 rounded-xl border-2 border-black bg-white px-3 py-1.5 text-xs font-black text-black sm:max-w-md"
+              className="min-w-[240px] max-w-full flex-1 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-900 sm:max-w-md"
             >
               <option value="SEMUA">
                 Semua Standar ({standarGroups.length} Standar — {indikator.length} Indikator)
@@ -216,12 +216,12 @@ export function TabelInstrumenDanRekap({
                   <Fragment key={`grp-${grp.standar}`}>
                     <tr
                       onClick={() => toggleStandar(grp.standar)}
-                      className="cursor-pointer select-none bg-[#FEF08A] transition hover:bg-[#fde047]"
+                      className="cursor-pointer select-none bg-slate-100/90 transition hover:bg-slate-200/70"
                     >
                       <td colSpan={6} className="py-2.5">
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div className="flex flex-wrap items-center gap-2 font-black text-sm text-black">
-                            <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg border border-black bg-white text-xs font-black text-black">
+                          <div className="flex flex-wrap items-center gap-2 font-bold text-sm text-slate-900">
+                            <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg border border-slate-200 bg-white text-[10px] font-bold text-slate-600">
                               {isOpen ? "▼" : "▶"}
                             </span>
                             <span>📂 {grp.standar}</span>
@@ -229,7 +229,7 @@ export function TabelInstrumenDanRekap({
                               Indikator #{grp.startIndex} – #{grp.endIndex} ({grp.items.length} Indikator)
                             </Badge>
                           </div>
-                          <span className="rounded-xl border border-black bg-white px-2.5 py-1 text-[11px] font-black text-black">
+                          <span className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700">
                             {isOpen ? "▲ Minimize Standar" : "▼ Buka Standar"}
                           </span>
                         </div>
@@ -299,12 +299,12 @@ export function TabelInstrumenDanRekap({
                   <Fragment key={`rekap-grp-${grp.standar}`}>
                     <tr
                       onClick={() => toggleStandar(grp.standar)}
-                      className="cursor-pointer select-none bg-[#FEF08A] transition hover:bg-[#fde047]"
+                      className="cursor-pointer select-none bg-slate-100/90 transition hover:bg-slate-200/70"
                     >
                       <td colSpan={11} className="py-2.5">
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div className="flex flex-wrap items-center gap-2 font-black text-sm text-black">
-                            <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg border border-black bg-white text-xs font-black text-black">
+                          <div className="flex flex-wrap items-center gap-2 font-bold text-sm text-slate-900">
+                            <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg border border-slate-200 bg-white text-[10px] font-bold text-slate-600">
                               {isOpen ? "▼" : "▶"}
                             </span>
                             <span>📂 {grp.standar}</span>
@@ -312,7 +312,7 @@ export function TabelInstrumenDanRekap({
                               Indikator #{grp.startIndex} – #{grp.endIndex} ({grp.items.length} Indikator)
                             </Badge>
                           </div>
-                          <span className="rounded-xl border border-black bg-white px-2.5 py-1 text-[11px] font-black text-black">
+                          <span className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700">
                             {isOpen ? "▲ Minimize Standar" : "▼ Buka Standar"}
                           </span>
                         </div>

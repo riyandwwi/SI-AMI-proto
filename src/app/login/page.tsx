@@ -4,17 +4,22 @@ import { one, type SP } from "@/components/ui";
 export default async function LoginPage({ searchParams }: { searchParams: SP }) {
   const err = one((await searchParams).err);
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#FAF7EE] p-4 text-[#121212]">
+    <div className="flex min-h-screen items-center justify-center bg-[#F1F5F9] p-4 text-slate-900">
       <div className="w-full max-w-md space-y-5">
         <div className="text-center space-y-2">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl border-3 border-black bg-[#FF5C38] text-xl font-black text-white shadow-[4px_4px_0px_#000000]">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 text-lg font-extrabold text-white shadow-sm">
             AMI
           </div>
-          <h1 className="text-3xl font-black tracking-tight text-black">SI-AMI ITBMP</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">SI-AMI ITBMP</h1>
+          <p className="text-xs font-medium text-slate-500">
+            Sistem Informasi Audit Mutu Internal Kampus ITBMP
+          </p>
         </div>
 
-        <div className="rounded-3xl border-3 border-black bg-white p-7 shadow-[8px_8px_0px_#000000] space-y-4">
-          <h2 className="border-b-2 border-black pb-3 text-xl font-black text-black">Masuk</h2>
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm space-y-4">
+          <h2 className="border-b border-slate-100 pb-3 text-base font-bold text-slate-900">
+            Masuk ke Akun Anda
+          </h2>
           <LoginForm initialError={err} />
         </div>
       </div>
