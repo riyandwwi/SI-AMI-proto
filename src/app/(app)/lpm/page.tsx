@@ -92,7 +92,7 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
       <Flash ok={one(sp.ok)} err={one(sp.err)} />
 
       {/* Navigasi Tab: Sesi AMI Aktif, Archive Sesi (di samping Sesi AMI), dan Pantau Pekerjaan */}
-      <div className="flex flex-wrap gap-2 border-b-2 border-black pb-3">
+      <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
         <Link
           href={`/lpm?tab=sesi&prodi=${prodiFilter}`}
           className={tab === "sesi" ? "btn text-xs" : "btn-secondary text-xs"}
@@ -116,7 +116,7 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
       {tab === "sesi" || tab === "archive" ? (
         <>
           {isArchiveTab ? (
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border-2 border-black bg-[#FEF08A] px-4 py-3 text-xs font-black text-black shadow-[3px_3px_0px_#000]">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-xs font-semibold text-amber-950">
               <span>
                 📦 Halaman Archive Sesi AMI — Menampilkan sesi yang sudah selesai dan dikunci ({archivedOnlyPeriodes.length} Sesi) agar tidak menumpuk di halaman Sesi AMI Aktif.
               </span>
@@ -125,83 +125,98 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
               </Link>
             </div>
           ) : (
-            <>
-              {/* Form Buat Sesi AMI */}
-              <form action={buatSesiAmi} className="card space-y-4">
-                <h2 className="border-b border-black/15 pb-2 text-base font-black text-black">
-                  + Buat Sesi AMI
-                </h2>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  <div className="space-y-1">
-                    <label>Tahun Akademik</label>
-                    <input name="tahun" required defaultValue="2026/2027" placeholder="2026/2027" className="w-full" />
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+              {/* Collapsible 1: Form Buat Sesi AMI */}
+              <details
+                open={activeOnlyPeriodes.length === 0}
+                className="card group p-4"
+              >
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-bold text-slate-900">
+                  <span>➕ Buat Sesi AMI Baru</span>
+                  <span className="btn-secondary px-2.5 py-1 text-xs group-open:bg-slate-100">
+                    Buka / Tutup Form
+                  </span>
+                </summary>
+                <form action={buatSesiAmi} className="mt-3 space-y-3 border-t border-slate-100 pt-3">
+                  <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+                    <div className="space-y-1">
+                      <label>Tahun Akademik</label>
+                      <input name="tahun" required defaultValue="2026/2027" placeholder="2026/2027" className="w-full" />
+                    </div>
+                    <div className="space-y-1">
+                      <label>Semester</label>
+                      <select name="semester" required defaultValue="Ganjil" className="w-full">
+                        <option value="Ganjil">Ganjil</option>
+                        <option value="Genap">Genap</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label>Program Studi</label>
+                      <div className="flex gap-2">
+                        <select name="prodiKode" required defaultValue="PRODI-BD" className="w-full">
+                          {PRODI_LIST.map((p) => (
+                            <option key={p.kode} value={p.kode}>
+                              {p.nama}
+                            </option>
+                          ))}
+                        </select>
+                        <button className="btn shrink-0">+ Buat</button>
+                      </div>
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <label>Semester</label>
-                    <select name="semester" required defaultValue="Ganjil" className="w-full">
-                      <option value="Ganjil">Ganjil</option>
-                      <option value="Genap">Genap</option>
-                    </select>
+                </form>
+              </details>
+
+              {/* Collapsible 2: Form Emergency LPM Tambah Akun Auditor / Auditee */}
+              <details className="card group p-4">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-bold text-slate-900">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span>👤 Tambah Akun Baru (Auditor / Auditee)</span>
+                    <Badge tone="amber">Password: 123</Badge>
                   </div>
-                  <div className="space-y-1">
-                    <label>Program Studi</label>
-                    <div className="flex gap-2">
+                  <span className="btn-secondary px-2.5 py-1 text-xs group-open:bg-slate-100">
+                    Buka / Tutup Form
+                  </span>
+                </summary>
+                <form action={tambahUserEmergencyOlehLpm} className="mt-3 space-y-3 border-t border-slate-100 pt-3">
+                  <input type="hidden" name="returnTo" value="/lpm?tab=sesi" />
+                  <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                    <div className="space-y-1">
+                      <label>Role</label>
+                      <select name="role" required defaultValue="AUDITOR" className="w-full font-semibold">
+                        <option value="AUDITOR">Auditor (Lintas Prodi)</option>
+                        <option value="AUDITEE">Auditee (Satu Prodi)</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label>Homebase / Prodi</label>
                       <select name="prodiKode" required defaultValue="PRODI-BD" className="w-full">
-                        {PRODI_LIST.map((p) => (
+                        {HOMEBASE_LIST.map((p) => (
                           <option key={p.kode} value={p.kode}>
                             {p.nama}
                           </option>
                         ))}
                       </select>
-                      <button className="btn shrink-0">+ Buat Sesi</button>
+                    </div>
+                    <div className="space-y-1">
+                      <label>Nama Lengkap</label>
+                      <input name="nama" required placeholder="Nama..." className="w-full" />
+                    </div>
+                    <div className="space-y-1">
+                      <label>NIDN / NUPTK</label>
+                      <input name="nimNuptk" required placeholder="NIDN / NUPTK..." className="w-full font-mono" />
+                    </div>
+                    <div className="space-y-1 sm:col-span-2">
+                      <label>Username</label>
+                      <div className="flex gap-2">
+                        <input name="username" required placeholder="Username login..." className="w-full font-mono" />
+                        <button className="btn shrink-0">+ Tambah Akun</button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </form>
-
-              {/* Form Emergency LPM: Tambah Akun Auditor / Auditee */}
-              <form action={tambahUserEmergencyOlehLpm} className="card space-y-4">
-                <input type="hidden" name="returnTo" value="/lpm?tab=sesi" />
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/15 pb-2">
-                  <h2 className="text-base font-black text-black">🚨 Emergency: + Buat Akun Auditor / Auditee</h2>
-                  <Badge tone="amber">🔑 Password Default: 123</Badge>
-                </div>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                  <div className="space-y-1">
-                    <label>Role</label>
-                    <select name="role" required defaultValue="AUDITOR" className="w-full font-bold">
-                      <option value="AUDITOR">Auditor (Lintas Prodi)</option>
-                      <option value="AUDITEE">Auditee (Satu Prodi)</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1">
-                    <label>Nama Lengkap</label>
-                    <input name="nama" required placeholder="Nama..." className="w-full" />
-                  </div>
-                  <div className="space-y-1">
-                    <label>NIDN / NUPTK</label>
-                    <input name="nimNuptk" required placeholder="NIDN / NUPTK..." className="w-full font-mono" />
-                  </div>
-                  <div className="space-y-1">
-                    <label>Homebase / Prodi</label>
-                    <select name="prodiKode" required defaultValue="PRODI-BD" className="w-full">
-                      {HOMEBASE_LIST.map((p) => (
-                        <option key={p.kode} value={p.kode}>
-                          {p.nama}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="space-y-1">
-                    <label>Username</label>
-                    <div className="flex gap-2">
-                      <input name="username" required placeholder="Username..." className="w-full font-mono" />
-                      <button className="btn shrink-0">+ Tambah</button>
-                    </div>
-                  </div>
-                </div>
-              </form>
-            </>
+                </form>
+              </details>
+            </div>
           )}
 
           {/* Filter Sesi per Program Studi (Urut Kronologis TA & Semester) */}

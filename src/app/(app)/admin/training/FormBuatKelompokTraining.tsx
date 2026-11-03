@@ -24,7 +24,7 @@ export function FormBuatKelompokTraining({
   lpmOptions?: UnassignedTrainingUser[];
 }) {
   const router = useRouter();
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(nextGroupNumber === 1);
   const [namaKelompok, setNamaKelompok] = useState(`Kelompok ${nextGroupNumber}`);
   const [lpmUserId, setLpmUserId] = useState("");
 
@@ -162,9 +162,9 @@ export function FormBuatKelompokTraining({
           {/* 2 Kolom: SISI KIRI (DROPDOWN AUDITOR) & SISI KANAN (DROPDOWN AUDITEE) */}
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {/* SISI KIRI: PILIH AUDITOR VIA DROPDOWN */}
-            <div className="rounded-2xl border-2 border-black bg-[#E9D5FF]/55 p-4 space-y-3 shadow-[3px_3px_0px_#000]">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/15 pb-2">
-                <span className="text-xs font-black uppercase text-black">
+            <div className="rounded-2xl border border-violet-200 bg-violet-50/40 p-4 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-violet-200/60 pb-2">
+                <span className="text-xs font-bold uppercase text-slate-800">
                   👈 Sisi Kiri: 🕵️ Pilih AUDITOR Kelompok Ini
                 </span>
                 <Badge tone="purple">Role: AUDITOR</Badge>
@@ -173,11 +173,11 @@ export function FormBuatKelompokTraining({
               <div className="space-y-2">
                 {auditorSelects.map((selectedId, idx) => (
                   <div key={idx} className="flex items-center gap-1.5">
-                    <span className="w-5 shrink-0 text-xs font-black text-black">{idx + 1}.</span>
+                    <span className="w-5 shrink-0 text-xs font-bold text-slate-700">{idx + 1}.</span>
                     <select
                       value={selectedId}
                       onChange={(e) => updateAuditorSelect(idx, e.target.value)}
-                      className="w-full bg-white text-xs font-bold text-black"
+                      className="w-full bg-white text-xs font-semibold text-slate-900"
                     >
                       <option value="">-- Pilih Akun Auditor --</option>
                       {unassignedUsers
@@ -210,9 +210,9 @@ export function FormBuatKelompokTraining({
             </div>
 
             {/* SISI KANAN: PILIH AUDITEE VIA DROPDOWN */}
-            <div className="rounded-2xl border-2 border-black bg-[#BAE6FD]/55 p-4 space-y-3 shadow-[3px_3px_0px_#000]">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/15 pb-2">
-                <span className="text-xs font-black uppercase text-black">
+            <div className="rounded-2xl border border-sky-200 bg-sky-50/40 p-4 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-sky-200/60 pb-2">
+                <span className="text-xs font-bold uppercase text-slate-800">
                   👉 Sisi Kanan: 📝 Pilih AUDITEE Kelompok Ini
                 </span>
                 <Badge tone="blue">Role: AUDITEE</Badge>

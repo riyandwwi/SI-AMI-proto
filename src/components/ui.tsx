@@ -10,12 +10,14 @@ export function Flash({ ok, err }: { ok?: string; err?: string }) {
   if (!ok && !err) return null;
   return (
     <div
-      className={`rounded-2xl border-2 border-black p-4 text-sm font-black shadow-[4px_4px_0px_#000000] ${
-        err ? "bg-[#FECDD3] text-black" : "bg-[#D9F99D] text-black"
+      className={`rounded-xl border p-3.5 text-sm font-semibold shadow-2xs ${
+        err
+          ? "border-rose-200 bg-rose-50 text-rose-900"
+          : "border-emerald-200 bg-emerald-50 text-emerald-900"
       }`}
     >
       <div className="flex items-center gap-2.5">
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-black bg-white text-xs shadow-[1.5px_1.5px_0px_#000000]">
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-xs shadow-2xs">
           {err ? "⚠️" : "✓"}
         </span>
         <span className="leading-snug">{err ?? ok}</span>
@@ -24,29 +26,32 @@ export function Flash({ ok, err }: { ok?: string; err?: string }) {
   );
 }
 
-export function PageHeader({ title, children }: { title: string; desc?: ReactNode; children?: ReactNode }) {
+export function PageHeader({ title, desc, children }: { title: string; desc?: ReactNode; children?: ReactNode }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-      <h1 className="text-2xl font-black tracking-tight text-black sm:text-3xl">{title}</h1>
+    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 pb-3 pt-1">
+      <div>
+        <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">{title}</h1>
+        {desc && <p className="mt-0.5 text-xs font-medium text-slate-500">{desc}</p>}
+      </div>
       {children}
     </div>
   );
 }
 
 const TONES = {
-  slate: "bg-white/90 text-black border border-black/25",
-  blue: "bg-[#BAE6FD] text-black border border-black/25",
-  green: "bg-[#D9F99D] text-black border border-black/25",
-  amber: "bg-[#FEF08A] text-black border border-black/25",
-  red: "bg-[#FECDD3] text-black border border-black/25",
-  purple: "bg-[#E9D5FF] text-black border border-black/25",
+  slate: "bg-slate-100 text-slate-700 border border-slate-200",
+  blue: "bg-sky-50 text-sky-800 border border-sky-200",
+  green: "bg-emerald-50 text-emerald-800 border border-emerald-200",
+  amber: "bg-amber-50 text-amber-800 border border-amber-200",
+  red: "bg-rose-50 text-rose-800 border border-rose-200",
+  purple: "bg-violet-50 text-violet-800 border border-violet-200",
 } as const;
 export type Tone = keyof typeof TONES;
 
 export function Badge({ tone = "slate", children }: { tone?: Tone; children: ReactNode }) {
   return (
     <span
-      className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-3 py-0.5 text-xs font-black uppercase tracking-wide ${TONES[tone]}`}
+      className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-semibold tracking-normal ${TONES[tone]}`}
     >
       {children}
     </span>
@@ -67,18 +72,18 @@ export function Stat({
 }) {
   return (
     <div
-      className={`rounded-2xl border-2 border-black p-5 shadow-[4px_4px_0px_#000000] transition-all hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[6px_6px_0px_#000000] ${color}`}
+      className={`rounded-2xl border border-slate-200/90 p-4 shadow-xs ${color}`}
     >
-      <div className="text-xs font-black uppercase tracking-wider text-slate-700">{label}</div>
-      <div className={`mt-1.5 text-3xl font-black ${tone ?? "text-black"}`}>{value}</div>
+      <div className="text-xs font-semibold text-slate-600">{label}</div>
+      <div className={`mt-1 text-2xl font-bold ${tone ?? "text-slate-900"}`}>{value}</div>
     </div>
   );
 }
 
 export function Empty({ children }: { children: ReactNode }) {
   return (
-    <div className="rounded-2xl border-2 border-dashed border-black bg-white/80 p-8 text-center text-sm font-bold text-slate-800 shadow-[4px_4px_0px_#000000]">
-      <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full border-2 border-black bg-[#FEF08A] text-sm shadow-[2px_2px_0px_#000000]">
+    <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm font-medium text-slate-600">
+      <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-sm">
         📂
       </div>
       {children}

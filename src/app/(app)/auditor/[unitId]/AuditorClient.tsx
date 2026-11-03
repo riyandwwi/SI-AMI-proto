@@ -929,8 +929,10 @@ export default function AuditorClient({
               setStatusFilter(statusFilter === "DICEK_SAYA" ? "ALL" : "DICEK_SAYA")
             }
             title={`Klik untuk melihat ${myCheckedCountMode} indikator yang dicek oleh ${currentUserName}`}
-            className={`flex items-center gap-2 rounded-full border-2 border-black px-4 py-2.5 text-xs font-black text-black shadow-[4px_4px_0px_#000] transition hover:-translate-y-0.5 ${
-              statusFilter === "DICEK_SAYA" ? "bg-[#4ADE80] ring-4 ring-black/20" : "bg-[#FDE047]"
+            className={`flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-bold shadow-md transition hover:-translate-y-0.5 ${
+              statusFilter === "DICEK_SAYA"
+                ? "border-emerald-600 bg-emerald-600 text-white ring-4 ring-emerald-500/20"
+                : "border-slate-300 bg-white text-slate-800 hover:bg-slate-50"
             }`}
           >
             <span>🕵️ Dicek Saya: {myCheckedCountMode}</span>
@@ -1384,14 +1386,14 @@ export default function AuditorClient({
 
             return (
               <div key={group.standar} className="space-y-2.5">
-                <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border-2 border-black bg-[#CBD5E1] px-4 py-2.5 shadow-[3px_3px_0px_#000]">
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-300 bg-slate-200/75 px-4 py-2.5">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-black text-[#0F172A]">📂 {group.standar}</span>
-                    <span className="rounded-lg border border-black bg-[#EDF2F7] px-2 py-0.5 text-xs font-black text-[#0F172A]">
+                    <span className="text-sm font-bold text-slate-900">📂 {group.standar}</span>
+                    <Badge tone="slate">
                       Indikator #{group.startIndex} – #{group.endIndex}
-                    </span>
+                    </Badge>
                   </div>
-                  <span className="text-xs font-bold text-slate-800">
+                  <span className="text-xs font-semibold text-slate-700">
                     {groupItems.length} indikator
                   </span>
                 </div>
@@ -1413,17 +1415,17 @@ export default function AuditorClient({
                   const isExpanded = Boolean(expandedIds[ind.id]);
 
                   const cardStyle = dirty
-                    ? "border-l-8 border-l-[#0F172A] bg-[#E2E8F0] text-[#0F172A] ring-2 ring-[#0F172A]"
+                    ? "border-l-4 border-l-amber-500 bg-amber-50/20 text-slate-900 ring-1 ring-amber-400/50"
                     : isCheckedInMode
-                      ? "border-l-8 border-l-[#0F172A] bg-[#EDF2F7] text-[#0F172A]"
-                      : "border-l-8 border-l-slate-500 bg-[#E6ECF2] text-[#0F172A]";
+                      ? "border-l-4 border-l-emerald-500 bg-white text-slate-900"
+                      : "border-l-4 border-l-slate-300 bg-white text-slate-900";
 
                   return (
                     <div
                       key={ind.id}
                       id={`auditor-ind-${ind.id}`}
-                      className={`rounded-2xl border-2 border-black px-5 shadow-[4px_4px_0px_#000000] transition ${cardStyle} ${
-                        isExpanded ? "space-y-3.5 py-4" : "py-3"
+                      className={`rounded-2xl border border-slate-200/90 px-4 shadow-2xs transition hover:border-slate-300 ${cardStyle} ${
+                        isExpanded ? "space-y-3.5 py-4" : "py-2.5"
                       }`}
                     >
                       {/* Baris Header Indikator (Klik untuk Buka / Minimize, seragam dengan Auditee) */}
@@ -1438,23 +1440,23 @@ export default function AuditorClient({
                           }
                         }}
                         className={`flex cursor-pointer select-none flex-wrap items-center justify-between gap-2 ${
-                          isExpanded ? "border-b-2 border-black/15 pb-3" : ""
+                          isExpanded ? "border-b border-slate-200 pb-3" : ""
                         }`}
                       >
                         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                          <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border-2 border-black bg-[#CBD5E1] text-xs font-black text-[#0F172A]">
+                          <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-100 text-[10px] font-bold text-slate-600">
                             {isExpanded ? "▼" : "▶"}
                           </span>
-                          <Badge tone="purple">Indikator #{noUrut}</Badge>
-                          <code className="rounded-xl border border-black bg-[#BAE6FD] px-2.5 py-0.5 text-sm font-black text-[#0F172A]">
+                          <Badge tone="purple">#{noUrut}</Badge>
+                          <code className="rounded-lg border border-sky-200 bg-sky-50 px-2 py-0.5 font-mono text-xs font-bold text-sky-900">
                             {ind.kode}
                           </code>
                           {!isExpanded ? (
-                            <span className="line-clamp-1 max-w-xl text-base font-bold text-[#0F172A]">
+                            <span className="line-clamp-1 max-w-xl text-sm font-semibold text-slate-800">
                               {ind.pernyataan}
                             </span>
                           ) : (
-                            <span className="text-base font-black text-[#0F172A]">{ind.standar}</span>
+                            <span className="text-sm font-bold text-slate-900">{ind.standar}</span>
                           )}
                         </div>
 

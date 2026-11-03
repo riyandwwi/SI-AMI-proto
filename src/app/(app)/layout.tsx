@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { ROLE_LABEL } from "@/lib/roles";
@@ -6,84 +7,65 @@ import { LiveSync } from "@/components/LiveSync";
 import { Badge } from "@/components/ui";
 import { logout } from "@/app/login/actions";
 
-const NAV = {
-  SUPER_ADMIN: [
-    { href: "/admin", label: "Kelola Akun" },
-    { href: "/admin/training", label: "🎓 Sesi Training" },
-  ],
-  LPM: [
-    { href: "/lpm", label: "Sesi AMI" },
-    { href: "/lpm?tab=archive", label: "📦 Archive" },
-    { href: "/lpm/indikator", label: "Indikator" },
-    { href: "/lpm/rekap", label: "Rekap & Excel" },
-    { href: "/lpm/log", label: "Log" },
-  ],
-  AUDITOR: [
-    { href: "/auditor", label: "Sesi Audit" },
-    { href: "/auditor?view=archive", label: "📦 Archive" },
-  ],
-  AUDITEE: [{ href: "/auditee", label: "Evaluasi Diri" }],
-} as const;
-
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
-  const firstName = user.nama.split(" ")[0] || user.nama;
-
-  const navItems = [...NAV[user.role]];
 
   const auditorBaseHref = user.trainingPeriodeId
     ? `/auditor/${user.trainingPeriodeId}`
     : "/auditor";
 
-  const shortcuts =
-    user.role === "LPM"
+  const navItems =
+    user.role === "SUPER_ADMIN"
       ? [
-          { href: "/lpm", label: "Sesi AMI", icon: "📋", bg: "bg-[#E9D5FF]" },
-          { href: "/lpm?tab=archive", label: "Archive", icon: "📦", bg: "bg-[#FDE68A]" },
-          { href: "/lpm/indikator", label: "Indikator", icon: "📑", bg: "bg-[#FEF08A]" },
-          { href: "/lpm/rekap", label: "Rekap", icon: "📊", bg: "bg-[#D9F99D]" },
-          { href: "/lpm/log", label: "Log", icon: "📜", bg: "bg-[#BAE6FD]" },
+          { href: "/admin", label: "👥 Kelola Akun" },
+          { href: "/admin/training", label: "🎓 Sesi Training" },
+          { href: "/admin/training/leaderboard?mode=auditee", label: "🏆 Leaderboard" },
         ]
-      : user.role === "AUDITOR"
+      : user.role === "LPM"
         ? [
-            { href: "/auditor", label: "Sesi Audit", icon: "🏛️", bg: "bg-[#E9D5FF]" },
-            { href: "/auditor?view=archive", label: "Archive", icon: "📦", bg: "bg-[#FDE68A]" },
-            { href: `${auditorBaseHref}?mode=dokumen`, label: "Dokumen", icon: "📂", bg: "bg-[#FEF08A]" },
-            { href: `${auditorBaseHref}?mode=lapangan`, label: "Lapangan", icon: "🔍", bg: "bg-[#D9F99D]" },
-            { href: `${auditorBaseHref}?mode=rtl`, label: "Verifikasi RTL", icon: "🔒", bg: "bg-[#BAE6FD]" },
+            { href: "/lpm", label: "📅 Sesi AMI" },
+            { href: "/lpm?tab=archive", label: "📦 Archive" },
+            { href: "/lpm/indikator", label: "📑 Indikator" },
+            { href: "/lpm/rekap", label: "📊 Rekap & Pengesahan" },
+            { href: "/lpm/log", label: "📜 Log" },
           ]
-        : user.role === "AUDITEE"
-          ? [
-              { href: "/auditee", label: "Evaluasi", icon: "📝", bg: "bg-[#E9D5FF]" },
-              { href: "/auditee", label: "Drive", icon: "🔗", bg: "bg-[#FEF08A]" },
-              { href: "/auditee", label: "Status", icon: "✅", bg: "bg-[#D9F99D]" },
-              { href: "/auditee", label: "RTL", icon: "🛠️", bg: "bg-[#BAE6FD]" },
-            ]
+        : user.role === "AUDITOR"
+          ? user.isTraining && user.trainingPeriodeId
+            ? [
+                { href: auditorBaseHref, label: "🔍 Pemeriksaan Audit" },
+                { href: `${auditorBaseHref}/ttd`, label: "✍️ Tanda Tangan" },
+              ]
+            : [
+                { href: "/auditor", label: "🏛️ Sesi Audit" },
+                { href: "/auditor?view=archive", label: "📦 Archive" },
+              ]
           : [
-              { href: "/admin", label: "Akun", icon: "👥", bg: "bg-[#E9D5FF]" },
-              { href: "/admin/training", label: "Training", icon: "🎓", bg: "bg-[#FEF08A]" },
-              { href: "/admin", label: "Prodi", icon: "🏫", bg: "bg-[#D9F99D]" },
-              { href: "/admin", label: "Role", icon: "🛡️", bg: "bg-[#BAE6FD]" },
+              { href: "/auditee", label: "📝 Evaluasi Diri & RTL" },
+              { href: "/auditee/ttd", label: "✍️ Tanda Tangan" },
             ];
 
   return (
-    <div className="min-h-screen bg-[#DCE3EC] text-[#0F172A]">
-      <header className="sticky top-0 z-30 border-b-2 border-black bg-[#DCE3EC]/95 backdrop-blur-sm">
+    <div className="min-h-screen bg-[#F1F5F9] text-slate-900">
+      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur-sm">
         <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-3 px-4 py-2.5">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-2xl border-2 border-black bg-[#FF5C38] text-xs font-black text-white shadow-[2.5px_2.5px_0px_#000000]">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-600 text-xs font-extrabold text-white shadow-2xs">
               AMI
             </div>
-            <div className="text-base font-black tracking-tight text-black">SI-AMI ITBMP</div>
+            <div className="text-sm font-bold tracking-tight text-slate-900 sm:text-base">
+              SI-AMI ITBMP
+            </div>
             <LiveSync />
             <div className="hidden md:block pl-2">
-              <NavLinks items={navItems} />
+              <Suspense fallback={null}>
+                <NavLinks items={navItems} />
+              </Suspense>
             </div>
           </div>
 
           <div className="flex items-center gap-2.5 text-sm">
             <div className="text-right">
-              <div className="font-bold text-black">
+              <div className="text-xs font-bold text-slate-900 sm:text-sm">
                 {user.nama}
               </div>
               <div className="flex items-center justify-end gap-1.5 pt-0.5 text-xs">
@@ -93,7 +75,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                   <Badge tone="purple">{ROLE_LABEL[user.role]}</Badge>
                 )}
                 {user.unit && (
-                  <span className="rounded-full border border-black bg-white px-2 py-0.2 font-bold text-[11px]">
+                  <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 font-semibold text-[11px] text-slate-700">
                     {user.unit.nama}
                   </span>
                 )}
@@ -109,36 +91,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </div>
         </div>
 
-        <div className="mx-auto max-w-[1440px] px-4 pb-2 md:hidden">
-          <NavLinks items={navItems} />
+        <div className="mx-auto max-w-[1440px] border-t border-slate-100 px-4 py-1.5 md:hidden">
+          <Suspense fallback={null}>
+            <NavLinks items={navItems} />
+          </Suspense>
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1440px] space-y-4 px-4 py-4">
-        <section className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-4 sm:gap-5">
-            {shortcuts.map((sc, idx) => (
-              <Link
-                key={idx}
-                href={sc.href}
-                className="group flex flex-col items-center gap-1"
-              >
-                <div
-                  className={`flex h-12 w-12 items-center justify-center rounded-full border-2 border-black text-lg shadow-[3px_3px_0px_#000000] transition-all group-hover:-translate-x-0.5 group-hover:-translate-y-0.5 group-hover:shadow-[4.5px_4.5px_0px_#000000] group-active:translate-x-0.5 group-active:translate-y-0.5 group-active:shadow-[1px_1px_0px_#000000] ${sc.bg}`}
-                >
-                  {sc.icon}
-                </div>
-                <span className="text-xs font-extrabold text-black group-hover:underline">
-                  {sc.label}
-                </span>
-              </Link>
-            ))}
-          </div>
-          <div className="text-sm font-bold text-slate-700">
-            Halo, <span className="font-black text-black">{firstName}</span>
-          </div>
-        </section>
-
+      <main className="mx-auto max-w-[1440px] space-y-4 px-4 py-5">
         {children}
       </main>
     </div>

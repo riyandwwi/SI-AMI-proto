@@ -33,14 +33,19 @@ export default async function AdminPage({ searchParams }: { searchParams: SP }) 
       <PageHeader title="Kelola Akun Pengguna" />
       <Flash ok={one(sp.ok)} err={one(sp.err)} />
 
-      {/* Form Tambah Akun */}
-      <form action={tambahUser} className="card space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/15 pb-3">
-          <h2 className="text-base font-black text-black">+ Buat Akun Baru</h2>
-          <Badge tone="amber">🔑 Password Default: 123</Badge>
-        </div>
+      {/* Form Tambah Akun (Collapsible agar halaman bersih) */}
+      <details open={userRows.length === 0} className="card group p-4">
+        <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 text-sm font-bold text-slate-900">
+          <div className="flex flex-wrap items-center gap-2">
+            <span>➕ Buat Akun Pengguna Baru</span>
+            <Badge tone="amber">🔑 Password Default: 123</Badge>
+          </div>
+          <span className="btn-secondary px-2.5 py-1 text-xs group-open:bg-slate-100">
+            Buka / Tutup Form
+          </span>
+        </summary>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <form action={tambahUser} className="mt-3 grid grid-cols-1 gap-3 border-t border-slate-100 pt-3 sm:grid-cols-2 lg:grid-cols-5">
           <div className="space-y-1">
             <label>Nama Lengkap</label>
             <input name="nama" required placeholder="Nama..." className="w-full" />
@@ -80,8 +85,8 @@ export default async function AdminPage({ searchParams }: { searchParams: SP }) 
               <button className="btn shrink-0">+ Buat</button>
             </div>
           </div>
-        </div>
-      </form>
+        </form>
+      </details>
 
       {/* Tabel Daftar Akun dengan Sort, Filter Role/Homebase, Search & Ubah Homebase */}
       <AdminUsersTable users={userRows} />
