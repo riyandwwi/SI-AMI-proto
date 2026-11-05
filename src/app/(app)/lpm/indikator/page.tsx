@@ -14,6 +14,7 @@ export default async function LpmIndikatorPage({ searchParams }: { searchParams:
   const filterPeriodeId = one(sp.periodeId) ?? "ALL";
 
   const rawPeriodes = await prisma.periode.findMany({
+    where: { aktif: true },
     include: {
       unit: true,
       indikator: {

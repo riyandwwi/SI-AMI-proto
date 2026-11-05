@@ -782,7 +782,7 @@ export interface ExcelIndikatorRowInput {
 export async function importBatchIndikatorExcel(
   targetPeriodeId: string,
   rows: ExcelIndikatorRowInput[],
-  mode: "SKIP_EXISTING" | "UPDATE_EXISTING" | "REPLACE_ALL" = "UPDATE_EXISTING"
+  mode: "SKIP_EXISTING" | "UPDATE_EXISTING" | "REPLACE_ALL" = "REPLACE_ALL"
 ): Promise<{
   ok: boolean;
   message?: string;
@@ -799,6 +799,7 @@ export async function importBatchIndikatorExcel(
   const periodes =
     targetPeriodeId === "ALL"
       ? await prisma.periode.findMany({
+          where: { aktif: true },
           include: { indikator: true },
           orderBy: { createdAt: "desc" },
         })

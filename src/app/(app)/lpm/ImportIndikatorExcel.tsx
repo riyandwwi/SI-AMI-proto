@@ -33,21 +33,18 @@ export function ImportIndikatorExcel({
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Default pilih sesi prodi pertama jika dibuka dari halaman /lpm/indikator (agar tidak otomatis menimpa semua prodi)
+  // Default pilih sesi prodi pertama yang aktif
   const [selectedPeriodeId, setSelectedPeriodeId] = useState<string>(() =>
     defaultPeriodeId === "ALL" && periodes.length > 0
       ? periodes[0].id
       : defaultPeriodeId
   );
-  const [mode, setMode] = useState<
-    "SKIP_EXISTING" | "UPDATE_EXISTING" | "REPLACE_ALL"
-  >("UPDATE_EXISTING");
+  const mode = "REPLACE_ALL" as const;
 
   useEffect(() => {
-    if (defaultPeriodeId !== "ALL") {
+    if (defaultPeriodeId !== "ALL" && periodes.some((p) => p.id === defaultPeriodeId)) {
       setSelectedPeriodeId(defaultPeriodeId);
     } else if (
-      selectedPeriodeId !== "ALL" &&
       periodes.length > 0 &&
       !periodes.some((p) => p.id === selectedPeriodeId)
     ) {
@@ -56,10 +53,7 @@ export function ImportIndikatorExcel({
   }, [defaultPeriodeId, periodes, selectedPeriodeId]);
 
   const selectedPeriodeObj = periodes.find((p) => p.id === selectedPeriodeId);
-  const targetDisplayName =
-    selectedPeriodeId === "ALL"
-      ? "Semua Sesi AMI"
-      : (selectedPeriodeObj?.nama ?? "Sesi Terpilih");
+  const targetDisplayName = selectedPeriodeObj?.nama ?? "Sesi Terpilih";
 
   const [fileName, setFileName] = useState<string>("");
   const [previewRows, setPreviewRows] = useState<PreviewRow[]>([]);
@@ -317,7 +311,7 @@ export function ImportIndikatorExcel({
           <h2 className="text-sm font-black text-black">📊 Import Indikator dari Excel</h2>
           {periodes.length > 0 && (
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-xs font-bold text-slate-600">➔ Target Prodi/Sesi:</span>
+              <span className="text-xs font-bold text-slate-600">➔ Pilih Sesi Aktif:</span>
               <select
                 value={selectedPeriodeId}
                 onChange={(e) => setSelectedPeriodeId(e.target.value)}
@@ -328,23 +322,6 @@ export function ImportIndikatorExcel({
                     🎯 {p.nama} ({p.existingCodes.length} Indikator)
                   </option>
                 ))}
-                <option value="ALL">🌐 Semua Sesi AMI Sekaligus</option>
-              </select>
-
-              <select
-                value={mode}
-                onChange={(e) =>
-                  setMode(
-                    e.target.value as "SKIP_EXISTING" | "UPDATE_EXISTING" | "REPLACE_ALL"
-                  )
-                }
-                className="text-xs font-semibold text-slate-700"
-              >
-                <option value="UPDATE_EXISTING">🔄 Tambah / Perbarui Indikator</option>
-                <option value="REPLACE_ALL">
-                  🧹 Ganti Seluruh Indikator di Sesi Ini dengan File Excel Ini
-                </option>
-                <option value="SKIP_EXISTING">⏭️ Hanya Tambah Baru (Skip yang Sama)</option>
               </select>
             </div>
           )}

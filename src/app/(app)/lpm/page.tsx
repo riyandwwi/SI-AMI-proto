@@ -84,7 +84,7 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
         : baseSessionPool.filter((p) => !p.isTraining && p.unit?.kode === prodiFilter);
 
   const activePeriodeForPantau =
-    periodes.find((p) => p.id === selectedPeriodeId) ?? periodes[0] ?? null;
+    periodes.find((p) => p.id === selectedPeriodeId) ?? activeOnlyPeriodes[0] ?? periodes[0] ?? null;
 
   return (
     <>
@@ -765,7 +765,7 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                     )}
                   </div>
                   <div className="flex flex-wrap gap-1.5">
-                    {periodes.map((p) => (
+                    {activeOnlyPeriodes.map((p) => (
                       <Link
                         key={p.id}
                         href={`/lpm?tab=pantau&periodeId=${p.id}`}
@@ -851,7 +851,7 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                 <>
                   {/* Import Indikator via Excel (Aman & Anti Tumpang Tindih) */}
                   <ImportIndikatorExcel
-                    periodes={periodes.map((p) => ({
+                    periodes={activeOnlyPeriodes.map((p) => ({
                       id: p.id,
                       nama: p.nama,
                       existingCodes: p.indikator.map(
@@ -864,7 +864,7 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                   {/* Form Bertahap Manual: 1. Standar -> 2. Pernyataan Standar -> 3. Indikator */}
                   <FormStandarBertahap
                     returnTo={`/lpm?tab=pantau&periodeId=${activePeriodeForPantau.id}`}
-                    periodes={periodes.map((p) => ({ id: p.id, nama: p.nama }))}
+                    periodes={activeOnlyPeriodes.map((p) => ({ id: p.id, nama: p.nama }))}
                     defaultPeriodeId={activePeriodeForPantau.id}
                     existingStandarList={(() => {
                       const stdMap = new Map<string, Set<string>>();
