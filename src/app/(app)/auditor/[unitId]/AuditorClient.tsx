@@ -198,9 +198,22 @@ export default function AuditorClient({
   >("ALL");
   const [klasifikasiFilter, setKlasifikasiFilter] = useState<"ALL" | Klasifikasi>("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [expandedStandars, setExpandedStandars] = useState<Record<string, boolean>>({});
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [minimizedRtlIds, setMinimizedRtlIds] = useState<Record<string, boolean>>({});
   const [isPending, startTransition] = useTransition();
+
+  const toggleStandar = (standar: string) => {
+    setExpandedStandars((prev) => {
+      const next = { ...prev };
+      if (next[standar]) {
+        delete next[standar];
+      } else {
+        next[standar] = true;
+      }
+      return next;
+    });
+  };
 
   const toggleExpand = (indId: string) => {
     setExpandedIds((prev) => {
@@ -215,6 +228,13 @@ export default function AuditorClient({
   };
 
   const expandAllVisible = (items: AuditorIndikatorItem[]) => {
+    setExpandedStandars((prev) => {
+      const next = { ...prev };
+      for (const item of items) {
+        next[item.standar] = true;
+      }
+      return next;
+    });
     setExpandedIds((prev) => {
       const next = { ...prev };
       for (const item of items) {
@@ -228,7 +248,24 @@ export default function AuditorClient({
     setExpandedIds({});
   };
 
+  const expandAllStandars = (standarNames: string[]) => {
+    const next: Record<string, boolean> = {};
+    for (const s of standarNames) next[s] = true;
+    setExpandedStandars(next);
+  };
+
+  const minimizeAllStandars = () => {
+    setExpandedStandars({});
+  };
+
   const scrollToAndExpandIndikator = (indId: string) => {
+    const targetInd = indikator.find((i) => i.id === indId);
+    if (targetInd) {
+      setExpandedStandars((prev) => ({
+        ...prev,
+        [targetInd.standar]: true,
+      }));
+    }
     setExpandedIds((prev) => ({
       ...prev,
       [indId]: true,
@@ -874,6 +911,8 @@ export default function AuditorClient({
     .filter((g) => g.groupItems.length > 0);
 
   const visibleFlatItems = visibleGroups.flatMap((g) => g.groupItems.map((x) => x.item));
+  const allVisibleStandarsOpen =
+    visibleGroups.length > 0 && visibleGroups.every((g) => Boolean(expandedStandars[g.standar]));
   const allVisibleExpanded =
     visibleFlatItems.length > 0 && visibleFlatItems.every((item) => Boolean(expandedIds[item.id]));
 
@@ -1221,6 +1260,20 @@ export default function AuditorClient({
               <button
                 type="button"
                 onClick={() => {
+                  if (allVisibleStandarsOpen) {
+                    minimizeAllStandars();
+                  } else {
+                    expandAllStandars(visibleGroups.map((g) => g.standar));
+                  }
+                }}
+                className="btn-secondary w-full justify-center py-1.5 text-xs"
+              >
+                {allVisibleStandarsOpen ? "🔼 Minimize Semua Standar" : "🔽 Buka Semua Standar"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
                   if (allVisibleExpanded) {
                     minimizeAll();
                   } else {
@@ -1383,22 +1436,55 @@ export default function AuditorClient({
         <div className="space-y-3 lg:col-span-8 xl:col-span-9">
           {visibleGroups.map((group) => {
             const { groupItems } = group;
+            const groupCheckedCount = groupItems.filter(({ item }) =>
+              isItemCheckedInMode(item.id)
+            ).length;
+            const isStandarOpen = Boolean(
+              expandedStandars[group.standar] || filterStandar !== "SEMUA" || qNorm
+            );
 
             return (
               <div key={group.standar} className="space-y-2.5">
-                <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-300 bg-slate-200/75 px-4 py-2.5">
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => toggleStandar(group.standar)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      toggleStandar(group.standar);
+                    }
+                  }}
+                  className="flex cursor-pointer select-none flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-300 bg-slate-200/75 px-4 py-2.5 transition hover:bg-slate-200"
+                >
                   <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-slate-300 bg-white text-[10px] font-bold text-slate-700">
+                      {isStandarOpen ? "▼" : "▶"}
+                    </span>
                     <span className="text-sm font-bold text-slate-900">📂 {group.standar}</span>
                     <Badge tone="slate">
                       Indikator #{group.startIndex} – #{group.endIndex}
                     </Badge>
                   </div>
-                  <span className="text-xs font-semibold text-slate-700">
-                    {groupItems.length} indikator
-                  </span>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <Badge tone={groupCheckedCount === groupItems.length ? "green" : "blue"}>
+                      ✓ {groupCheckedCount}/{groupItems.length} Dicek
+                    </Badge>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleStandar(group.standar);
+                      }}
+                      className="rounded-lg border border-slate-300 bg-white px-2.5 py-0.5 text-xs font-bold text-slate-800 hover:bg-slate-50"
+                    >
+                      {isStandarOpen ? "▲ Minimize Standar" : "▼ Buka Standar"}
+                    </button>
+                  </div>
                 </div>
 
-                {groupItems.map(({ item: ind, noUrut }) => {
+                {isStandarOpen &&
+                  groupItems.map(({ item: ind, noUrut }) => {
                   const isian = ind.isian;
                   const cur = values[ind.id];
                   const sav = savedValues[ind.id];

@@ -106,7 +106,8 @@ export default function AuditeeClient({
     savedValuesRef.current = savedValues;
   }, [savedValues]);
 
-  // State buka/minimize per indikator (default semua ter-minimize agar ringkas)
+  // State buka/minimize per standar & per indikator (default semua ter-minimize agar ringkas)
+  const [expandedStandars, setExpandedStandars] = useState<Record<string, boolean>>({});
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [notice, setNotice] = useState<{ ok?: string; err?: string } | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -238,6 +239,18 @@ export default function AuditeeClient({
 
   const dirtyIds = indikator.map((i) => i.id).filter(isDirty);
 
+  const toggleStandar = (standar: string) => {
+    setExpandedStandars((prev) => {
+      const next = { ...prev };
+      if (next[standar]) {
+        delete next[standar];
+      } else {
+        next[standar] = true;
+      }
+      return next;
+    });
+  };
+
   // Toggle buka/tutup mandiri per kartu: TIDAK menutup kartu lain di atasnya agar layar tidak pernah loncat ke atas
   const toggleExpand = (indId: string) => {
     setExpandedIds((prev) => {
@@ -252,6 +265,13 @@ export default function AuditeeClient({
   };
 
   const expandAllVisible = (visibleItems: AuditeeIndikatorItem[]) => {
+    setExpandedStandars((prev) => {
+      const next = { ...prev };
+      for (const item of visibleItems) {
+        next[item.standar] = true;
+      }
+      return next;
+    });
     setExpandedIds((prev) => {
       const next = { ...prev };
       for (const item of visibleItems) {
@@ -263,6 +283,16 @@ export default function AuditeeClient({
 
   const minimizeAll = () => {
     setExpandedIds({});
+  };
+
+  const expandAllStandars = (standarNames: string[]) => {
+    const next: Record<string, boolean> = {};
+    for (const s of standarNames) next[s] = true;
+    setExpandedStandars(next);
+  };
+
+  const minimizeAllStandars = () => {
+    setExpandedStandars({});
   };
 
   // Cari indikator berikutnya yang belum diisi link Drive-nya (hanya untuk tombol manual "Lompat ke Belum Diisi")
@@ -290,6 +320,13 @@ export default function AuditeeClient({
   };
 
   const scrollToAndExpandIndikator = (indId: string) => {
+    const targetInd = indikator.find((i) => i.id === indId);
+    if (targetInd) {
+      setExpandedStandars((prev) => ({
+        ...prev,
+        [targetInd.standar]: true,
+      }));
+    }
     setExpandedIds((prev) => ({
       ...prev,
       [indId]: true,
@@ -474,6 +511,8 @@ export default function AuditeeClient({
     .filter((g) => g.filteredItems.length > 0);
 
   const visibleFlatItems = visibleGroups.flatMap((g) => g.filteredItems.map((x) => x.item));
+  const allVisibleStandarsOpen =
+    visibleGroups.length > 0 && visibleGroups.every((g) => Boolean(expandedStandars[g.standar]));
   const allVisibleExpanded =
     visibleFlatItems.length > 0 && visibleFlatItems.every((item) => Boolean(expandedIds[item.id]));
   const nextUnfinishedCandidateId = findNextUnfinishedId();
@@ -753,6 +792,20 @@ export default function AuditeeClient({
               <button
                 type="button"
                 onClick={() => {
+                  if (allVisibleStandarsOpen) {
+                    minimizeAllStandars();
+                  } else {
+                    expandAllStandars(visibleGroups.map((g) => g.standar));
+                  }
+                }}
+                className="btn-secondary w-full justify-center py-1.5 text-xs"
+              >
+                {allVisibleStandarsOpen ? "🔼 Minimize Semua Standar" : "🔽 Buka Semua Standar"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
                   if (allVisibleExpanded) {
                     minimizeAll();
                   } else {
@@ -804,12 +857,29 @@ export default function AuditeeClient({
             const groupSavedCount = group.items.filter(({ item }) =>
               Boolean((savedValues[item.id]?.linkDrive ?? item.isian?.linkDrive ?? "").trim()),
             ).length;
+            const isStandarOpen = Boolean(
+              expandedStandars[group.standar] || standarFilter !== "ALL" || qNorm
+            );
 
             return (
               <div key={group.standar} className="space-y-2.5">
-                {/* Kepala Kelompok Standar */}
-                <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-300 bg-slate-200/75 px-4 py-2.5">
+                {/* Kepala Kelompok Standar (Klik untuk Buka / Minimize per Standar) */}
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => toggleStandar(group.standar)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      toggleStandar(group.standar);
+                    }
+                  }}
+                  className="flex cursor-pointer select-none flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-300 bg-slate-200/75 px-4 py-2.5 transition hover:bg-slate-200"
+                >
                   <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-slate-300 bg-white text-[10px] font-bold text-slate-700">
+                      {isStandarOpen ? "▼" : "▶"}
+                    </span>
                     <span className="text-sm font-bold text-slate-900">📂 {group.standar}</span>
                     <Badge tone="slate">
                       Indikator #{group.startIndex} – #{group.endIndex}
@@ -819,10 +889,21 @@ export default function AuditeeClient({
                     <Badge tone={groupSavedCount === group.items.length ? "green" : "blue"}>
                       ✓ {groupSavedCount}/{group.items.length} Terisi
                     </Badge>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleStandar(group.standar);
+                      }}
+                      className="rounded-lg border border-slate-300 bg-white px-2.5 py-0.5 text-xs font-bold text-slate-800 hover:bg-slate-50"
+                    >
+                      {isStandarOpen ? "▲ Minimize Standar" : "▼ Buka Standar"}
+                    </button>
                   </div>
                 </div>
 
-                {group.filteredItems.map(({ item: ind, noUrut }) => {
+                {isStandarOpen &&
+                  group.filteredItems.map(({ item: ind, noUrut }) => {
                   const isian = ind.isian;
                   const cur = values[ind.id] ?? { klaim: "", linkDrive: "", rtlPic: "", rtlRencana: "", rtlLinkBukti: "", rtlStatus: "PROSES" };
                   const sav = savedValues[ind.id] ?? { klaim: "", linkDrive: "", diisiOleh: null };
