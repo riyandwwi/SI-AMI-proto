@@ -1,10 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { HOMEBASE_LIST, ROLE_LABEL, ROLES, type RoleName } from "@/lib/roles";
 import { Badge } from "@/components/ui";
 import { PasswordCell } from "./PasswordCell";
-import { gantiPasswordUser, hapusUser, ubahHomebaseUser } from "./actions";
+import {
+  gantiPasswordUser,
+  hapusUser,
+  ubahHomebaseUser,
+  ubahProfilInlineUser,
+} from "./actions";
 
 export interface AdminUserRow {
   id: string;
@@ -21,31 +27,98 @@ export interface AdminUserRow {
 type SortKey = "homebase" | "role" | "nama_asc" | "nama_desc" | "username";
 
 export function AdminUsersTable({ users }: { users: AdminUserRow[] }) {
+  const router = useRouter();
+  const [localUsers, setLocalUsers] = useState<AdminUserRow[]>(users);
   const [roleFilter, setRoleFilter] = useState<string>("ALL");
   const [unitFilter, setUnitFilter] = useState<string>("ALL");
   const [search, setSearch] = useState<string>("");
   const [sortBy, setSortBy] = useState<SortKey>("homebase");
 
-  // Hitung jumlah per role dan per homebase
-  const roleCounts = useMemo(() => {
-    const map: Record<string, number> = { ALL: users.length };
-    for (const r of ROLES) map[r] = 0;
-    for (const u of users) map[u.role] = (map[u.role] ?? 0) + 1;
-    return map;
+  // State edit inline (klik 2x pada Nama atau NIDN/NUPTK tanpa tombol tambahan)
+  const [editingCell, setEditingCell] = useState<{
+    userId: string;
+    field: "nama" | "nimNuptk";
+  } | null>(null);
+  const [draftValue, setDraftValue] = useState<string>("");
+  const skipBlurSaveRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    setLocalUsers(users);
   }, [users]);
 
+  const startInlineEdit = (
+    userId: string,
+    field: "nama" | "nimNuptk",
+    currentValue: string
+  ) => {
+    skipBlurSaveRef.current = false;
+    setEditingCell({ userId, field });
+    setDraftValue(currentValue);
+  };
+
+  const commitInlineEdit = async (
+    userId: string,
+    field: "nama" | "nimNuptk",
+    rawValue: string
+  ) => {
+    if (skipBlurSaveRef.current) {
+      skipBlurSaveRef.current = false;
+      return;
+    }
+
+    const target = localUsers.find((u) => u.id === userId);
+    setEditingCell(null);
+    if (!target) return;
+
+    const trimmed = rawValue.trim();
+    const oldVal = (field === "nama" ? target.nama : target.nimNuptk).trim();
+
+    if (field === "nama" && !trimmed) return;
+    if (trimmed === oldVal) return;
+
+    // Update optimistik di tabel
+    setLocalUsers((prev) =>
+      prev.map((u) => (u.id === userId ? { ...u, [field]: trimmed } : u))
+    );
+
+    const res = await ubahProfilInlineUser({
+      userId,
+      field,
+      value: trimmed,
+    });
+
+    if (!res.ok) {
+      // Kembalikan ke nilai lama jika gagal
+      setLocalUsers((prev) =>
+        prev.map((u) => (u.id === userId ? { ...u, [field]: oldVal } : u))
+      );
+      alert(res.error ?? "Gagal menyimpan perubahan.");
+      return;
+    }
+
+    router.refresh();
+  };
+
+  // Hitung jumlah per role dan per homebase
+  const roleCounts = useMemo(() => {
+    const map: Record<string, number> = { ALL: localUsers.length };
+    for (const r of ROLES) map[r] = 0;
+    for (const u of localUsers) map[u.role] = (map[u.role] ?? 0) + 1;
+    return map;
+  }, [localUsers]);
+
   const unitCounts = useMemo(() => {
-    const map: Record<string, number> = { ALL: users.length };
+    const map: Record<string, number> = { ALL: localUsers.length };
     for (const h of HOMEBASE_LIST) map[h.kode] = 0;
-    for (const u of users) {
+    for (const u of localUsers) {
       if (u.unitKode) map[u.unitKode] = (map[u.unitKode] ?? 0) + 1;
     }
     return map;
-  }, [users]);
+  }, [localUsers]);
 
   const filteredAndSorted = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const list = users.filter((u) => {
+    const list = localUsers.filter((u) => {
       if (roleFilter !== "ALL" && u.role !== roleFilter) return false;
       if (unitFilter !== "ALL" && u.unitKode !== unitFilter) return false;
       if (q) {
@@ -94,7 +167,7 @@ export function AdminUsersTable({ users }: { users: AdminUserRow[] }) {
     });
 
     return list;
-  }, [users, roleFilter, unitFilter, search, sortBy]);
+  }, [localUsers, roleFilter, unitFilter, search, sortBy]);
 
   return (
     <div className="card space-y-4">
@@ -207,13 +280,92 @@ export function AdminUsersTable({ users }: { users: AdminUserRow[] }) {
             </tr>
           </thead>
           <tbody>
-            {filteredAndSorted.map((u) => (
-              <tr key={u.id} className="hover:bg-[#FAF7EE]/60 transition-colors">
-                <td className="font-bold text-black">{u.nama}</td>
-                <td className="font-mono text-xs font-semibold text-slate-800">
-                  {u.nimNuptk || "—"}
-                </td>
-                <td>
+            {filteredAndSorted.map((u) => {
+              const isEditingNama =
+                editingCell?.userId === u.id && editingCell.field === "nama";
+              const isEditingNuptk =
+                editingCell?.userId === u.id && editingCell.field === "nimNuptk";
+
+              return (
+                <tr key={u.id} className="hover:bg-[#FAF7EE]/60 transition-colors">
+                  <td
+                    onMouseDown={(e) => {
+                      if (e.detail > 1 && !isEditingNama) e.preventDefault();
+                    }}
+                    onDoubleClick={() => {
+                      if (!isEditingNama) startInlineEdit(u.id, "nama", u.nama);
+                    }}
+                    title="Klik 2x untuk mengubah nama"
+                    className={`font-bold text-black ${
+                      isEditingNama
+                        ? ""
+                        : "cursor-pointer select-none hover:text-blue-700 hover:underline decoration-dotted underline-offset-4"
+                    }`}
+                  >
+                    {isEditingNama ? (
+                      <input
+                        type="text"
+                        autoFocus
+                        value={draftValue}
+                        onFocus={(e) => e.currentTarget.select()}
+                        onChange={(e) => setDraftValue(e.target.value)}
+                        onBlur={(e) => commitInlineEdit(u.id, "nama", e.currentTarget.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            e.currentTarget.blur();
+                          } else if (e.key === "Escape") {
+                            e.preventDefault();
+                            skipBlurSaveRef.current = true;
+                            setEditingCell(null);
+                          }
+                        }}
+                        className="w-full min-w-[160px] select-text rounded-lg border-2 border-blue-600 bg-white px-2 py-1 text-xs font-bold text-black"
+                      />
+                    ) : (
+                      u.nama
+                    )}
+                  </td>
+                  <td
+                    onMouseDown={(e) => {
+                      if (e.detail > 1 && !isEditingNuptk) e.preventDefault();
+                    }}
+                    onDoubleClick={() => {
+                      if (!isEditingNuptk) startInlineEdit(u.id, "nimNuptk", u.nimNuptk);
+                    }}
+                    title="Klik 2x untuk mengubah NIDN / NUPTK"
+                    className={`font-mono text-xs font-semibold text-slate-800 ${
+                      isEditingNuptk
+                        ? ""
+                        : "cursor-pointer select-none hover:text-blue-700 hover:underline decoration-dotted underline-offset-4"
+                    }`}
+                  >
+                    {isEditingNuptk ? (
+                      <input
+                        type="text"
+                        autoFocus
+                        value={draftValue}
+                        onFocus={(e) => e.currentTarget.select()}
+                        onChange={(e) => setDraftValue(e.target.value)}
+                        onBlur={(e) => commitInlineEdit(u.id, "nimNuptk", e.currentTarget.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            e.currentTarget.blur();
+                          } else if (e.key === "Escape") {
+                            e.preventDefault();
+                            skipBlurSaveRef.current = true;
+                            setEditingCell(null);
+                          }
+                        }}
+                        placeholder="NIDN / NUPTK..."
+                        className="w-full min-w-[140px] select-text rounded-lg border-2 border-blue-600 bg-white px-2 py-1 font-mono text-xs font-semibold text-slate-900"
+                      />
+                    ) : (
+                      u.nimNuptk || "—"
+                    )}
+                  </td>
+                  <td>
                   <form action={ubahHomebaseUser} className="flex items-center gap-1">
                     <input type="hidden" name="userId" value={u.id} />
                     <select
@@ -279,8 +431,9 @@ export function AdminUsersTable({ users }: { users: AdminUserRow[] }) {
                     </form>
                   )}
                 </td>
-              </tr>
-            ))}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

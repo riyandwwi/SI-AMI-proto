@@ -149,3 +149,76 @@ export async function hapusUser(fd: FormData) {
   revalidatePath("/admin");
   ok("/admin", `Akun "${target.username}" (${target.nama}) berhasil dihapus.`);
 }
+
+export async function ubahProfilInlineUser(input: {
+  userId: string;
+  field: "nama" | "nimNuptk";
+  value: string;
+}): Promise<{ ok: boolean; value?: string; error?: string }> {
+  try {
+    const admin = await requireUser("SUPER_ADMIN");
+    const userId = (input.userId ?? "").trim();
+    const field = input.field;
+    const val = (input.value ?? "").trim().slice(0, field === "nama" ? 120 : 64);
+
+    if (!userId || (field !== "nama" && field !== "nimNuptk")) {
+      return { ok: false, error: "Parameter tidak valid." };
+    }
+
+    if (field === "nama" && !val) {
+      return { ok: false, error: "Nama lengkap tidak boleh kosong." };
+    }
+
+    const target = await prisma.user.findUnique({ where: { id: userId } });
+    if (!target) {
+      return { ok: false, error: "Pengguna tidak ditemukan." };
+    }
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: field === "nama" ? { nama: val } : { nimNuptk: val },
+    });
+
+    // Sinkronkan juga nama/NIP pada Periode jika user ini menjabat sebagai Ketua Auditee / Ketua Auditor
+    if (field === "nama") {
+      await prisma.periode.updateMany({
+        where: { ketuaAuditeeId: userId },
+        data: { ketuaAuditeeNama: val },
+      });
+      await prisma.periode.updateMany({
+        where: { ketuaAuditorId: userId },
+        data: { ketuaAuditorNama: val },
+      });
+    } else {
+      await prisma.periode.updateMany({
+        where: { ketuaAuditeeId: userId },
+        data: { ketuaAuditeeNip: val },
+      });
+      await prisma.periode.updateMany({
+        where: { ketuaAuditorId: userId },
+        data: { ketuaAuditorNip: val },
+      });
+    }
+
+    await catat(
+      admin.id,
+      field === "nama" ? "UBAH_NAMA_USER" : "UBAH_NUPTK_USER",
+      `Ubah ${field === "nama" ? "nama" : "NIDN/NUPTK"} ${target.username}: "${
+        field === "nama" ? target.nama : target.nimNuptk
+      }" -> "${val}"`
+    );
+
+    revalidatePath("/admin");
+    revalidatePath("/lpm");
+    revalidatePath("/auditor");
+    revalidatePath("/auditee");
+
+    return { ok: true, value: val };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Gagal menyimpan perubahan.",
+    };
+  }
+}
+
