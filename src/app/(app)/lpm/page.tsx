@@ -138,7 +138,7 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                   </span>
                 </summary>
                 <form action={buatSesiAmi} className="mt-3 space-y-3 border-t border-slate-100 pt-3">
-                  <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                     <div className="space-y-1">
                       <label>Tahun Akademik</label>
                       <input name="tahun" required defaultValue="2026/2027" placeholder="2026/2027" className="w-full" />
@@ -152,13 +152,20 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                     </div>
                     <div className="space-y-1">
                       <label>Program Studi</label>
+                      <select name="prodiKode" required defaultValue="PRODI-BD" className="w-full">
+                        {PRODI_LIST.map((p) => (
+                          <option key={p.kode} value={p.kode}>
+                            {p.nama}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label>Indikator Awal</label>
                       <div className="flex gap-2">
-                        <select name="prodiKode" required defaultValue="PRODI-BD" className="w-full">
-                          {PRODI_LIST.map((p) => (
-                            <option key={p.kode} value={p.kode}>
-                              {p.nama}
-                            </option>
-                          ))}
+                        <select name="sumberIndikator" defaultValue="KOSONG" className="w-full text-xs">
+                          <option value="KOSONG">📄 Kosong (0 Indikator — Import Excel per Prodi)</option>
+                          <option value="SALIN_PRODI_SAMA">🔄 Salin dari Sesi Sebelumnya (Prodi Sama)</option>
                         </select>
                         <button className="btn shrink-0">+ Buat</button>
                       </div>

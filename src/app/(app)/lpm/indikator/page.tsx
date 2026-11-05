@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { sortPeriodesChronological } from "@/lib/periode";
@@ -10,6 +11,7 @@ import { hapusSemuaIndikator, toggleKunciIndikator } from "../actions";
 export default async function LpmIndikatorPage({ searchParams }: { searchParams: SP }) {
   await requireUser("LPM");
   const sp = await searchParams;
+  const filterPeriodeId = one(sp.periodeId) ?? "ALL";
 
   const rawPeriodes = await prisma.periode.findMany({
     include: {
@@ -22,6 +24,10 @@ export default async function LpmIndikatorPage({ searchParams }: { searchParams:
   });
 
   const periodes = sortPeriodesChronological(rawPeriodes);
+  const visiblePeriodes =
+    filterPeriodeId === "ALL"
+      ? periodes
+      : periodes.filter((p) => p.id === filterPeriodeId);
 
   const periodeOptions = periodes.map((p) => ({
     id: p.id,
@@ -32,7 +38,7 @@ export default async function LpmIndikatorPage({ searchParams }: { searchParams:
   // Kumpulkan semua Standar yang sudah ada beserta daftar Pernyataan Standarnya
   const standarMap = new Map<string, Set<string>>();
   const standarCountMap = new Map<string, number>();
-  for (const p of periodes) {
+  for (const p of visiblePeriodes) {
     for (const ind of p.indikator) {
       if (!ind.standar) continue;
       if (!standarMap.has(ind.standar)) {
@@ -53,32 +59,61 @@ export default async function LpmIndikatorPage({ searchParams }: { searchParams:
     })
   );
 
+  const defaultTargetId =
+    filterPeriodeId !== "ALL" && periodes.some((p) => p.id === filterPeriodeId)
+      ? filterPeriodeId
+      : (periodes[0]?.id ?? "ALL");
+
   return (
     <>
       <PageHeader title="Master Standar, Pernyataan Standar & Indikator SPMI">
         {periodes.length > 0 && (
           <div className="flex flex-wrap items-center gap-2">
             <form action={toggleKunciIndikator}>
-              <input type="hidden" name="periodeId" value="ALL" />
+              <input type="hidden" name="periodeId" value={filterPeriodeId} />
               <input type="hidden" name="lockAction" value="LOCK" />
-              <input type="hidden" name="returnTo" value="/lpm/indikator" />
+              <input
+                type="hidden"
+                name="returnTo"
+                value={
+                  filterPeriodeId === "ALL"
+                    ? "/lpm/indikator"
+                    : `/lpm/indikator?periodeId=${filterPeriodeId}`
+                }
+              />
               <button className="btn-success text-xs">
-                🔒 Kunci &amp; Terbitkan Semua Sesi ke Auditor/Auditee
+                🔒 Kunci &amp; Terbitkan {filterPeriodeId === "ALL" ? "Semua Sesi" : "Sesi Ini"}
               </button>
             </form>
             <form action={toggleKunciIndikator}>
-              <input type="hidden" name="periodeId" value="ALL" />
+              <input type="hidden" name="periodeId" value={filterPeriodeId} />
               <input type="hidden" name="lockAction" value="UNLOCK" />
-              <input type="hidden" name="returnTo" value="/lpm/indikator" />
+              <input
+                type="hidden"
+                name="returnTo"
+                value={
+                  filterPeriodeId === "ALL"
+                    ? "/lpm/indikator"
+                    : `/lpm/indikator?periodeId=${filterPeriodeId}`
+                }
+              />
               <button className="btn-secondary text-xs">
-                🔓 Buka Kunci Semua Sesi (Edit)
+                🔓 Buka Kunci {filterPeriodeId === "ALL" ? "Semua Sesi" : "Sesi Ini"} (Edit)
               </button>
             </form>
             <form action={hapusSemuaIndikator}>
-              <input type="hidden" name="periodeId" value="ALL" />
-              <input type="hidden" name="returnTo" value="/lpm/indikator" />
+              <input type="hidden" name="periodeId" value={filterPeriodeId} />
+              <input
+                type="hidden"
+                name="returnTo"
+                value={
+                  filterPeriodeId === "ALL"
+                    ? "/lpm/indikator"
+                    : `/lpm/indikator?periodeId=${filterPeriodeId}`
+                }
+              />
               <button className="btn-danger text-xs">
-                🗑️ Hapus Semua Indikator (Semua Sesi)
+                🗑️ Hapus Indikator ({filterPeriodeId === "ALL" ? "Semua Sesi" : "Sesi Ini"})
               </button>
             </form>
           </div>
@@ -86,25 +121,54 @@ export default async function LpmIndikatorPage({ searchParams }: { searchParams:
       </PageHeader>
       <Flash ok={one(sp.ok)} err={one(sp.err)} />
 
-      {/* 1. Card Import Indikator dari Excel (1 Baris Minimalis) */}
+      {/* Filter Pilih Sesi Prodi (PWK / Bisnis Digital / Aktuaria) */}
       {periodes.length > 0 && (
-        <ImportIndikatorExcel periodes={periodeOptions} defaultPeriodeId="ALL" />
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-black uppercase text-slate-700">Pilih Sesi Prodi:</span>
+          <Link
+            href="/lpm/indikator"
+            className={filterPeriodeId === "ALL" ? "btn text-xs" : "btn-secondary text-xs"}
+          >
+            Semua Sesi ({periodes.length})
+          </Link>
+          {periodes.map((p) => (
+            <Link
+              key={p.id}
+              href={`/lpm/indikator?periodeId=${p.id}`}
+              className={filterPeriodeId === p.id ? "btn text-xs" : "btn-secondary text-xs"}
+            >
+              {p.unit?.nama ?? p.nama} — {p.tahun} ({p.semester}) [{p.indikator.length} Indikator]
+            </Link>
+          ))}
+        </div>
+      )}
+
+      {/* 1. Card Import Indikator dari Excel (Dengan Dropdown Target Sesi Prodi) */}
+      {periodes.length > 0 && (
+        <ImportIndikatorExcel
+          periodes={periodeOptions}
+          defaultPeriodeId={defaultTargetId}
+        />
       )}
 
       {/* 2. Card Input Indikator Manual (Default Ter-Minimize) */}
       <FormStandarBertahap
-        returnTo="/lpm/indikator"
+        returnTo={
+          filterPeriodeId === "ALL"
+            ? "/lpm/indikator"
+            : `/lpm/indikator?periodeId=${filterPeriodeId}`
+        }
         periodes={periodes.map((p) => ({ id: p.id, nama: p.nama }))}
-        defaultPeriodeId="ALL"
+        defaultPeriodeId={defaultTargetId}
         existingStandarList={existingStandarList}
       />
 
       {/* 3. Tabel Standar, Pernyataan Standar & Indikator (Dengan Dropdown Pilih Standar Top-Down) */}
-      {periodes.length === 0 ? (
+      {visiblePeriodes.length === 0 ? (
         <Empty>Belum ada Sesi AMI.</Empty>
       ) : (
         <div className="space-y-4">
-          {periodes.map((p) => {
+          {visiblePeriodes.map((p) => {
             const rekapRows = p.indikator.map((ind) => ({
               id: ind.id,
               kode: ind.kode,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
 import { Badge } from "@/components/ui";
@@ -33,8 +33,34 @@ export function ImportIndikatorExcel({
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const selectedPeriodeId = defaultPeriodeId;
-  const mode: "SKIP_EXISTING" | "UPDATE_EXISTING" = "UPDATE_EXISTING";
+  // Default pilih sesi prodi pertama jika dibuka dari halaman /lpm/indikator (agar tidak otomatis menimpa semua prodi)
+  const [selectedPeriodeId, setSelectedPeriodeId] = useState<string>(() =>
+    defaultPeriodeId === "ALL" && periodes.length > 0
+      ? periodes[0].id
+      : defaultPeriodeId
+  );
+  const [mode, setMode] = useState<
+    "SKIP_EXISTING" | "UPDATE_EXISTING" | "REPLACE_ALL"
+  >("UPDATE_EXISTING");
+
+  useEffect(() => {
+    if (defaultPeriodeId !== "ALL") {
+      setSelectedPeriodeId(defaultPeriodeId);
+    } else if (
+      selectedPeriodeId !== "ALL" &&
+      periodes.length > 0 &&
+      !periodes.some((p) => p.id === selectedPeriodeId)
+    ) {
+      setSelectedPeriodeId(periodes[0].id);
+    }
+  }, [defaultPeriodeId, periodes, selectedPeriodeId]);
+
+  const selectedPeriodeObj = periodes.find((p) => p.id === selectedPeriodeId);
+  const targetDisplayName =
+    selectedPeriodeId === "ALL"
+      ? "Semua Sesi AMI"
+      : (selectedPeriodeObj?.nama ?? "Sesi Terpilih");
+
   const [fileName, setFileName] = useState<string>("");
   const [previewRows, setPreviewRows] = useState<PreviewRow[]>([]);
   const [parseError, setParseError] = useState<string | null>(null);
@@ -287,7 +313,42 @@ export function ImportIndikatorExcel({
   return (
     <div className="card space-y-3 py-3.5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-sm font-black text-black">📊 Import Indikator dari Excel</h2>
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="text-sm font-black text-black">📊 Import Indikator dari Excel</h2>
+          {periodes.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-xs font-bold text-slate-600">➔ Target Prodi/Sesi:</span>
+              <select
+                value={selectedPeriodeId}
+                onChange={(e) => setSelectedPeriodeId(e.target.value)}
+                className="text-xs font-bold text-slate-900"
+              >
+                {periodes.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    🎯 {p.nama} ({p.existingCodes.length} Indikator)
+                  </option>
+                ))}
+                <option value="ALL">🌐 Semua Sesi AMI Sekaligus</option>
+              </select>
+
+              <select
+                value={mode}
+                onChange={(e) =>
+                  setMode(
+                    e.target.value as "SKIP_EXISTING" | "UPDATE_EXISTING" | "REPLACE_ALL"
+                  )
+                }
+                className="text-xs font-semibold text-slate-700"
+              >
+                <option value="UPDATE_EXISTING">🔄 Tambah / Perbarui Indikator</option>
+                <option value="REPLACE_ALL">
+                  🧹 Ganti Seluruh Indikator di Sesi Ini dengan File Excel Ini
+                </option>
+                <option value="SKIP_EXISTING">⏭️ Hanya Tambah Baru (Skip yang Sama)</option>
+              </select>
+            </div>
+          )}
+        </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <button
@@ -324,7 +385,8 @@ export function ImportIndikatorExcel({
         <div className="space-y-3 rounded-2xl border border-black/20 bg-[#FAF7EE] p-3.5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="text-xs font-black text-black">
-              📋 Pratinjau File: <span className="font-mono">{fileName}</span> ({previewRows.length} baris terbaca)
+              📋 Pratinjau File: <span className="font-mono">{fileName}</span> ({previewRows.length} baris terbaca) ➔{" "}
+              <span className="text-blue-700">{targetDisplayName}</span>
             </div>
             <div className="flex flex-wrap gap-2">
               <button
@@ -343,7 +405,7 @@ export function ImportIndikatorExcel({
               >
                 {isPending
                   ? "Mengimport..."
-                  : `✅ Konfirmasi Import (${validRowsToImport.length} Indikator)`}
+                  : `✅ Import ${validRowsToImport.length} Indikator ke ${targetDisplayName}`}
               </button>
             </div>
           </div>

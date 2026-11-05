@@ -72,22 +72,37 @@ export async function buatSesiAmi(fd: FormData) {
     create: { kode: prodiDef.kode, nama: prodiDef.nama, jenis: "PRODI", diaudit: true },
   });
 
-  const lastPeriode = await prisma.periode.findFirst({
-    include: { indikator: { orderBy: { urutan: "asc" } } },
-    orderBy: { createdAt: "desc" },
-  });
-  const sourceIndikator =
-    lastPeriode && lastPeriode.indikator.length > 0
-      ? lastPeriode.indikator.map((i, idx) => ({
-          kode: i.kode,
-          standar: i.standar,
-          pernyataanStandar: i.pernyataanStandar,
-          pernyataan: i.pernyataan,
-          target: i.target,
-          buktiDiminta: i.buktiDiminta,
-          urutan: idx + 1,
-        }))
-      : DEFAULT_INDIKATOR;
+  // Opsi sumber indikator awal: default KOSONG (0 indikator) agar tiap prodi (PWK/BD/Aktuaria)
+  // tidak tercampur indikator prodi lain. Jika dipilih SALIN_PRODI_SAMA, hanya menyalin dari sesi prodi yang sama.
+  const sumberIndikator = str(fd, "sumberIndikator", 32) || "KOSONG";
+  let sourceIndikator: {
+    kode: string;
+    standar: string;
+    pernyataanStandar: string | null;
+    pernyataan: string;
+    target: string;
+    buktiDiminta: string | null;
+    urutan: number;
+  }[] = [];
+
+  if (sumberIndikator === "SALIN_PRODI_SAMA") {
+    const lastSameProdiPeriode = await prisma.periode.findFirst({
+      where: { unitId: unit.id, isTraining: false },
+      include: { indikator: { orderBy: { urutan: "asc" } } },
+      orderBy: { createdAt: "desc" },
+    });
+    if (lastSameProdiPeriode && lastSameProdiPeriode.indikator.length > 0) {
+      sourceIndikator = lastSameProdiPeriode.indikator.map((i, idx) => ({
+        kode: i.kode,
+        standar: i.standar,
+        pernyataanStandar: i.pernyataanStandar,
+        pernyataan: i.pernyataan,
+        target: i.target,
+        buktiDiminta: i.buktiDiminta,
+        urutan: idx + 1,
+      }));
+    }
+  }
 
   const nama = `AMI ${unit.nama} — ${tahun} (${semester})`;
   const p = await prisma.periode.create({
@@ -99,9 +114,13 @@ export async function buatSesiAmi(fd: FormData) {
       tahap: "PENGISIAN",
       sourceLocked: false,
       aktif: true,
-      indikator: {
-        create: sourceIndikator,
-      },
+      ...(sourceIndikator.length > 0
+        ? {
+            indikator: {
+              create: sourceIndikator,
+            },
+          }
+        : {}),
     },
   });
 
@@ -763,7 +782,7 @@ export interface ExcelIndikatorRowInput {
 export async function importBatchIndikatorExcel(
   targetPeriodeId: string,
   rows: ExcelIndikatorRowInput[],
-  mode: "SKIP_EXISTING" | "UPDATE_EXISTING" = "SKIP_EXISTING"
+  mode: "SKIP_EXISTING" | "UPDATE_EXISTING" | "REPLACE_ALL" = "UPDATE_EXISTING"
 ): Promise<{
   ok: boolean;
   message?: string;
@@ -806,13 +825,19 @@ export async function importBatchIndikatorExcel(
   let skippedCount = 0;
 
   for (const p of periodes) {
+    if (mode === "REPLACE_ALL") {
+      await prisma.indikator.deleteMany({ where: { periodeId: p.id } });
+    }
+
     const existingMap = new Map(
-      p.indikator.map((ind) => [
-        `${ind.standar.trim().toUpperCase()}|||${ind.kode.trim().toUpperCase()}`,
-        ind,
-      ])
+      mode === "REPLACE_ALL"
+        ? []
+        : p.indikator.map((ind) => [
+            `${ind.standar.trim().toUpperCase()}|||${ind.kode.trim().toUpperCase()}`,
+            ind,
+          ])
     );
-    let nextUrutan = p.indikator.length + 1;
+    let nextUrutan = mode === "REPLACE_ALL" ? 1 : p.indikator.length + 1;
 
     for (const raw of rows) {
       const kode = (raw.kode || "").trim().toUpperCase().replace(/\s+/g, "-").slice(0, 32);
@@ -858,10 +883,13 @@ export async function importBatchIndikatorExcel(
     }
   }
 
+  const targetLabel =
+    periodes.length === 1 ? periodes[0].nama : `${periodes.length} Sesi AMI`;
+
   await catat(
     user.id,
     "IMPORT_EXCEL_INDIKATOR",
-    `Import Excel: +${addedCount} baru, ${updatedCount} diperbarui, ${skippedCount} dilewati`
+    `Import Excel ke [${targetLabel}] (${mode}): +${addedCount} baru, ${updatedCount} diperbarui, ${skippedCount} dilewati`
   );
   revalidatePath("/lpm/indikator");
   revalidatePath("/lpm");
@@ -873,7 +901,7 @@ export async function importBatchIndikatorExcel(
     addedCount,
     updatedCount,
     skippedCount,
-    message: `Import selesai: ${addedCount} indikator baru ditambahkan, ${updatedCount} diperbarui, ${skippedCount} dilewati (indikator manual aman).`,
+    message: `Import ke "${targetLabel}" selesai: ${addedCount} indikator baru ditambahkan, ${updatedCount} diperbarui, ${skippedCount} dilewati.`,
   };
 }
 
