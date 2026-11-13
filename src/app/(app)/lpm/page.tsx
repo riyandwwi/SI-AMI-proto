@@ -21,7 +21,6 @@ import {
   hapusSemuaTtdSesi,
   hapusSesiAmi,
   hapusStandarEmergency,
-  hapusUserEmergencyOlehLpm,
   lepasAuditorDariSesi,
   pilihKetuaSesiAmi,
   tambahUserEmergencyOlehLpm,
@@ -280,7 +279,7 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                 );
 
                 const assignedAuditors =
-                  assignedFromPenugasan.length > 0 ? assignedFromPenugasan : fallbackCrossAuditors;
+                  p.penugasan.length > 0 ? assignedFromPenugasan : fallbackCrossAuditors;
 
                 const assignedIds = new Set(assignedAuditors.map((a) => a.id));
 
@@ -605,17 +604,6 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                                         </button>
                                       </form>
                                     )}
-                                    <form action={hapusUserEmergencyOlehLpm}>
-                                      <input type="hidden" name="userId" value={a.id} />
-                                      <input
-                                        type="hidden"
-                                        name="returnTo"
-                                        value={`/lpm?tab=sesi&prodi=${prodiFilter}`}
-                                      />
-                                      <button className="btn-danger px-2 py-0.5 text-[11px]">
-                                        Hapus
-                                      </button>
-                                    </form>
                                   </div>
                                 </li>
                               );
@@ -685,29 +673,16 @@ export default async function LpmPage({ searchParams }: { searchParams: SP }) {
                                         </button>
                                       </form>
                                     )}
-                                    {assignedFromPenugasan.length > 0 && (
-                                      <form action={lepasAuditorDariSesi}>
-                                        <input type="hidden" name="periodeId" value={p.id} />
-                                        <input type="hidden" name="auditorId" value={a.id} />
-                                        <input
-                                          type="hidden"
-                                          name="returnTo"
-                                          value={`/lpm?tab=sesi&prodi=${prodiFilter}`}
-                                        />
-                                        <button className="btn-secondary px-2 py-0.5 text-[11px]">
-                                          Lepas
-                                        </button>
-                                      </form>
-                                    )}
-                                    <form action={hapusUserEmergencyOlehLpm}>
-                                      <input type="hidden" name="userId" value={a.id} />
+                                    <form action={lepasAuditorDariSesi}>
+                                      <input type="hidden" name="periodeId" value={p.id} />
+                                      <input type="hidden" name="auditorId" value={a.id} />
                                       <input
                                         type="hidden"
                                         name="returnTo"
                                         value={`/lpm?tab=sesi&prodi=${prodiFilter}`}
                                       />
-                                      <button className="btn-danger px-2 py-0.5 text-[11px]">
-                                        Hapus
+                                      <button className="btn-secondary px-2 py-0.5 text-[11px]">
+                                        Lepas dari Sesi
                                       </button>
                                     </form>
                                   </div>

@@ -276,20 +276,63 @@ export async function lepasAuditorDariSesi(fd: FormData) {
   const periodeId = str(fd, "periodeId", 64);
   const auditorId = str(fd, "auditorId", 64);
 
-  const penugasan = await prisma.penugasan.findFirst({
+  const periode = await prisma.periode.findUnique({
+    where: { id: periodeId },
+  });
+  if (!periode || !periode.unitId) fail(returnTo, "Sesi AMI tidak ditemukan.");
+
+  const existingPenugasan = await prisma.penugasan.findFirst({
     where: { periodeId },
   });
-  if (!penugasan) fail(returnTo, "Penugasan tidak ditemukan.");
 
-  await prisma.penugasanAuditor.deleteMany({
-    where: { penugasanId: penugasan.id, auditorId },
-  });
+  if (existingPenugasan) {
+    await prisma.penugasanAuditor.deleteMany({
+      where: { penugasanId: existingPenugasan.id, auditorId },
+    });
+  } else {
+    const newPenugasan = await prisma.penugasan.create({
+      data: {
+        periodeId: periode.id,
+        unitId: periode.unitId,
+        disahkan: true,
+      },
+    });
+    const remainingAuditors = await prisma.user.findMany({
+      where: {
+        role: "AUDITOR",
+        aktif: true,
+        isTraining: false,
+        NOT: [{ unitId: periode.unitId }, { id: auditorId }],
+      },
+      orderBy: { nama: "asc" },
+    });
+    for (let i = 0; i < remainingAuditors.length; i++) {
+      await prisma.penugasanAuditor.create({
+        data: {
+          penugasanId: newPenugasan.id,
+          auditorId: remainingAuditors[i].id,
+          peran: i === 0 ? "KETUA" : "ANGGOTA",
+        },
+      });
+    }
+  }
+
+  if (periode.ketuaAuditorId === auditorId) {
+    await prisma.periode.update({
+      where: { id: periode.id },
+      data: {
+        ketuaAuditorId: null,
+        ketuaAuditorNama: null,
+        ketuaAuditorNip: null,
+      },
+    });
+  }
 
   await catat(lpm.id, "LEPAS_AUDITOR_SESI", `Periode ${periodeId} - Auditor ${auditorId}`);
   revalidatePath("/lpm");
   revalidatePath("/auditor");
   revalidatePath("/auditee");
-  ok(returnTo, "Auditor dilepas dari sesi ini.");
+  ok(returnTo, "Auditor dilepas dari sesi ini (akun tetap tersimpan).");
 }
 
 // ====================================================
@@ -399,25 +442,12 @@ export async function tambahUserEmergencyOlehLpm(fd: FormData) {
 }
 
 export async function hapusUserEmergencyOlehLpm(fd: FormData) {
-  const lpm = await requireUser("LPM");
+  await requireUser("LPM");
   const returnTo = str(fd, "returnTo", 200) || "/lpm";
-  const userId = str(fd, "userId", 64);
-
-  if (!userId) fail(returnTo, "ID akun tidak valid.");
-
-  const target = await prisma.user.findUnique({ where: { id: userId } });
-  if (!target) fail(returnTo, "Akun tidak ditemukan.");
-  if (target.role !== "AUDITOR" && target.role !== "AUDITEE") {
-    fail(returnTo, "LPM hanya dapat menghapus akun Auditor atau Auditee.");
-  }
-
-  await prisma.user.delete({ where: { id: userId } });
-  await catat(lpm.id, `LPM_HAPUS_${target.role}`, `${target.nama} (${target.username})`);
-  revalidatePath("/lpm");
-  revalidatePath("/admin");
-  revalidatePath("/auditor");
-  revalidatePath("/auditee");
-  ok(returnTo, `Akun ${target.role} "${target.nama}" (${target.username}) berhasil dihapus.`);
+  fail(
+    returnTo,
+    "Fitur hapus akun di halaman LPM telah dinonaktifkan agar akun tidak terhapus. Gunakan tombol 'Lepas dari Sesi' untuk mengganti Auditor."
+  );
 }
 
 // Backward-compatible aliases
