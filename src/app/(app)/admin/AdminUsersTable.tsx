@@ -34,10 +34,10 @@ export function AdminUsersTable({ users }: { users: AdminUserRow[] }) {
   const [search, setSearch] = useState<string>("");
   const [sortBy, setSortBy] = useState<SortKey>("homebase");
 
-  // State edit inline (klik 2x pada Nama atau NIDN/NUPTK tanpa tombol tambahan)
+  // State edit inline (klik 2x pada Nama, NIDN/NUPTK, atau Username tanpa tombol tambahan)
   const [editingCell, setEditingCell] = useState<{
     userId: string;
-    field: "nama" | "nimNuptk";
+    field: "nama" | "nimNuptk" | "username";
   } | null>(null);
   const [draftValue, setDraftValue] = useState<string>("");
   const skipBlurSaveRef = useRef<boolean>(false);
@@ -48,7 +48,7 @@ export function AdminUsersTable({ users }: { users: AdminUserRow[] }) {
 
   const startInlineEdit = (
     userId: string,
-    field: "nama" | "nimNuptk",
+    field: "nama" | "nimNuptk" | "username",
     currentValue: string
   ) => {
     skipBlurSaveRef.current = false;
@@ -58,7 +58,7 @@ export function AdminUsersTable({ users }: { users: AdminUserRow[] }) {
 
   const commitInlineEdit = async (
     userId: string,
-    field: "nama" | "nimNuptk",
+    field: "nama" | "nimNuptk" | "username",
     rawValue: string
   ) => {
     if (skipBlurSaveRef.current) {
@@ -70,10 +70,19 @@ export function AdminUsersTable({ users }: { users: AdminUserRow[] }) {
     setEditingCell(null);
     if (!target) return;
 
-    const trimmed = rawValue.trim();
-    const oldVal = (field === "nama" ? target.nama : target.nimNuptk).trim();
+    const trimmed =
+      field === "username"
+        ? rawValue.trim().toLowerCase().replace(/\s+/g, "")
+        : rawValue.trim();
+    const oldVal = (
+      field === "nama"
+        ? target.nama
+        : field === "nimNuptk"
+          ? target.nimNuptk
+          : target.username
+    ).trim();
 
-    if (field === "nama" && !trimmed) return;
+    if ((field === "nama" || field === "username") && !trimmed) return;
     if (trimmed === oldVal) return;
 
     // Update optimistik di tabel
@@ -285,6 +294,8 @@ export function AdminUsersTable({ users }: { users: AdminUserRow[] }) {
                 editingCell?.userId === u.id && editingCell.field === "nama";
               const isEditingNuptk =
                 editingCell?.userId === u.id && editingCell.field === "nimNuptk";
+              const isEditingUsername =
+                editingCell?.userId === u.id && editingCell.field === "username";
 
               return (
                 <tr key={u.id} className="hover:bg-[#FAF7EE]/60 transition-colors">
@@ -397,10 +408,46 @@ export function AdminUsersTable({ users }: { users: AdminUserRow[] }) {
                     {ROLE_LABEL[u.role]}
                   </Badge>
                 </td>
-                <td>
-                  <code className="rounded-lg border border-black/25 bg-[#FAF7EE] px-2 py-0.5 text-xs font-mono font-bold text-black">
-                    {u.username}
-                  </code>
+                <td
+                  onMouseDown={(e) => {
+                    if (e.detail > 1 && !isEditingUsername) e.preventDefault();
+                  }}
+                  onDoubleClick={() => {
+                    if (!isEditingUsername) startInlineEdit(u.id, "username", u.username);
+                  }}
+                  title="Klik 2x untuk mengubah username"
+                  className={
+                    isEditingUsername
+                      ? ""
+                      : "cursor-pointer select-none"
+                  }
+                >
+                  {isEditingUsername ? (
+                    <input
+                      type="text"
+                      autoFocus
+                      value={draftValue}
+                      onFocus={(e) => e.currentTarget.select()}
+                      onChange={(e) => setDraftValue(e.target.value)}
+                      onBlur={(e) => commitInlineEdit(u.id, "username", e.currentTarget.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          e.currentTarget.blur();
+                        } else if (e.key === "Escape") {
+                          e.preventDefault();
+                          skipBlurSaveRef.current = true;
+                          setEditingCell(null);
+                        }
+                      }}
+                      placeholder="username..."
+                      className="w-full min-w-[130px] select-text rounded-lg border-2 border-blue-600 bg-white px-2 py-1 font-mono text-xs font-bold text-black"
+                    />
+                  ) : (
+                    <code className="rounded-lg border border-black/25 bg-[#FAF7EE] px-2 py-0.5 text-xs font-mono font-bold text-black hover:border-blue-600 hover:text-blue-700">
+                      {u.username}
+                    </code>
+                  )}
                 </td>
                 <td>
                   <PasswordCell plainPassword={u.plainPassword} />

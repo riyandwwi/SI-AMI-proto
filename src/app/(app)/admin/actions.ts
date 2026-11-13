@@ -152,21 +152,30 @@ export async function hapusUser(fd: FormData) {
 
 export async function ubahProfilInlineUser(input: {
   userId: string;
-  field: "nama" | "nimNuptk";
+  field: "nama" | "nimNuptk" | "username";
   value: string;
 }): Promise<{ ok: boolean; value?: string; error?: string }> {
   try {
     const admin = await requireUser("SUPER_ADMIN");
     const userId = (input.userId ?? "").trim();
     const field = input.field;
-    const val = (input.value ?? "").trim().slice(0, field === "nama" ? 120 : 64);
 
-    if (!userId || (field !== "nama" && field !== "nimNuptk")) {
+    if (!userId || (field !== "nama" && field !== "nimNuptk" && field !== "username")) {
       return { ok: false, error: "Parameter tidak valid." };
     }
 
+    const rawTrimmed = (input.value ?? "").trim();
+    const val =
+      field === "username"
+        ? rawTrimmed.toLowerCase().replace(/\s+/g, "").slice(0, 64)
+        : rawTrimmed.slice(0, field === "nama" ? 120 : 64);
+
     if (field === "nama" && !val) {
       return { ok: false, error: "Nama lengkap tidak boleh kosong." };
+    }
+
+    if (field === "username" && !val) {
+      return { ok: false, error: "Username tidak boleh kosong." };
     }
 
     const target = await prisma.user.findUnique({ where: { id: userId } });
@@ -174,9 +183,21 @@ export async function ubahProfilInlineUser(input: {
       return { ok: false, error: "Pengguna tidak ditemukan." };
     }
 
+    if (field === "username" && val !== target.username) {
+      const existing = await prisma.user.findUnique({ where: { username: val } });
+      if (existing && existing.id !== userId) {
+        return { ok: false, error: `Username "${val}" sudah digunakan oleh akun lain.` };
+      }
+    }
+
     await prisma.user.update({
       where: { id: userId },
-      data: field === "nama" ? { nama: val } : { nimNuptk: val },
+      data:
+        field === "nama"
+          ? { nama: val }
+          : field === "nimNuptk"
+            ? { nimNuptk: val }
+            : { username: val },
     });
 
     // Sinkronkan juga nama/NIP pada Periode jika user ini menjabat sebagai Ketua Auditee / Ketua Auditor
@@ -189,7 +210,7 @@ export async function ubahProfilInlineUser(input: {
         where: { ketuaAuditorId: userId },
         data: { ketuaAuditorNama: val },
       });
-    } else {
+    } else if (field === "nimNuptk") {
       await prisma.periode.updateMany({
         where: { ketuaAuditeeId: userId },
         data: { ketuaAuditeeNip: val },
@@ -202,9 +223,19 @@ export async function ubahProfilInlineUser(input: {
 
     await catat(
       admin.id,
-      field === "nama" ? "UBAH_NAMA_USER" : "UBAH_NUPTK_USER",
-      `Ubah ${field === "nama" ? "nama" : "NIDN/NUPTK"} ${target.username}: "${
-        field === "nama" ? target.nama : target.nimNuptk
+      field === "nama"
+        ? "UBAH_NAMA_USER"
+        : field === "nimNuptk"
+          ? "UBAH_NUPTK_USER"
+          : "UBAH_USERNAME_USER",
+      `Ubah ${
+        field === "nama" ? "nama" : field === "nimNuptk" ? "NIDN/NUPTK" : "username"
+      } ${target.username}: "${
+        field === "nama"
+          ? target.nama
+          : field === "nimNuptk"
+            ? target.nimNuptk
+            : target.username
       }" -> "${val}"`
     );
 
