@@ -203,6 +203,15 @@ export default function AuditorClient({
   const [minimizedRtlIds, setMinimizedRtlIds] = useState<Record<string, boolean>>({});
   const [isPending, startTransition] = useTransition();
 
+  // Otomatis sembunyikan notifikasi pojok kanan bawah setelah 3.5 detik
+  useEffect(() => {
+    if (!notice?.ok && !notice?.err) return;
+    const timer = setTimeout(() => {
+      setNotice(null);
+    }, 3500);
+    return () => clearTimeout(timer);
+  }, [notice]);
+
   const toggleStandar = (standar: string) => {
     setExpandedStandars((prev) => {
       const next = { ...prev };
@@ -947,13 +956,29 @@ export default function AuditorClient({
       {(notice?.ok || notice?.err) && (
         <div className="fixed bottom-20 right-5 z-50 flex max-w-md flex-col items-end gap-2">
           {notice?.ok && (
-            <div className="rounded-2xl border-2 border-black bg-[#D9F99D] px-4 py-2.5 text-sm font-black text-black shadow-[4px_4px_0px_#000]">
-              ✓ {notice.ok}
+            <div className="flex items-center gap-3 rounded-2xl border-2 border-black bg-[#D9F99D] px-4 py-2.5 text-sm font-black text-black shadow-[4px_4px_0px_#000]">
+              <span>✓ {notice.ok}</span>
+              <button
+                type="button"
+                onClick={() => setNotice(null)}
+                title="Tutup notifikasi"
+                className="ml-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-black/30 bg-white/70 text-xs font-black text-black hover:bg-white"
+              >
+                ✕
+              </button>
             </div>
           )}
           {notice?.err && (
-            <div className="rounded-2xl border-2 border-black bg-[#FECDD3] px-4 py-2.5 text-sm font-black text-black shadow-[4px_4px_0px_#000]">
-              ⚠️ {notice.err}
+            <div className="flex items-center gap-3 rounded-2xl border-2 border-black bg-[#FECDD3] px-4 py-2.5 text-sm font-black text-black shadow-[4px_4px_0px_#000]">
+              <span>⚠️ {notice.err}</span>
+              <button
+                type="button"
+                onClick={() => setNotice(null)}
+                title="Tutup notifikasi"
+                className="ml-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-black/30 bg-white/70 text-xs font-black text-black hover:bg-white"
+              >
+                ✕
+              </button>
             </div>
           )}
         </div>
