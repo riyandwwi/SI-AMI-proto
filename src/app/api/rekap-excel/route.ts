@@ -159,7 +159,7 @@ export async function GET(req: NextRequest) {
     targetSignPeriode
       ? `
       <div class="sig-wrapper">
-        <div class="sig-date-row">${esc(tanggalCetakDisplay)}</div>
+        <div id="sig-date-row" class="sig-date-row"${isPrint ? ' contenteditable="true" title="Klik untuk langsung ubah tempat &amp; tanggal"' : ""}>${esc(tanggalCetakDisplay)}</div>
         <div class="sig-top-row">
           <!-- KIRI: KETUA AUDITEE -->
           <div class="sig-box">
@@ -227,7 +227,10 @@ export async function GET(req: NextRequest) {
           @page { size: landscape; margin: 12mm; }
           body { font-family: Arial, sans-serif; font-size: 10pt; color: #000; background: #fff; margin: 16px; }
           h2 { margin: 0 0 12px 0; font-size: 14pt; }
-          .toolbar { display: flex; gap: 10px; margin-bottom: 16px; align-items: center; }
+          .toolbar { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; align-items: center; background: #FAF7EE; border: 2px solid #000; padding: 10px 12px; border-radius: 12px; }
+          .date-edit-box { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 260px; }
+          .date-edit-box label { font-weight: bold; font-size: 9.5pt; white-space: nowrap; }
+          .date-edit-box input { flex: 1; min-width: 200px; padding: 7px 10px; border: 2px solid #000; border-radius: 8px; font-size: 10pt; font-weight: bold; background: #fff; color: #000; }
           .btn-print { background: #FF5C38; color: #fff; border: 2px solid #000; padding: 8px 14px; border-radius: 8px; font-weight: bold; cursor: pointer; text-decoration: none; font-size: 10pt; box-shadow: 2px 2px 0 #000; }
           .btn-excel { background: #D9F99D; color: #000; border: 2px solid #000; padding: 8px 14px; border-radius: 8px; font-weight: bold; cursor: pointer; text-decoration: none; font-size: 10pt; box-shadow: 2px 2px 0 #000; }
           table { width: 100%; border-collapse: collapse; font-size: 9pt; }
@@ -235,6 +238,8 @@ export async function GET(req: NextRequest) {
           td { border: 1px solid #000000; padding: 5px; vertical-align: top; word-break: break-word; }
           .sig-wrapper { margin-top: 28px; page-break-inside: avoid; width: 100%; }
           .sig-date-row { text-align: right; padding: 0 50px 10px 50px; font-size: 10pt; font-weight: bold; }
+          .sig-date-row[contenteditable="true"]:hover { background: #FEF9C3; cursor: text; border-radius: 6px; }
+          .sig-date-row[contenteditable="true"]:focus { outline: 2px dashed #2563EB; background: #FEF9C3; border-radius: 6px; }
           .sig-top-row { display: flex; justify-content: space-between; align-items: flex-start; padding: 0 40px; }
           .sig-bottom-center { display: flex; justify-content: center; margin-top: 18px; }
           .sig-box { width: 280px; text-align: center; font-size: 10pt; }
@@ -255,10 +260,46 @@ export async function GET(req: NextRequest) {
         ${
           isPrint
             ? `<div class="toolbar no-print">
+                <div class="date-edit-box">
+                  <label for="input-tgl-cetak">📍 Tempat &amp; Tanggal:</label>
+                  <input id="input-tgl-cetak" type="text" value="${esc(tanggalCetakDisplay)}" placeholder="Contoh: Banyuwangi, 27 November 2026" />
+                </div>
                 <button type="button" class="btn-print" onclick="window.print()">🖨️ Print / Simpan PDF</button>
-                <a class="btn-excel" href="${excelHref}">📥 Download Excel (.xls)</a>
+                <a id="btn-download-excel" class="btn-excel" href="${excelHref}">📥 Download Excel (.xls)</a>
               </div>
-              <script>window.onload = function() { setTimeout(function() { window.print(); }, 350); };</script>`
+              <script>
+                (function() {
+                  var inputEl = document.getElementById("input-tgl-cetak");
+                  var dateRowEl = document.getElementById("sig-date-row");
+                  var excelBtn = document.getElementById("btn-download-excel");
+                  var periodeId = ${JSON.stringify(periodeId ?? "")};
+
+                  function updateExcelHref(val) {
+                    if (!excelBtn) return;
+                    var params = new URLSearchParams();
+                    if (periodeId) params.set("periodeId", periodeId);
+                    if (val && val.trim()) params.set("tgl", val.trim());
+                    var qs = params.toString();
+                    excelBtn.setAttribute("href", "/api/rekap-excel" + (qs ? "?" + qs : ""));
+                  }
+
+                  if (inputEl) {
+                    inputEl.addEventListener("input", function() {
+                      var v = inputEl.value;
+                      if (dateRowEl) dateRowEl.textContent = v;
+                      updateExcelHref(v);
+                    });
+                  }
+
+                  if (dateRowEl) {
+                    dateRowEl.addEventListener("input", function() {
+                      var v = dateRowEl.textContent || "";
+                      if (inputEl) inputEl.value = v;
+                      updateExcelHref(v);
+                    });
+                  }
+                })();
+              </script>`
             : ""
         }
         <h2>REKAPITULASI HASIL AUDIT MUTU INTERNAL (SI-AMI ITBMP)</h2>
