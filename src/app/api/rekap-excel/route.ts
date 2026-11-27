@@ -155,6 +155,17 @@ export async function GET(req: NextRequest) {
       year: "numeric",
     })}`;
 
+  const sigSlotControls = (slot: "auditee" | "auditor" | "lpm", label: string) =>
+    isPrint
+      ? `<div class="sig-actions no-print">
+          <label class="sig-mini-btn">📁 Upload TTD<input type="file" accept="image/*" style="display:none" onchange="uploadSigImage(event, '${slot}')" /></label>
+          <button type="button" class="sig-mini-btn" onclick="openSigPad('${slot}', '${label}')">✍️ Gambar</button>
+          <button type="button" class="sig-mini-btn sig-mini-del" onclick="clearSigSlot('${slot}')" title="Hapus TTD">✕</button>
+        </div>`
+      : "";
+
+  const editableAttr = isPrint ? ' contenteditable="true" title="Klik untuk langsung mengubah teks"' : "";
+
   const signatureHtml =
     targetSignPeriode
       ? `
@@ -165,30 +176,32 @@ export async function GET(req: NextRequest) {
           <div class="sig-box">
             <div class="sig-role">Pihak Terperiksa (Auditee),</div>
             <div class="sig-title">Ketua Auditee ${esc(targetSignPeriode.unit?.nama ?? "")}</div>
-            <div class="sig-img-area">
+            <div id="sig-area-auditee" class="sig-img-area">
               ${
                 targetSignPeriode.ttdAuditee
                   ? `<img src="${targetSignPeriode.ttdAuditee}" alt="TTD Auditee" class="sig-img" />`
                   : ""
               }
             </div>
-            <div class="sig-name">${esc(auditeeNama || "........................................")}</div>
-            <div class="sig-nip">NUPTK: ${esc(auditeeNuptk || "........................")}</div>
+            ${sigSlotControls("auditee", "Ketua Auditee")}
+            <div class="sig-name"${editableAttr}>${esc(auditeeNama || "........................................")}</div>
+            <div class="sig-nip"${editableAttr}>NUPTK: ${esc(auditeeNuptk || "........................")}</div>
           </div>
 
           <!-- KANAN: KETUA AUDITOR -->
           <div class="sig-box">
             <div class="sig-role">Diperiksa &amp; Diverifikasi Oleh,</div>
             <div class="sig-title">Ketua Tim Auditor AMI</div>
-            <div class="sig-img-area">
+            <div id="sig-area-auditor" class="sig-img-area">
               ${
                 targetSignPeriode.ttdAuditor
                   ? `<img src="${targetSignPeriode.ttdAuditor}" alt="TTD Auditor" class="sig-img" />`
                   : ""
               }
             </div>
-            <div class="sig-name">${esc(auditorNama || "........................................")}</div>
-            <div class="sig-nip">NUPTK: ${esc(auditorNuptk || "........................")}</div>
+            ${sigSlotControls("auditor", "Ketua Tim Auditor AMI")}
+            <div class="sig-name"${editableAttr}>${esc(auditorNama || "........................................")}</div>
+            <div class="sig-nip"${editableAttr}>NUPTK: ${esc(auditorNuptk || "........................")}</div>
           </div>
         </div>
 
@@ -197,15 +210,16 @@ export async function GET(req: NextRequest) {
           <div class="sig-box">
             <div class="sig-role">Mengetahui &amp; Mengesahkan,</div>
             <div class="sig-title">Kepala Lembaga Penjaminan Mutu (LPM) ITBMP</div>
-            <div class="sig-img-area">
+            <div id="sig-area-lpm" class="sig-img-area">
               ${
                 targetSignPeriode.ttdLpm
                   ? `<img src="${targetSignPeriode.ttdLpm}" alt="TTD Kepala LPM" class="sig-img" />`
                   : ""
               }
             </div>
-            <div class="sig-name">${esc(lpmNama || "........................................")}</div>
-            <div class="sig-nip">NUPTK: ${esc(lpmNuptk || "........................")}</div>
+            ${sigSlotControls("lpm", "Kepala LPM ITBMP")}
+            <div class="sig-name"${editableAttr}>${esc(lpmNama || "........................................")}</div>
+            <div class="sig-nip"${editableAttr}>NUPTK: ${esc(lpmNuptk || "........................")}</div>
           </div>
         </div>
       </div>
@@ -250,6 +264,19 @@ export async function GET(req: NextRequest) {
           .sig-empty { font-size: 8.5pt; color: #888; font-style: italic; }
           .sig-name { font-weight: bold; text-decoration: underline; }
           .sig-nip { font-size: 9pt; margin-top: 2px; }
+          .sig-name[contenteditable="true"]:hover, .sig-nip[contenteditable="true"]:hover { background: #FEF9C3; cursor: text; border-radius: 4px; }
+          .sig-name[contenteditable="true"]:focus, .sig-nip[contenteditable="true"]:focus { outline: 2px dashed #2563EB; background: #FEF9C3; border-radius: 4px; }
+          .sig-actions { display: flex; justify-content: center; gap: 5px; margin-bottom: 6px; }
+          .sig-mini-btn { display: inline-flex; align-items: center; gap: 3px; background: #fff; color: #000; border: 1.5px solid #000; border-radius: 6px; padding: 3px 7px; font-size: 8pt; font-weight: bold; cursor: pointer; }
+          .sig-mini-btn:hover { background: #FEF08A; }
+          .sig-mini-del { background: #FEE2E2; color: #991B1B; }
+          .sig-mini-del:hover { background: #FCA5A5; }
+          .sig-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.55); display: none; align-items: center; justify-content: center; z-index: 9999; padding: 16px; }
+          .sig-modal-backdrop.open { display: flex; }
+          .sig-modal-card { background: #fff; border: 2px solid #000; border-radius: 14px; box-shadow: 4px 4px 0 #000; width: 100%; max-width: 480px; padding: 16px; }
+          .sig-modal-title { font-weight: bold; font-size: 11pt; margin-bottom: 10px; }
+          .sig-canvas { width: 100%; height: 200px; border: 2px dashed #64748B; border-radius: 10px; background: #FAFAFA; touch-action: none; cursor: crosshair; display: block; }
+          .sig-modal-btns { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
           @media print {
             .no-print { display: none !important; }
             body { margin: 0; }
@@ -266,40 +293,7 @@ export async function GET(req: NextRequest) {
                 </div>
                 <button type="button" class="btn-print" onclick="window.print()">🖨️ Print / Simpan PDF</button>
                 <a id="btn-download-excel" class="btn-excel" href="${excelHref}">📥 Download Excel (.xls)</a>
-              </div>
-              <script>
-                (function() {
-                  var inputEl = document.getElementById("input-tgl-cetak");
-                  var dateRowEl = document.getElementById("sig-date-row");
-                  var excelBtn = document.getElementById("btn-download-excel");
-                  var periodeId = ${JSON.stringify(periodeId ?? "")};
-
-                  function updateExcelHref(val) {
-                    if (!excelBtn) return;
-                    var params = new URLSearchParams();
-                    if (periodeId) params.set("periodeId", periodeId);
-                    if (val && val.trim()) params.set("tgl", val.trim());
-                    var qs = params.toString();
-                    excelBtn.setAttribute("href", "/api/rekap-excel" + (qs ? "?" + qs : ""));
-                  }
-
-                  if (inputEl) {
-                    inputEl.addEventListener("input", function() {
-                      var v = inputEl.value;
-                      if (dateRowEl) dateRowEl.textContent = v;
-                      updateExcelHref(v);
-                    });
-                  }
-
-                  if (dateRowEl) {
-                    dateRowEl.addEventListener("input", function() {
-                      var v = dateRowEl.textContent || "";
-                      if (inputEl) inputEl.value = v;
-                      updateExcelHref(v);
-                    });
-                  }
-                })();
-              </script>`
+              </div>`
             : ""
         }
         <h2>REKAPITULASI HASIL AUDIT MUTU INTERNAL (SI-AMI ITBMP)</h2>
@@ -338,6 +332,155 @@ export async function GET(req: NextRequest) {
           </tbody>
         </table>
         ${signatureHtml}
+        ${
+          isPrint
+            ? `
+        <div id="sig-modal" class="sig-modal-backdrop no-print" onclick="if(event.target===this) closeSigPad()">
+          <div class="sig-modal-card">
+            <div id="sig-modal-title" class="sig-modal-title">✍️ Gambar Tanda Tangan</div>
+            <canvas id="sig-canvas" class="sig-canvas" width="440" height="200"></canvas>
+            <div class="sig-modal-btns">
+              <button type="button" class="sig-mini-btn" onclick="clearSigCanvas()">🧹 Bersihkan</button>
+              <button type="button" class="sig-mini-btn" onclick="closeSigPad()">Batal</button>
+              <button type="button" class="btn-print" style="padding:5px 12px;font-size:9pt;" onclick="applySigCanvas()">✅ Pasang TTD</button>
+            </div>
+          </div>
+        </div>
+        <script>
+          (function() {
+            var inputEl = document.getElementById("input-tgl-cetak");
+            var dateRowEl = document.getElementById("sig-date-row");
+            var excelBtn = document.getElementById("btn-download-excel");
+            var periodeId = ${JSON.stringify(periodeId ?? "")};
+
+            function updateExcelHref(val) {
+              if (!excelBtn) return;
+              var params = new URLSearchParams();
+              if (periodeId) params.set("periodeId", periodeId);
+              if (val && val.trim()) params.set("tgl", val.trim());
+              var qs = params.toString();
+              excelBtn.setAttribute("href", "/api/rekap-excel" + (qs ? "?" + qs : ""));
+            }
+
+            if (inputEl) {
+              inputEl.addEventListener("input", function() {
+                var v = inputEl.value;
+                if (dateRowEl) dateRowEl.textContent = v;
+                updateExcelHref(v);
+              });
+            }
+
+            if (dateRowEl) {
+              dateRowEl.addEventListener("input", function() {
+                var v = dateRowEl.textContent || "";
+                if (inputEl) inputEl.value = v;
+                updateExcelHref(v);
+              });
+            }
+
+            // === Upload & Gambar Tanda Tangan Langsung di Halaman Cetak ===
+            var activeSlot = null;
+            var modal = document.getElementById("sig-modal");
+            var modalTitle = document.getElementById("sig-modal-title");
+            var canvas = document.getElementById("sig-canvas");
+            var ctx = canvas ? canvas.getContext("2d") : null;
+            var drawing = false;
+            var hasStroke = false;
+
+            function setSlotImage(slot, dataUrl) {
+              var area = document.getElementById("sig-area-" + slot);
+              if (!area) return;
+              area.innerHTML = dataUrl ? '<img src="' + dataUrl + '" alt="TTD" class="sig-img" />' : "";
+            }
+
+            window.uploadSigImage = function(ev, slot) {
+              var file = ev.target && ev.target.files ? ev.target.files[0] : null;
+              if (!file) return;
+              var reader = new FileReader();
+              reader.onload = function(e) {
+                if (e.target && typeof e.target.result === "string") {
+                  setSlotImage(slot, e.target.result);
+                }
+              };
+              reader.readAsDataURL(file);
+              ev.target.value = "";
+            };
+
+            window.clearSigSlot = function(slot) {
+              setSlotImage(slot, "");
+            };
+
+            window.clearSigCanvas = function() {
+              if (!ctx || !canvas) return;
+              ctx.clearRect(0, 0, canvas.width, canvas.height);
+              hasStroke = false;
+            };
+
+            window.openSigPad = function(slot, label) {
+              activeSlot = slot;
+              if (modalTitle) modalTitle.textContent = "✍️ Gambar Tanda Tangan — " + label;
+              window.clearSigCanvas();
+              if (modal) modal.classList.add("open");
+            };
+
+            window.closeSigPad = function() {
+              if (modal) modal.classList.remove("open");
+              activeSlot = null;
+            };
+
+            window.applySigCanvas = function() {
+              if (!activeSlot || !canvas) return;
+              if (hasStroke) {
+                setSlotImage(activeSlot, canvas.toDataURL("image/png"));
+              }
+              window.closeSigPad();
+            };
+
+            if (canvas && ctx) {
+              ctx.lineWidth = 2.6;
+              ctx.lineCap = "round";
+              ctx.lineJoin = "round";
+              ctx.strokeStyle = "#0F172A";
+
+              function getPos(e) {
+                var rect = canvas.getBoundingClientRect();
+                var scaleX = canvas.width / rect.width;
+                var scaleY = canvas.height / rect.height;
+                return {
+                  x: (e.clientX - rect.left) * scaleX,
+                  y: (e.clientY - rect.top) * scaleY
+                };
+              }
+
+              canvas.addEventListener("pointerdown", function(e) {
+                drawing = true;
+                hasStroke = true;
+                canvas.setPointerCapture(e.pointerId);
+                var p = getPos(e);
+                ctx.beginPath();
+                ctx.moveTo(p.x, p.y);
+              });
+
+              canvas.addEventListener("pointermove", function(e) {
+                if (!drawing) return;
+                var p = getPos(e);
+                ctx.lineTo(p.x, p.y);
+                ctx.stroke();
+              });
+
+              canvas.addEventListener("pointerup", function() {
+                drawing = false;
+              });
+
+              canvas.addEventListener("pointercancel", function() {
+                drawing = false;
+              });
+            }
+          })();
+        </script>
+        `
+            : ""
+        }
       </body>
     </html>
   `;
